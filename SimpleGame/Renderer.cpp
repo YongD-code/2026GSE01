@@ -1,196 +1,182 @@
 #include "stdafx.h"
 #include "Renderer.h"
+#include "Dependencies/freeglut.h"
+#include <cmath>
+#include <cstddef>
+#include <iostream>
+#include <utility>
+#include <windows.h>
 
-Renderer::Renderer(int windowSizeX, int windowSizeY)
-{
-	Initialize(windowSizeX, windowSizeY);
+#pragma comment(lib, "gdi32.lib")
+
+namespace {
+GLuint Shader(GLenum kind, const char* source) {
+    GLuint shader = glCreateShader(kind);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+    GLint ok = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+    if (!ok) {
+        char log[2048] = {};
+        glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+        std::cerr << log << std::endl;
+        glDeleteShader(shader);
+        return 0;
+    }
+    return shader;
 }
-
-
-Renderer::~Renderer()
-{
 }
-
-void Renderer::Initialize(int windowSizeX, int windowSizeY)
-{
-	//Set window size
-	m_WindowSizeX = windowSizeX;
-	m_WindowSizeY = windowSizeY;
-
-	//Load shaders
-	m_SolidRectShader = CompileShaders("./Shaders/SolidRect.vs", "./Shaders/SolidRect.fs");
-	
-	//Create VBOs
-	CreateVertexBufferObjects();
-
-	if (m_SolidRectShader > 0 && m_VBORect > 0)
-	{
-		m_Initialized = true;
-	}
+Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height) {
+    // Embedded shaders make startup independent of the working directory.
+    const char* vs = "#version 330\nlayout(location=0) in vec2 position;\n"
+        "layout(location=1) in vec4 color; out vec4 tint; uniform vec2 viewport;\n"
+        "void main(){ gl_Position=vec4(position.x/viewport.x*2.-1.,"
+        "1.-position.y/viewport.y*2.,0.,1.); tint=color; }";
+    const char* fs = "#version 330\nin vec4 tint; out vec4 outputColor;\n"
+        "void main(){ outputColor=tint; }";
+    GLuint vertex = Shader(GL_VERTEX_SHADER, vs), fragment = Shader(GL_FRAGMENT_SHADER, fs);
+    if (!vertex || !fragment) {
+        if (vertex) glDeleteShader(vertex);
+        if (fragment) glDeleteShader(fragment);
+        return;
+    }
+    m_Program = glCreateProgram();
+    glAttachShader(m_Program, vertex); glAttachShader(m_Program, fragment);
+    glLinkProgram(m_Program);
+    glDeleteShader(vertex); glDeleteShader(fragment);
+    GLint ok = 0; glGetProgramiv(m_Program, GL_LINK_STATUS, &ok);
+    if (!ok) {
+        char log[2048] = {};
+        glGetProgramInfoLog(m_Program, sizeof(log), nullptr, log);
+        std::cerr << log << std::endl;
+        return;
+    }
+    m_Viewport = glGetUniformLocation(m_Program, "viewport");
+    glGenVertexArrays(1, &m_Array); glBindVertexArray(m_Array);
+    glGenBuffers(1, &m_Buffer); glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
+    glEnableVertexAttribArray(0); glEnableVertexAttribArray(1);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+        reinterpret_cast<void*>(offsetof(Vertex, r)));
+    glBindVertexArray(0);
+    m_Vertices.reserve(40000);
+    m_Initialized = true;
+    Resize(width, height);
 }
-
-bool Renderer::IsInitialized()
-{
-	return m_Initialized;
+Renderer::~Renderer() {
+    if (m_Buffer) glDeleteBuffers(1, &m_Buffer);
+    if (m_Array) glDeleteVertexArrays(1, &m_Array);
+    if (m_Program) glDeleteProgram(m_Program);
 }
-
-void Renderer::CreateVertexBufferObjects()
-{
-	float rect[]
-		=
-	{
-		-1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f, -1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, 1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, //Triangle1
-		-1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f,  1.f / m_WindowSizeX, 1.f / m_WindowSizeY, 0.f, 1.f / m_WindowSizeX, -1.f / m_WindowSizeY, 0.f, //Triangle2
-	};
-
-	glGenBuffers(1, &m_VBORect);
-	glBindBuffer(GL_ARRAY_BUFFER, m_VBORect);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(rect), rect, GL_STATIC_DRAW);
+void Renderer::Resize(int width, int height) {
+    m_Width = width > 0 ? width : 1; m_Height = height > 0 ? height : 1;
+    glViewport(0, 0, m_Width, m_Height);
 }
-
-void Renderer::AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum ShaderType)
-{
-	//쉐이더 오브젝트 생성
-	GLuint ShaderObj = glCreateShader(ShaderType);
-
-	if (ShaderObj == 0) {
-		fprintf(stderr, "Error creating shader type %d\n", ShaderType);
-	}
-
-	const GLchar* p[1];
-	p[0] = pShaderText;
-	GLint Lengths[1];
-
-	size_t slen = strlen(pShaderText);
-	if (slen > INT_MAX) {
-		// Handle error
-	}
-	GLint len = (GLint)slen;
-
-	Lengths[0] = len;
-	//쉐이더 코드를 쉐이더 오브젝트에 할당
-	glShaderSource(ShaderObj, 1, p, Lengths);
-
-	//할당된 쉐이더 코드를 컴파일
-	glCompileShader(ShaderObj);
-
-	GLint success;
-	// ShaderObj 가 성공적으로 컴파일 되었는지 확인
-	glGetShaderiv(ShaderObj, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		GLchar InfoLog[1024];
-
-		//OpenGL 의 shader log 데이터를 가져옴
-		glGetShaderInfoLog(ShaderObj, 1024, NULL, InfoLog);
-		fprintf(stderr, "Error compiling shader type %d: '%s'\n", ShaderType, InfoLog);
-		printf("%s \n", pShaderText);
-	}
-
-	// ShaderProgram 에 attach!!
-	glAttachShader(ShaderProgram, ShaderObj);
+void Renderer::Begin(Color c) {
+    m_Vertices.clear();
+    glClearColor(c.r, c.g, c.b, c.a);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
-
-bool Renderer::ReadFile(char* filename, std::string *target)
-{
-	std::ifstream file(filename);
-	if (file.fail())
-	{
-		std::cout << filename << " file loading failed.. \n";
-		file.close();
-		return false;
-	}
-	std::string line;
-	while (getline(file, line)) {
-		target->append(line.c_str());
-		target->append("\n");
-	}
-	return true;
+void Renderer::Flush() {
+    if (m_Vertices.empty() || !m_Initialized) return;
+    glUseProgram(m_Program); glUniform2f(m_Viewport, float(m_Width), float(m_Height));
+    glBindVertexArray(m_Array); glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
+    glBufferData(GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_Vertices.size()));
+    glBindVertexArray(0); glUseProgram(0); m_Vertices.clear();
 }
-
-GLuint Renderer::CompileShaders(char* filenameVS, char* filenameFS)
-{
-	GLuint ShaderProgram = glCreateProgram(); //빈 쉐이더 프로그램 생성
-
-	if (ShaderProgram == 0) { //쉐이더 프로그램이 만들어졌는지 확인
-		fprintf(stderr, "Error creating shader program\n");
-	}
-
-	std::string vs, fs;
-
-	//shader.vs 가 vs 안으로 로딩됨
-	if (!ReadFile(filenameVS, &vs)) {
-		printf("Error compiling vertex shader\n");
-		return -1;
-	};
-
-	//shader.fs 가 fs 안으로 로딩됨
-	if (!ReadFile(filenameFS, &fs)) {
-		printf("Error compiling fragment shader\n");
-		return -1;
-	};
-
-	// ShaderProgram 에 vs.c_str() 버텍스 쉐이더를 컴파일한 결과를 attach함
-	AddShader(ShaderProgram, vs.c_str(), GL_VERTEX_SHADER);
-
-	// ShaderProgram 에 fs.c_str() 프레그먼트 쉐이더를 컴파일한 결과를 attach함
-	AddShader(ShaderProgram, fs.c_str(), GL_FRAGMENT_SHADER);
-
-	GLint Success = 0;
-	GLchar ErrorLog[1024] = { 0 };
-
-	//Attach 완료된 shaderProgram 을 링킹함
-	glLinkProgram(ShaderProgram);
-
-	//링크가 성공했는지 확인
-	glGetProgramiv(ShaderProgram, GL_LINK_STATUS, &Success);
-
-	if (Success == 0) {
-		// shader program 로그를 받아옴
-		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error linking shader program\n" << ErrorLog;
-		return -1;
-	}
-
-	glValidateProgram(ShaderProgram);
-	glGetProgramiv(ShaderProgram, GL_VALIDATE_STATUS, &Success);
-	if (!Success) {
-		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error validating shader program\n" << ErrorLog;
-		return -1;
-	}
-
-	glUseProgram(ShaderProgram);
-	std::cout << filenameVS << ", " << filenameFS << " Shader compiling is done.";
-
-	return ShaderProgram;
+void Renderer::Triangle(Point a, Point b, Point c, Color col) {
+    m_Vertices.push_back({a.x,a.y,col.r,col.g,col.b,col.a});
+    m_Vertices.push_back({b.x,b.y,col.r,col.g,col.b,col.a});
+    m_Vertices.push_back({c.x,c.y,col.r,col.g,col.b,col.a});
 }
-
-void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a)
-{
-	float newX, newY;
-
-	GetGLPosition(x, y, &newX, &newY);
-
-	//Program select
-	glUseProgram(m_SolidRectShader);
-
-	glUniform4f(glGetUniformLocation(m_SolidRectShader, "u_Trans"), newX, newY, 0, size);
-	glUniform4f(glGetUniformLocation(m_SolidRectShader, "u_Color"), r, g, b, a);
-
-	int attribPosition = glGetAttribLocation(m_SolidRectShader, "a_Position");
-	glEnableVertexAttribArray(attribPosition);
-	glBindBuffer(GL_ARRAY_BUFFER, m_VBORect);
-	glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
-
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-
-	glDisableVertexAttribArray(attribPosition);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+void Renderer::Quad(Point a, Point b, Point c, Point d, Color col) {
+    Triangle(a,b,c,col); Triangle(a,c,d,col);
 }
-
-void Renderer::GetGLPosition(float x, float y, float *newX, float *newY)
-{
-	*newX = x * 2.f / m_WindowSizeX;
-	*newY = y * 2.f / m_WindowSizeY;
+void Renderer::Rect(float x, float y, float w, float h, Color c) {
+    Quad({x,y},{x+w,y},{x+w,y+h},{x,y+h},c);
+}
+void Renderer::Ellipse(float x, float y, float rx, float ry, Color c) {
+    const int segments = 24;
+    for (int i=0; i<segments; ++i) {
+        float a = i*6.2831853f/segments, b = (i+1)*6.2831853f/segments;
+        Triangle({x,y},{x+std::cos(a)*rx,y+std::sin(a)*ry},
+            {x+std::cos(b)*rx,y+std::sin(b)*ry},c);
+    }
+}
+void Renderer::Line(Point a, Point b, float w, Color c) {
+    float dx=b.x-a.x, dy=b.y-a.y, length=std::sqrt(dx*dx+dy*dy);
+    if (length < .001f) return;
+    float nx=-dy/length*w*.5f, ny=dx/length*w*.5f;
+    Quad({a.x+nx,a.y+ny},{b.x+nx,b.y+ny},{b.x-nx,b.y-ny},{a.x-nx,a.y-ny},c);
+}
+void Renderer::Text(float x, float y, const std::string& text, Color c, bool large) {
+    if (text.empty()) return;
+    const std::string key = (large ? "large:" : "normal:") + text;
+    auto found = m_TextCache.find(key);
+    if (found == m_TextCache.end()) {
+        // Decode UTF-8 explicitly, independent of the Windows system code page.
+        int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.c_str(),
+            static_cast<int>(text.size()), nullptr, 0);
+        if (count <= 0) return;
+        std::wstring wide(count, L'\0');
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.c_str(),
+            static_cast<int>(text.size()), &wide[0], count);
+        HDC dc = CreateCompatibleDC(nullptr);
+        if (!dc) return;
+        HFONT font = CreateFontW(large ? -20 : -15, 0, 0, 0, large ? FW_BOLD : FW_NORMAL,
+            FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Malgun Gothic");
+        if (!font) { DeleteDC(dc); return; }
+        HGDIOBJ oldFont = SelectObject(dc, font);
+        SIZE size = {}; TEXTMETRICW metrics = {};
+        if (!GetTextExtentPoint32W(dc, wide.c_str(), count, &size) || !GetTextMetricsW(dc, &metrics)) {
+            SelectObject(dc, oldFont); DeleteObject(font); DeleteDC(dc); return;
+        }
+        TextBitmap bitmap;
+        bitmap.width = size.cx + 2; bitmap.height = metrics.tmHeight;
+        bitmap.descent = metrics.tmDescent;
+        BITMAPINFO info = {};
+        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = bitmap.width;
+        // Positive height gives bottom-up pixels, matching OpenGL's raster order.
+        info.bmiHeader.biHeight = bitmap.height;
+        info.bmiHeader.biPlanes = 1; info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        void* bits = nullptr;
+        HBITMAP dib = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+        if (!dib) { SelectObject(dc, oldFont); DeleteObject(font); DeleteDC(dc); return; }
+        HGDIOBJ oldBitmap = SelectObject(dc, dib);
+        PatBlt(dc, 0, 0, bitmap.width, bitmap.height, BLACKNESS);
+        SetBkMode(dc, TRANSPARENT); SetTextColor(dc, RGB(255,255,255));
+        BOOL drawn = TextOutW(dc, 0, 0, wide.c_str(), count);
+        GdiFlush();
+        const unsigned char* source = static_cast<const unsigned char*>(bits);
+        bitmap.pixels.resize(static_cast<size_t>(bitmap.width) * bitmap.height * 4);
+        for (size_t i = 0; i < bitmap.pixels.size(); i += 4) {
+            bitmap.pixels[i] = bitmap.pixels[i+1] = bitmap.pixels[i+2] = 255;
+            bitmap.pixels[i+3] = source[i];
+        }
+        SelectObject(dc, oldBitmap); SelectObject(dc, oldFont);
+        DeleteObject(dib); DeleteObject(font); DeleteDC(dc);
+        if (!drawn) return;
+        // Bound memory use when future dialogue introduces many unique lines.
+        if (m_TextCache.size() >= 128) m_TextCache.clear();
+        found = m_TextCache.emplace(key, std::move(bitmap)).first;
+    }
+    Flush();
+    const TextBitmap& bitmap = found->second;
+    glUseProgram(0);
+    glWindowPos2i(static_cast<int>(x), m_Height-static_cast<int>(y)-bitmap.descent);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glPixelTransferf(GL_RED_SCALE, c.r); glPixelTransferf(GL_GREEN_SCALE, c.g);
+    glPixelTransferf(GL_BLUE_SCALE, c.b); glPixelTransferf(GL_ALPHA_SCALE, c.a);
+    glDrawPixels(bitmap.width, bitmap.height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.pixels.data());
+    glPixelTransferf(GL_RED_SCALE, 1); glPixelTransferf(GL_GREEN_SCALE, 1);
+    glPixelTransferf(GL_BLUE_SCALE, 1); glPixelTransferf(GL_ALPHA_SCALE, 1);
+}
+void Renderer::DrawSolidRect(float x, float y, float, float size, float r, float g, float b, float a) {
+    Rect(m_Width*.5f+x-size*.5f,m_Height*.5f-y-size*.5f,size,size,Color(r,g,b,a));
 }
