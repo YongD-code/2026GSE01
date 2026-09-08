@@ -39,9 +39,6 @@ class Prototype {
         r.Quad(b,Screen(x+w,y),Screen(x+w,y+d),c,right);
         r.Quad(a,b,c,e,top);
     }
-    void Glow(Point p,float size,Color c) {
-        for (int i=6;i>=1;--i) r.Ellipse(p.x,p.y,size*i/6,size*i/12,Color(c.r,c.g,c.b,.025f));
-    }
     void Say(const std::string& name,const std::string& text) {
         speaker=name; message=text; messageTime=8;
     }
@@ -105,8 +102,6 @@ class Prototype {
             Screen(o.x+o.w*.65f,front,48),Screen(o.x+o.w*.42f,front,48),Color(.07f,.09f,.10f));
         r.Quad(Screen(o.x+18,front,38),Screen(o.x+40,front,38),
             Screen(o.x+40,front,62),Screen(o.x+18,front,62),Color(2.2f,1.25f,.45f));
-        Point window=Screen(o.x+29,front,49);
-        Glow(window,48,Color(1,.55f,.2f));
         Box(o.x+o.w*.7f,o.y+18,18,20,o.h+70,Color(.32f,.32f,.29f),Color(.23f,.23f,.23f),Color(.16f,.17f,.18f));
     }
     void Tree(const Object& o) {
@@ -142,7 +137,6 @@ class Prototype {
         Point p=Screen(spirit.x,spirit.y);
         float bob=std::sin(time*2.6f)*5;
         r.Ellipse(p.x,p.y,19,7,Color(.12f,.61f,.66f,.17f));
-        Glow({p.x,p.y-23+bob},65,Color(.22f,.85f,.82f));
         r.Triangle({p.x-12,p.y-23+bob},{p.x+12,p.y-23+bob},{p.x-4,p.y+1+bob},Color(.25f,.66f,.70f,.6f));
         r.Ellipse(p.x,p.y-29+bob,14,17,Color(.31f,.74f,.77f,.8f));
         r.Ellipse(p.x-2,p.y-31+bob,8,11,Color(.85f,1.8f,1.55f,.85f));
@@ -155,7 +149,6 @@ class Prototype {
     }
     void Hearth() {
         Point p=Screen(0,0);
-        Glow(p,130,Color(1,.53f,.18f));
         r.Ellipse(p.x,p.y,28,13,Color(.29f,.28f,.26f));
         r.Ellipse(p.x,p.y,22,9,Color(.09f,.10f,.11f));
         r.Line({p.x-15,p.y+3},{p.x+12,p.y-5},6,Color(.36f,.23f,.16f));
@@ -187,7 +180,7 @@ class Prototype {
         r.Text(float(width-267),93,captured?"체험 포획: 사용 완료":"체험 포획: 1회 가능",muted);
         r.Text(float(width-267),115,toySword?"간직한 물건: 나무칼":"불가의 아이를 찾아보세요.",muted);
         Panel(24,float(height-55),float(width-48),32);
-        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    P  화면 효과    ESC  닫기",ivory);
+        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    P  화면 효과    B  블룸    ESC  닫기",ivory);
         WorldPoint location=controlling?spirit:player;
         std::ostringstream positionText;
         positionText<<"지역 좌표 "<<World::Index(location.x)<<", "<<World::Index(location.y)<<" · 주변 구역 "<<world.chunks.size();
@@ -237,6 +230,7 @@ public:
         if(!fresh) return;
         if(key==27) { if(journal) journal=false; else messageTime=0; }
         if(key=='p') { r.postProcess.enabled=!r.postProcess.enabled; Say("화면 효과",r.postProcess.enabled?"후처리를 켰습니다.":"후처리를 껐습니다."); }
+        if(key=='b') { r.postProcess.bloomEnabled=!r.postProcess.bloomEnabled; Say("빛 번짐",r.postProcess.bloomEnabled?"블룸을 켰습니다. 후처리도 켜져 있어야 적용됩니다.":"블룸을 껐습니다."); }
         if(key=='j') journal=!journal;
         if(journal) return;
         if(key=='e') Interact();
@@ -339,6 +333,7 @@ public:
         HUD();r.Flush();
     }
 };
+
 
 
 

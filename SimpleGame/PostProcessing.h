@@ -5,7 +5,9 @@
 struct PostProcessSettings {
     bool enabled = true;
     float exposure = 1.15f;
-    float bloomStrength = .35f;
+    bool bloomEnabled = true;
+    float bloomStrength = .45f;
+    float bloomRadius = 3.f;
     float bloomThreshold = 1.f;
     float vignetteStrength = .38f;
     float edgeBlurStrength = .65f;
@@ -14,7 +16,7 @@ struct PostProcessSettings {
 // Linear HDR scene -> half-resolution blur/bloom -> tone mapping -> display-space UI.
 class PostProcessing {
     GLuint filter=0, composite=0, vao=0;
-    GLuint textures[5]={}, framebuffers[5]={};
+    GLuint textures[7]={}, framebuffers[7]={};
     int width=0,height=0,halfWidth=0,halfHeight=0;
     bool ready=false;
     static GLuint Program(const char* fragment) {
@@ -52,17 +54,17 @@ void main() {
         return program;
     }
     void ReleaseTargets() {
-        glDeleteTextures(5,textures);glDeleteFramebuffers(5,framebuffers);
-        for(int i=0;i<5;++i) {textures[i]=0;framebuffers[i]=0;}
+        glDeleteTextures(7,textures);glDeleteFramebuffers(7,framebuffers);
+        for(int i=0;i<7;++i) {textures[i]=0;framebuffers[i]=0;}
         ready=false;
     }
-    void Pass(int source,int destination,bool horizontal,bool extract,float threshold) {
+    void Pass(int source,int destination,bool horizontal,bool extract,float threshold,float radius=1.f) {
         glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[destination]);
         glViewport(0,0,halfWidth,halfHeight);
         glUseProgram(filter);
         glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,textures[source]);
         glUniform1i(glGetUniformLocation(filter,"sourceImage"),0);
-        glUniform2f(glGetUniformLocation(filter,"direction"),horizontal?1.f:0.f,horizontal?0.f:1.f);
+        glUniform2f(glGetUniformLocation(filter,"direction"),horizontal?radius:0.f,horizontal?0.f:radius);
         glUniform1i(glGetUniformLocation(filter,"extractBright"),extract?1:0);
         glUniform1f(glGetUniformLocation(filter,"threshold"),threshold);
         glDrawArrays(GL_TRIANGLES,0,3);
@@ -96,7 +98,7 @@ void main() {
 )GLSL");
         composite=Program(R"GLSL(#version 330
 in vec2 uv; out vec4 result;
-uniform sampler2D sceneImage,blurImage,bloomImage;
+uniform sampler2D sceneImage,blurImage,bloomImage,broadBloomImage;
 uniform float exposure,bloomStrength,vignetteStrength,edgeBlurStrength;
 vec3 toneMap(vec3 c) {
     return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.0,1.0);
@@ -107,7 +109,9 @@ void main() {
     float edge=smoothstep(.45,1.25,radius);
     vec3 color=mix(texture(sceneImage,uv).rgb,texture(blurImage,uv).rgb,
                    clamp(edge*edgeBlurStrength,0.0,1.0));
-    color+=texture(bloomImage,uv).rgb*bloomStrength;
+    // Retain a tight halo while adding a softer, wider scattering component.
+    vec3 bloom=texture(bloomImage,uv).rgb*.4+texture(broadBloomImage,uv).rgb*.6;
+    color+=bloom*bloomStrength;
     color*=1.0-clamp(vignetteStrength,0.0,.9)*smoothstep(.35,1.35,radius);
     color=toneMap(color*max(exposure,.01));
     result=vec4(pow(color,vec3(1.0/2.2)),1.0);
@@ -126,9 +130,9 @@ void main() {
         ReleaseTargets();width=w;height=h;
         halfWidth=w/2>0?w/2:1;halfHeight=h/2>0?h/2:1;
         if(!filter||!composite||!vao) return;
-        glGenTextures(5,textures);glGenFramebuffers(5,framebuffers);
+        glGenTextures(7,textures);glGenFramebuffers(7,framebuffers);
         ready=true;
-        for(int i=0;i<5;++i) {
+        for(int i=0;i<7;++i) {
             glBindTexture(GL_TEXTURE_2D,textures[i]);
             glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA16F,i==0?w:halfWidth,i==0?h:halfHeight,
                          0,GL_RGBA,GL_FLOAT,nullptr);
@@ -159,26 +163,39 @@ void main() {
         glBindVertexArray(vao);
         Pass(0,1,true,false,settings.bloomThreshold);
         Pass(1,2,false,false,settings.bloomThreshold);
-        Pass(0,3,true,true,settings.bloomThreshold);
-        Pass(3,4,false,false,settings.bloomThreshold);
-        // A second bloom pass spreads the small emissive shapes beyond their edges.
-        Pass(4,3,true,false,settings.bloomThreshold);
-        Pass(3,4,false,false,settings.bloomThreshold);
+        if(settings.bloomEnabled) {
+            Pass(0,3,true,true,settings.bloomThreshold);
+            Pass(3,4,false,false,settings.bloomThreshold);
+            Pass(4,3,true,false,settings.bloomThreshold);
+            Pass(3,4,false,false,settings.bloomThreshold);
+            // Keep texture 4 intact as the tight halo; 5/6 hold the broad halo.
+            const float radius=settings.bloomRadius>0.f?settings.bloomRadius:1.f;
+            Pass(4,5,true,false,settings.bloomThreshold,radius);
+            Pass(5,6,false,false,settings.bloomThreshold,radius);
+            Pass(6,5,true,false,settings.bloomThreshold,radius);
+            Pass(5,6,false,false,settings.bloomThreshold,radius);
+        } else {
+            // Avoid sampling uninitialized or stale bloom when toggled off.
+            glClearColor(0,0,0,0);
+            glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[4]);glClear(GL_COLOR_BUFFER_BIT);
+            glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[6]);glClear(GL_COLOR_BUFFER_BIT);
+        }
         glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,width,height);
         glUseProgram(composite);
-        const int indices[3]={0,2,4};
-        const char* names[3]={"sceneImage","blurImage","bloomImage"};
-        for(int i=0;i<3;++i) {
+        const int indices[4]={0,2,4,6};
+        const char* names[4]={"sceneImage","blurImage","bloomImage","broadBloomImage"};
+        for(int i=0;i<4;++i) {
             glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,textures[indices[i]]);
             glUniform1i(glGetUniformLocation(composite,names[i]),i);
         }
         glUniform1f(glGetUniformLocation(composite,"exposure"),settings.exposure);
-        glUniform1f(glGetUniformLocation(composite,"bloomStrength"),settings.bloomStrength);
+        glUniform1f(glGetUniformLocation(composite,"bloomStrength"),settings.bloomEnabled?settings.bloomStrength:0.f);
         glUniform1f(glGetUniformLocation(composite,"vignetteStrength"),settings.vignetteStrength);
         glUniform1f(glGetUniformLocation(composite,"edgeBlurStrength"),settings.edgeBlurStrength);
         glDrawArrays(GL_TRIANGLES,0,3);
-        for(int i=2;i>=0;--i) {glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,0);}
+        for(int i=3;i>=0;--i) {glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,0);}
         glBindVertexArray(0);glUseProgram(0);
         glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     }
 };
+
