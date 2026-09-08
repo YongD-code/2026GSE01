@@ -1,36 +1,39 @@
 #pragma once
 #include "Renderer.h"
+#include "World.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
 #include <sstream>
 
-// A small, authored vertical slice. World coordinates are independent of rendering.
+// Authored starting village surrounded by deterministic streamed chunks.
 class Prototype {
-    struct Object { int kind; float x,y,w,d,h; }; // house, tree, ruin
+    using Object=WorldObject;
+    World world;
+    std::vector<Object> villageObjects;
     Renderer& r;
     int width=1280, height=800;
     bool keys[256] = {};
     bool arrows[4] = {};
     std::vector<Object> objects;
-    Point player={70,160}, spirit={300,160}, camera={70,160};
-    const Point child={-100,90}, keeper={150,-100}, fire={0,0};
+    WorldPoint player={70,160}, spirit={300,160}, camera={70,160};
+    const WorldPoint child={-100,90}, keeper={150,-100}, fire={0,0};
     float time=0, walk=0, messageTime=0;
     bool moving=false, captured=false, controlling=false, journal=false, toySword=false;
     int childTalk=0;
     std::string speaker, message;
-    static float Distance(Point a, Point b) {
-        float x=a.x-b.x,y=a.y-b.y; return std::sqrt(x*x+y*y);
+    static double Distance(WorldPoint a, WorldPoint b) {
+        double x=a.x-b.x,y=a.y-b.y; return std::sqrt(x*x+y*y);
     }
-    Point Screen(float x,float y,float z=0) const {
+    Point Screen(double x,double y,double z=0) const {
         x-=camera.x; y-=camera.y;
-        return {width*.5f+(x-y)*.85f,height*.51f+(x+y)*.43f-z};
+        return {static_cast<float>(width*.5+(x-y)*.85),static_cast<float>(height*.51+(x+y)*.43-z)};
     }
-    void Ground(float x,float y,float w,float d,Color c) {
+    void Ground(double x,double y,double w,double d,Color c) {
         r.Quad(Screen(x,y),Screen(x+w,y),Screen(x+w,y+d),Screen(x,y+d),c);
     }
-    void Box(float x,float y,float w,float d,float h,Color top,Color left,Color right) {
+    void Box(double x,double y,double w,double d,double h,Color top,Color left,Color right) {
         Point a=Screen(x,y,h),b=Screen(x+w,y,h),c=Screen(x+w,y+d,h),e=Screen(x,y+d,h);
         r.Quad(e,c,Screen(x+w,y+d),Screen(x,y+d),left);
         r.Quad(b,Screen(x+w,y),Screen(x+w,y+d),c,right);
@@ -42,20 +45,20 @@ class Prototype {
     void Say(const std::string& name,const std::string& text) {
         speaker=name; message=text; messageTime=8;
     }
-    bool Blocked(Point p) const {
-        if (p.x < -820 || p.y < -820 || p.x > 820 || p.y > 820) return true;
-        for (const Object& o:objects) {
+    bool Blocked(WorldPoint p) {
+        if(world.Blocked(p)) return true;
+        for (const Object& o:villageObjects) {
             if (p.x>o.x-12 && p.x<o.x+o.w+12 && p.y>o.y-12 && p.y<o.y+o.d+12) return true;
         }
         return false;
     }
     int Nearby() const {
         if (controlling) return -1;
-        float best=90; int target=-1;
-        const Point positions[]={child,keeper,spirit,fire};
+        double best=90; int target=-1;
+        const WorldPoint positions[]={child,keeper,spirit,fire};
         for(int i=0;i<4;++i) {
             if(i==2 && captured) continue;
-            float d=Distance(player,positions[i]);
+            double d=Distance(player,positions[i]);
             if(d<best) { best=d; target=i; }
         }
         return target;
@@ -97,7 +100,7 @@ class Prototype {
                 {d.x+(c.x-d.x)*u,d.y+(c.y-d.y)*u},2,Color(.16f,.13f,.14f));
         }
         // Front-wall door and windows lie on the same projected plane as the wall.
-        float front=o.y+o.d;
+        double front=o.y+o.d;
         r.Quad(Screen(o.x+o.w*.42f,front,0),Screen(o.x+o.w*.65f,front,0),
             Screen(o.x+o.w*.65f,front,48),Screen(o.x+o.w*.42f,front,48),Color(.07f,.09f,.10f));
         r.Quad(Screen(o.x+18,front,38),Screen(o.x+40,front,38),
@@ -109,15 +112,15 @@ class Prototype {
     void Tree(const Object& o) {
         Point p=Screen(o.x+o.w*.5f,o.y+o.d*.5f);
         r.Ellipse(p.x,p.y,27,11,Color(0,0,0,.25f));
-        r.Line(p,{p.x-4,p.y-o.h},7,Color(.17f,.16f,.17f));
+        r.Line(p,{p.x-4,static_cast<float>(p.y-o.h)},7,Color(.17f,.16f,.17f));
         for(int i=0;i<4;++i) {
-            float side=i%2 ? 1.f : -1.f, level=p.y-o.h*.35f-i*15;
+            float side=i%2 ? 1.f : -1.f, level=static_cast<float>(p.y-o.h*.35-i*15);
             Point tip={p.x+side*(23+i*3),level-28};
             r.Line({p.x-2,level},tip,4,Color(.19f,.18f,.19f));
             r.Line(tip,{tip.x+side*10,tip.y-21},2,Color(.22f,.21f,.22f));
         }
     }
-    void Person(Point pos, Color coat, bool active, bool childSize=false) {
+    void Person(WorldPoint pos, Color coat, bool active, bool childSize=false) {
         Point p=Screen(pos.x,pos.y);
         float scale=childSize?.8f:1.f;
         float sway=active&&moving?std::sin(walk)*2:0;
@@ -173,7 +176,7 @@ class Prototype {
         Color ivory(.86f,.84f,.74f),muted(.49f,.57f,.58f),gold(.82f,.66f,.39f);
         Panel(24,24,268,100);
         r.Text(42,50,"마지막 불씨",ivory,true);
-        r.Text(42,72,"잿빛 마을 · 시제품 01",muted);
+        r.Text(42,72,world.Region(controlling?spirit:player),muted);
         r.Rect(42,87,184,7,Color(.20f,.17f,.18f));
         r.Rect(42,87,184,7,Color(.57f,.29f,.25f));
         r.Text(237,96,"100",ivory);
@@ -185,6 +188,14 @@ class Prototype {
         r.Text(float(width-267),115,toySword?"간직한 물건: 나무칼":"불가의 아이를 찾아보세요.",muted);
         Panel(24,float(height-55),float(width-48),32);
         r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    P  화면 효과    ESC  닫기",ivory);
+        WorldPoint location=controlling?spirit:player;
+        std::ostringstream positionText;
+        positionText<<"지역 좌표 "<<World::Index(location.x)<<", "<<World::Index(location.y)<<" · 주변 구역 "<<world.chunks.size();
+        r.Text(42,146,positionText.str(),muted);
+        const double homeX=(-location.x+location.y)*.85,homeY=(-location.x-location.y)*.43;
+        const char* homeDirection=std::abs(homeX)>std::abs(homeY)?(homeX>0?"오른쪽":"왼쪽"):(homeY>0?"아래쪽":"위쪽");
+        std::ostringstream homeText; homeText<<"마을 불씨: "<<homeDirection<<" · 거리 "<<static_cast<long long>(Distance(location,fire));
+        r.Text(42,168,homeText.str(),muted);
         int target=Nearby();
         if(target>=0 && !journal) {
             const char* hints[]={"[E] 미라와 대화하기","[E] 불씨지기와 대화하기","[E] 슬픔의 도깨비불 포획하기","[E] 불가에서 쉬기"};
@@ -213,16 +224,11 @@ class Prototype {
     }
 public:
     explicit Prototype(Renderer& renderer):r(renderer) {
-        objects={{0,-300,-210,140,110,92},{0,-70,-360,155,115,115},
+        villageObjects={{0,-300,-210,140,110,92},{0,-70,-360,155,115,115},
             {0,-440,90,130,100,85},{0,270,-250,145,110,98},
             {2,330,240,65,35,30},{2,390,270,30,35,52},
             {2,280,280,25,25,24}};
-        // Deterministic decorations; the first prototype uses a bounded authored map.
-        for(int i=0;i<72;++i) {
-            float x=float((i*379+71)%1550-775),y=float((i*613+137)%1550-775);
-            if(std::abs(x)<500 && std::abs(y)<440) continue;
-            objects.push_back({1,x,y,18,18,float(70+(i*17)%55)});
-        }
+        world.Stream(camera,player,width,height);
     }
     void Resize(int w,int h) {width=w;height=h;r.Resize(w,h);}
     void Key(unsigned char key,bool down) {
@@ -254,40 +260,52 @@ public:
                 const float pace = sprint ? 1.8f : 1.f;
                 float speed=(controlling?160.f:125.f)*pace;
                 dx=dx/length*speed*dt;dy=dy/length*speed*dt;
-                Point& actor=controlling?spirit:player;
-                Point next={actor.x+dx,actor.y}; if(!Blocked(next)) actor=next;
+                WorldPoint& actor=controlling?spirit:player;
+                WorldPoint next={actor.x+dx,actor.y}; if(!Blocked(next)) actor=next;
                 next={actor.x,actor.y+dy}; if(!Blocked(next)) actor=next;
                 moving=true; walk+=dt*10*pace;
             }
             if(captured&&!controlling) {
-                Point target={player.x+35,player.y+20};
+                WorldPoint target={player.x+35,player.y+20};
                 float t=1-std::exp(-dt*3); spirit.x+=(target.x-spirit.x)*t; spirit.y+=(target.y-spirit.y)*t;
             }
         }
-        Point target=controlling?spirit:player;
+        WorldPoint target=controlling?spirit:player;
+        if(Distance(target,camera)>2000) camera=target; // Distant vessel switch.
         float t=1-std::exp(-dt*6);camera.x+=(target.x-camera.x)*t;camera.y+=(target.y-camera.y)*t;
+        world.Stream(camera,target,width,height);
     }
     void Draw() {
         r.Begin(Color(.035f,.052f,.069f));
-        for(int y=-13;y<13;++y) for(int x=-13;x<13;++x) {
-            unsigned seed=static_cast<unsigned>((x+31)*73856093u)^static_cast<unsigned>((y+37)*19349663u);
-            float shade=float(seed%13)*.002f;
-            Ground(x*64.f,y*64.f,64,64,Color(.095f+shade,.125f+shade,.13f+shade));
-            Point p=Screen(x*64.f+float(seed%53),y*64.f+float(seed%47));
-            r.Line(p,{p.x+3,p.y-4},1,Color(.24f,.27f,.24f,.4f));
+        objects=villageObjects;
+        for(const auto& pair:world.chunks) {
+            const World::Chunk& chunk=pair.second;
+            for(const Object& o:chunk.objects) objects.push_back(o);
+            for(int y=0;y<8;++y) for(int x=0;x<8;++x) {
+                World::Coordinate tx=chunk.key.first*8+x,ty=chunk.key.second*8+y;
+                double wx=double(tx)*64,wy=double(ty)*64;
+                Point p=Screen(wx,wy);
+                if(p.x < -120 || p.x > width+120 || p.y < -100 || p.y > height+100) continue;
+                auto hash=World::Hash(tx,ty,42);
+                float shade=float(hash%15)*.002f;
+                Color color=chunk.biome==0?Color(.095f+shade,.125f+shade,.13f+shade):
+                    (chunk.biome==1?Color(.12f+shade,.145f+shade,.145f+shade):Color(.15f+shade,.14f+shade,.14f+shade));
+                if(World::Village(wx,wy)) color=Color(.11f+shade,.13f+shade,.13f+shade);
+                bool road=World::Road(tx,ty);
+                if(road) color=Color(.23f+shade,.23f+shade,.20f+shade);
+                Ground(wx,wy,64,64,color);
+                if(road) Ground(wx+12+double(hash%17),wy+15,16,10,Color(.32f,.31f,.26f,.5f));
+                else r.Line(p,{p.x+3,p.y-4},1,Color(.24f,.27f,.24f,.4f));
+            }
         }
-        Ground(-810,-48,1620,96,Color(.23f,.23f,.20f));
-        Ground(-48,-810,96,1620,Color(.23f,.23f,.20f));
         Ground(-165,-145,330,290,Color(.24f,.24f,.21f));
-        for(int i=0;i<115;++i) {
-            float x=float((i*73)%1580-790),y=float((i*37)%76-38);
-            Ground(x,y,13,9,Color(.32f,.31f,.26f,.55f));
-            Ground(y,x,9,13,Color(.32f,.31f,.26f,.45f));
-        }
-        struct Entry {float depth;int index;};
+        struct Entry {double depth;int index;};
         std::vector<Entry> order;
         for(size_t i=0;i<objects.size();++i) {
-            const Object& o=objects[i]; order.push_back({o.x+o.y+o.w+o.d,static_cast<int>(i)});
+            const Object& o=objects[i];
+            Point bounds=Screen(o.x+o.w*.5,o.y+o.d*.5);
+            if(bounds.x < -300 || bounds.x > width+300 || bounds.y < -250 || bounds.y > height+350) continue;
+            order.push_back({o.x+o.y+o.w+o.d,static_cast<int>(i)});
         }
         order.push_back({0,-1});order.push_back({child.x+child.y,-2});
         order.push_back({keeper.x+keeper.y,-3});order.push_back({player.x+player.y,-4});
@@ -321,5 +339,7 @@ public:
         HUD();r.Flush();
     }
 };
+
+
 
 

@@ -28,6 +28,7 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="PostProcessing.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="World.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -55,4 +56,5 @@
     </None>
   </ItemGroup>
 </Project>
+
 
