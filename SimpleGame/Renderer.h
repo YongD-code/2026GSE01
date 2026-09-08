@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <map>
+#include "PostProcessing.h"
+#include <memory>
 
 struct Color {
     float r, g, b, a;
@@ -21,6 +23,8 @@ public:
     void Resize(int width, int height);
     void Begin(Color background);
     void Flush();
+    void FinishScene();
+    PostProcessSettings postProcess;
     void Triangle(Point a, Point b, Point c, Color color);
     void Quad(Point a, Point b, Point c, Point d, Color color);
     void Rect(float x, float y, float width, float height, Color color);
@@ -34,6 +38,9 @@ private:
     GLint m_Viewport = -1;
     int m_Width, m_Height;
     bool m_Initialized = false;
+    bool m_InHDRScene = false;
+    GLint m_LinearScene = -1;
+    std::unique_ptr<PostProcessing> m_Post;
     std::vector<Vertex> m_Vertices;
     struct TextBitmap {
         int width = 0, height = 0, descent = 0;
@@ -41,3 +48,4 @@ private:
     };
     std::map<std::string, TextBitmap> m_TextCache;
 };
+

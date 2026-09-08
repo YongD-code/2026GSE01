@@ -33,7 +33,7 @@ Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height) {
         "void main(){ gl_Position=vec4(position.x/viewport.x*2.-1.,"
         "1.-position.y/viewport.y*2.,0.,1.); tint=color; }";
     const char* fs = "#version 330\nin vec4 tint; out vec4 outputColor;\n"
-        "void main(){ outputColor=tint; }";
+        "uniform bool linearScene; void main(){ outputColor=vec4(linearScene ? pow(max(tint.rgb,vec3(0)),vec3(2.2)) : tint.rgb,tint.a); }";
     GLuint vertex = Shader(GL_VERTEX_SHADER, vs), fragment = Shader(GL_FRAGMENT_SHADER, fs);
     if (!vertex || !fragment) {
         if (vertex) glDeleteShader(vertex);
@@ -59,11 +59,14 @@ Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height) {
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         reinterpret_cast<void*>(offsetof(Vertex, r)));
     glBindVertexArray(0);
+    m_LinearScene = glGetUniformLocation(m_Program, "linearScene");
+    m_Post.reset(new PostProcessing());
     m_Vertices.reserve(40000);
     m_Initialized = true;
     Resize(width, height);
 }
 Renderer::~Renderer() {
+    m_Post.reset();
     if (m_Buffer) glDeleteBuffers(1, &m_Buffer);
     if (m_Array) glDeleteVertexArrays(1, &m_Array);
     if (m_Program) glDeleteProgram(m_Program);
@@ -71,9 +74,12 @@ Renderer::~Renderer() {
 void Renderer::Resize(int width, int height) {
     m_Width = width > 0 ? width : 1; m_Height = height > 0 ? height : 1;
     glViewport(0, 0, m_Width, m_Height);
+    if (m_Post) m_Post->Resize(m_Width, m_Height);
 }
 void Renderer::Begin(Color c) {
     m_Vertices.clear();
+    m_InHDRScene = m_Post && m_Post->Begin(postProcess.enabled);
+    if (m_InHDRScene) { c.r=std::pow(c.r,2.2f); c.g=std::pow(c.g,2.2f); c.b=std::pow(c.b,2.2f); }
     glClearColor(c.r, c.g, c.b, c.a);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
@@ -82,10 +88,16 @@ void Renderer::Begin(Color c) {
 void Renderer::Flush() {
     if (m_Vertices.empty() || !m_Initialized) return;
     glUseProgram(m_Program); glUniform2f(m_Viewport, float(m_Width), float(m_Height));
+    glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
     glBindVertexArray(m_Array); glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
     glBufferData(GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_Vertices.size()));
     glBindVertexArray(0); glUseProgram(0); m_Vertices.clear();
+}
+void Renderer::FinishScene() {
+    Flush();
+    if (m_InHDRScene) m_Post->Finish(postProcess);
+    m_InHDRScene = false;
 }
 void Renderer::Triangle(Point a, Point b, Point c, Color col) {
     m_Vertices.push_back({a.x,a.y,col.r,col.g,col.b,col.a});
@@ -180,3 +192,4 @@ void Renderer::Text(float x, float y, const std::string& text, Color c, bool lar
 void Renderer::DrawSolidRect(float x, float y, float, float size, float r, float g, float b, float a) {
     Rect(m_Width*.5f+x-size*.5f,m_Height*.5f-y-size*.5f,size,size,Color(r,g,b,a));
 }
+

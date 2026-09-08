@@ -101,7 +101,7 @@ class Prototype {
         r.Quad(Screen(o.x+o.w*.42f,front,0),Screen(o.x+o.w*.65f,front,0),
             Screen(o.x+o.w*.65f,front,48),Screen(o.x+o.w*.42f,front,48),Color(.07f,.09f,.10f));
         r.Quad(Screen(o.x+18,front,38),Screen(o.x+40,front,38),
-            Screen(o.x+40,front,62),Screen(o.x+18,front,62),Color(.90f,.55f,.24f));
+            Screen(o.x+40,front,62),Screen(o.x+18,front,62),Color(2.2f,1.25f,.45f));
         Point window=Screen(o.x+29,front,49);
         Glow(window,48,Color(1,.55f,.2f));
         Box(o.x+o.w*.7f,o.y+18,18,20,o.h+70,Color(.32f,.32f,.29f),Color(.23f,.23f,.23f),Color(.16f,.17f,.18f));
@@ -142,7 +142,7 @@ class Prototype {
         Glow({p.x,p.y-23+bob},65,Color(.22f,.85f,.82f));
         r.Triangle({p.x-12,p.y-23+bob},{p.x+12,p.y-23+bob},{p.x-4,p.y+1+bob},Color(.25f,.66f,.70f,.6f));
         r.Ellipse(p.x,p.y-29+bob,14,17,Color(.31f,.74f,.77f,.8f));
-        r.Ellipse(p.x-2,p.y-31+bob,8,11,Color(.69f,.91f,.85f,.85f));
+        r.Ellipse(p.x-2,p.y-31+bob,8,11,Color(.85f,1.8f,1.55f,.85f));
         r.Rect(p.x-6,p.y-33+bob,3,4,Color(.06f,.17f,.22f));
         r.Rect(p.x+3,p.y-33+bob,3,4,Color(.06f,.17f,.22f));
         for(int i=0;i<5;++i) {
@@ -157,8 +157,8 @@ class Prototype {
         r.Ellipse(p.x,p.y,22,9,Color(.09f,.10f,.11f));
         r.Line({p.x-15,p.y+3},{p.x+12,p.y-5},6,Color(.36f,.23f,.16f));
         float flicker=std::sin(time*13)*3;
-        r.Triangle({p.x-13,p.y},{p.x+11,p.y},{p.x+3,p.y-40-flicker},Color(.92f,.38f,.13f,.9f));
-        r.Triangle({p.x-7,p.y},{p.x+8,p.y},{p.x-2,p.y-25+flicker},Color(1,.77f,.36f));
+        r.Triangle({p.x-13,p.y},{p.x+11,p.y},{p.x+3,p.y-40-flicker},Color(2.4f,.9f,.25f,.9f));
+        r.Triangle({p.x-7,p.y},{p.x+8,p.y},{p.x-2,p.y-25+flicker},Color(3.f,1.8f,.6f));
         for(int i=0;i<7;++i) {
             float t=std::fmod(time*18+i*12.f,85.f);
             r.Ellipse(p.x+std::sin(t*.08f+i)*12,p.y-t,1.3f,2,Color(1,.66f,.30f,1-t/85));
@@ -184,7 +184,7 @@ class Prototype {
         r.Text(float(width-267),93,captured?"체험 포획: 사용 완료":"체험 포획: 1회 가능",muted);
         r.Text(float(width-267),115,toySword?"간직한 물건: 나무칼":"불가의 아이를 찾아보세요.",muted);
         Panel(24,float(height-55),float(width-48),32);
-        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    ESC  닫기",ivory);
+        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    P  화면 효과    ESC  닫기",ivory);
         int target=Nearby();
         if(target>=0 && !journal) {
             const char* hints[]={"[E] 미라와 대화하기","[E] 불씨지기와 대화하기","[E] 슬픔의 도깨비불 포획하기","[E] 불가에서 쉬기"};
@@ -230,6 +230,7 @@ public:
         bool fresh=down&&!keys[key]; keys[key]=down;
         if(!fresh) return;
         if(key==27) { if(journal) journal=false; else messageTime=0; }
+        if(key=='p') { r.postProcess.enabled=!r.postProcess.enabled; Say("화면 효과",r.postProcess.enabled?"후처리를 켰습니다.":"후처리를 껐습니다."); }
         if(key=='j') journal=!journal;
         if(journal) return;
         if(key=='e') Interact();
@@ -314,9 +315,11 @@ public:
             float y=std::fmod(i*73.f+time*8,height+10.f);
             r.Rect(x,y,2,2,Color(.67f,.65f,.55f,.2f));
         }
+        r.FinishScene(); // Post-process the world before drawing crisp UI and text.
         // Framing bars keep the world visually quiet behind the interface.
         r.Rect(0,0,float(width),10,Color(.02f,.03f,.04f));
         HUD();r.Flush();
     }
 };
+
 
