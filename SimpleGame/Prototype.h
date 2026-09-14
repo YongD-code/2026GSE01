@@ -2,6 +2,7 @@
 #include "Renderer.h"
 #include "World.h"
 #include "SpriteSheet.h"
+#include "LevelOne.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -9,468 +10,915 @@
 #include <sstream>
 
 // Authored starting village surrounded by deterministic streamed chunks.
-class Prototype {
-    using Object=WorldObject;
+class Prototype
+{
+    using Object = WorldObject;
     World world;
+    LevelOne levelOne;
     std::vector<Object> villageObjects;
     Renderer& r;
     SpriteSheet protagonistSheet, childSheet, keeperSheet;
     SpriteAnimation protagonistAnimation;
     SpriteSheet attackSheet;
-    Facing attackFacing=Facing::South;
-    float attackTime=-1, attackCooldown=0, boltLife=0, impactLife=0;
-    float spiritHit[3]={};
-    WorldPoint bolt={0,0}, boltVelocity={0,0}, impact={0,0};
-    bool attackReleased=false;
     SpriteSheet spiritSheets[3];
     SpriteAnimation companionAnimation;
-    const WorldPoint wildSpirits[3]={{300,160},{-220,250},{220,360}};
-    int capturedSpirit=0;
-    const char* SpiritName(int type) const {
-        static const char* names[]={"재등불","울음종","가시여우"}; return names[type];
+    const WorldPoint wildSpirits[3] = {{300, 160}, {-220, 250}, {220, 360}};
+    int capturedSpirit = 0;
+
+    const char* SpiritName(int type) const
+    {
+        static const char* names[] = {"재등불", "울음종", "가시여우"};
+        return names[type];
     }
-    const char* SpiritStory(int type) const {
-        static const char* stories[]={"꺼진 집의 온기를 품고 떠도는 작은 등불.","돌아오지 않는 이를 기다리며 소리 없이 우는 종.","버려진 숲의 약속을 지키는 가면 쓴 여우."}; return stories[type];
+
+    const char* SpiritStory(int type) const
+    {
+        static const char* stories[] = {"꺼진 집의 온기를 품고 떠도는 작은 등불.",
+                                        "돌아오지 않는 이를 기다리며 소리 없이 우는 종.",
+                                        "버려진 숲의 약속을 지키는 가면 쓴 여우."};
+        return stories[type];
     }
-    int width=1280, height=800;
+
+    int width = 1280, height = 800;
     bool keys[256] = {};
     bool arrows[4] = {};
     std::vector<Object> objects;
-    WorldPoint player={70,160}, spirit={300,160}, camera={70,160};
-    const WorldPoint child={-100,90}, keeper={150,-100}, fire={0,0};
-    float time=0, walk=0, messageTime=0;
-    bool moving=false, captured=false, controlling=false, journal=false, toySword=false;
-    int childTalk=0;
+    WorldPoint player = {70, 160}, spirit = {300, 160}, camera = {70, 160};
+    const WorldPoint child = {-100, 90}, keeper = {150, -100}, fire = {0, 0};
+    float time = 0, walk = 0, messageTime = 0;
+    bool moving = false, captured = false, controlling = false, journal = false, toySword = false;
+    int childTalk = 0;
     std::string speaker, message;
-    static double Distance(WorldPoint a, WorldPoint b) {
-        double x=a.x-b.x,y=a.y-b.y; return std::sqrt(x*x+y*y);
+
+    static double Distance(WorldPoint a, WorldPoint b)
+    {
+        double x = a.x - b.x, y = a.y - b.y;
+        return std::sqrt(x * x + y * y);
     }
-    Point Screen(double x,double y,double z=0) const {
-        x-=camera.x; y-=camera.y;
-        return {static_cast<float>(width*.5+(x-y)*.85),static_cast<float>(height*.51+(x+y)*.43-z)};
+
+    Point Screen(double x, double y, double z = 0) const
+    {
+        x -= camera.x;
+        y -= camera.y;
+        return {static_cast<float>(width * .5 + (x - y) * .85),
+                static_cast<float>(height * .51 + (x + y) * .43 - z)};
     }
-    void Ground(double x,double y,double w,double d,Color c) {
-        r.Quad(Screen(x,y),Screen(x+w,y),Screen(x+w,y+d),Screen(x,y+d),c);
+
+    void Ground(double x, double y, double w, double d, Color c)
+    {
+        r.Quad(Screen(x, y), Screen(x + w, y), Screen(x + w, y + d), Screen(x, y + d), c);
     }
-    void Box(double x,double y,double w,double d,double h,Color top,Color left,Color right) {
-        Point a=Screen(x,y,h),b=Screen(x+w,y,h),c=Screen(x+w,y+d,h),e=Screen(x,y+d,h);
-        r.Quad(e,c,Screen(x+w,y+d),Screen(x,y+d),left);
-        r.Quad(b,Screen(x+w,y),Screen(x+w,y+d),c,right);
-        r.Quad(a,b,c,e,top);
+
+    void Box(double x, double y, double w, double d, double h, Color top, Color left, Color right)
+    {
+        Point a = Screen(x, y, h), b = Screen(x + w, y, h), c = Screen(x + w, y + d, h),
+              e = Screen(x, y + d, h);
+        r.Quad(e, c, Screen(x + w, y + d), Screen(x, y + d), left);
+        r.Quad(b, Screen(x + w, y), Screen(x + w, y + d), c, right);
+        r.Quad(a, b, c, e, top);
     }
-    void Say(const std::string& name,const std::string& text) {
-        speaker=name; message=text; messageTime=8;
+
+    void Say(const std::string& name, const std::string& text)
+    {
+        speaker = name;
+        message = text;
+        messageTime = 8;
     }
-    bool Blocked(WorldPoint p) {
-        if(world.Blocked(p)) return true;
-        for (const Object& o:villageObjects) {
-            if (p.x>o.x-12 && p.x<o.x+o.w+12 && p.y>o.y-12 && p.y<o.y+o.d+12) return true;
+
+    bool Blocked(WorldPoint p)
+    {
+        if (world.Blocked(p))
+            return true;
+        for (const Object& o : villageObjects)
+        {
+            if (p.x > o.x - 12 && p.x < o.x + o.w + 12 && p.y > o.y - 12 && p.y < o.y + o.d + 12)
+                return true;
         }
         return false;
     }
-    int NearestWild() const {
-        double best=90; int found=-1;
-        for(int i=0;i<3;++i) {
-            if(captured&&i==capturedSpirit) continue;
-            double d=Distance(player,wildSpirits[i]); if(d<best) {best=d;found=i;}
-        } return found;
+
+    int NearestWild() const
+    {
+        double best = 90;
+        int found = -1;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (captured && i == capturedSpirit)
+                continue;
+            double d = Distance(player, wildSpirits[i]);
+            if (d < best)
+            {
+                best = d;
+                found = i;
+            }
+        }
+        return found;
     }
-    int Nearby() const {
-        if (controlling) return -1;
-        double best=90; int target=-1;
-        int nearest=NearestWild();
-        const WorldPoint positions[]={child,keeper,nearest>=0?wildSpirits[nearest]:spirit,fire};
-        for(int i=0;i<4;++i) {
-            if(i==2 && nearest<0) continue;
-            double d=Distance(player,positions[i]);
-            if(d<best) { best=d; target=i; }
+
+    int Nearby() const
+    {
+        if (controlling)
+            return -1;
+        double best = 90;
+        int target = -1;
+        int nearest = NearestWild();
+        const WorldPoint positions[] = {
+            child, keeper, nearest >= 0 ? wildSpirits[nearest] : spirit, fire};
+        for (int i = 0; i < 4; ++i)
+        {
+            if (i == 2 && nearest < 0)
+                continue;
+            double d = Distance(player, positions[i]);
+            if (d < best)
+            {
+                best = d;
+                target = i;
+            }
         }
         return target;
     }
-    void Interact() {
-        switch(Nearby()) {
+
+    void Interact()
+    {
+        switch (Nearby())
+        {
         case 0:
-            if (!toySword) {
-                toySword=true;
+            if (!toySword)
+            {
+                toySword = true;
                 Say("마을 아이 · 미라", "이 나무칼 가져가. 어둠이 찾아오면 꼭 쥐고 있어.");
-            } else {
+            }
+            else
+            {
                 ++childTalk;
-                Say("마을 아이 · 미라", childTalk%2 ?
-                    "아직 가지고 있네. 엄마가 그랬어. 작은 물건도 다정한 마음을 기억한대." :
-                    "마을 밖에서 작은 등불이 걸어 다니는 걸 봤어. 여우도 있었고…");
+                Say("마을 아이 · 미라",
+                    childTalk % 2
+                        ? "아직 가지고 있네. 엄마가 그랬어. 작은 물건도 다정한 마음을 기억한대."
+                        : "마을 밖에서 작은 등불이 걸어 다니는 걸 봤어. 여우도 있었고…");
             }
             break;
-        case 1: Say("불씨지기", "불씨 하나면 충분하오. 잠시 쉬어 가시오, 나그네. 길은 달아나지 않으니."); break;
-        case 2: {
-            int selected=NearestWild(); if(selected<0) break;
-            if(captured) { Say(SpiritName(selected),"이번 체험의 포획 기회를 이미 사용했습니다. 다른 주령도 관찰해 보세요."); break; }
-            capturedSpirit=selected; spirit=wildSpirits[selected]; captured=true;
-            Say("도감 · 새로운 기록",std::string(SpiritName(selected))+"을 포획했습니다. Q로 조종하고 J로 기록을 살펴보세요.");
-        }
+        case 1:
+            Say("불씨지기",
+                "불씨 하나면 충분하오. 잠시 쉬어 가시오, 나그네. 길은 달아나지 않으니.");
             break;
-        case 3: Say("마지막 불씨", "잠시나마 마을이 안전하게 느껴진다. 아직 누군가 이 불을 지키고 있다."); break;
-        default: break;
+        case 2:
+        {
+            int selected = NearestWild();
+            if (selected < 0)
+                break;
+            if (captured)
+            {
+                Say(SpiritName(selected),
+                    "이번 체험의 포획 기회를 이미 사용했습니다. 다른 주령도 관찰해 보세요.");
+                break;
+            }
+            capturedSpirit = selected;
+            spirit = wildSpirits[selected];
+            captured = true;
+            Say("도감 · 새로운 기록",
+                std::string(SpiritName(selected)) +
+                    "을 포획했습니다. Q로 조종하고 J로 기록을 살펴보세요.");
+        }
+        break;
+        case 3:
+            levelOne.health = levelOne.MaximumHealth();
+            Say("마지막 불씨",
+                "잠시나마 마을이 안전하게 느껴진다. 아직 누군가 이 불을 지키고 있다.");
+            break;
+        default:
+            break;
         }
     }
-    void House(const Object& o) {
-        Box(o.x,o.y,o.w,o.d,o.h,Color(.23f,.25f,.25f),Color(.19f,.21f,.22f),Color(.12f,.15f,.17f));
-        Point a=Screen(o.x-12,o.y-12,o.h),b=Screen(o.x+o.w+12,o.y-12,o.h);
-        Point c=Screen(o.x+o.w+12,o.y+o.d+12,o.h),d=Screen(o.x-12,o.y+o.d+12,o.h);
-        Point ridgeA=Screen(o.x-12,o.y+o.d*.5f,o.h+65),ridgeB=Screen(o.x+o.w+12,o.y+o.d*.5f,o.h+65);
-        r.Triangle(a,d,ridgeA,Color(.16f,.19f,.20f));
-        r.Quad(ridgeA,ridgeB,c,d,Color(.27f,.19f,.18f));
-        r.Triangle(b,c,ridgeB,Color(.19f,.13f,.14f));
-        r.Line(ridgeA,ridgeB,3,Color(.38f,.29f,.24f));
-        for(int i=1;i<5;++i) {
-            float u=float(i)/5;
-            r.Line({ridgeA.x+(ridgeB.x-ridgeA.x)*u,ridgeA.y+(ridgeB.y-ridgeA.y)*u},
-                {d.x+(c.x-d.x)*u,d.y+(c.y-d.y)*u},2,Color(.16f,.13f,.14f));
+
+    void House(const Object& o)
+    {
+        Box(o.x,
+            o.y,
+            o.w,
+            o.d,
+            o.h,
+            Color(.23f, .25f, .25f),
+            Color(.19f, .21f, .22f),
+            Color(.12f, .15f, .17f));
+        Point a = Screen(o.x - 12, o.y - 12, o.h), b = Screen(o.x + o.w + 12, o.y - 12, o.h);
+        Point c = Screen(o.x + o.w + 12, o.y + o.d + 12, o.h),
+              d = Screen(o.x - 12, o.y + o.d + 12, o.h);
+        Point ridgeA = Screen(o.x - 12, o.y + o.d * .5f, o.h + 65),
+              ridgeB = Screen(o.x + o.w + 12, o.y + o.d * .5f, o.h + 65);
+        r.Triangle(a, d, ridgeA, Color(.16f, .19f, .20f));
+        r.Quad(ridgeA, ridgeB, c, d, Color(.27f, .19f, .18f));
+        r.Triangle(b, c, ridgeB, Color(.19f, .13f, .14f));
+        r.Line(ridgeA, ridgeB, 3, Color(.38f, .29f, .24f));
+        for (int i = 1; i < 5; ++i)
+        {
+            float u = float(i) / 5;
+            r.Line({ridgeA.x + (ridgeB.x - ridgeA.x) * u, ridgeA.y + (ridgeB.y - ridgeA.y) * u},
+                   {d.x + (c.x - d.x) * u, d.y + (c.y - d.y) * u},
+                   2,
+                   Color(.16f, .13f, .14f));
         }
         // Front-wall door and windows lie on the same projected plane as the wall.
-        double front=o.y+o.d;
-        r.Quad(Screen(o.x+o.w*.42f,front,0),Screen(o.x+o.w*.65f,front,0),
-            Screen(o.x+o.w*.65f,front,48),Screen(o.x+o.w*.42f,front,48),Color(.07f,.09f,.10f));
-        r.Quad(Screen(o.x+18,front,38),Screen(o.x+40,front,38),
-            Screen(o.x+40,front,62),Screen(o.x+18,front,62),Color(2.2f,1.25f,.45f));
-        Box(o.x+o.w*.7f,o.y+18,18,20,o.h+70,Color(.32f,.32f,.29f),Color(.23f,.23f,.23f),Color(.16f,.17f,.18f));
+        double front = o.y + o.d;
+        r.Quad(Screen(o.x + o.w * .42f, front, 0),
+               Screen(o.x + o.w * .65f, front, 0),
+               Screen(o.x + o.w * .65f, front, 48),
+               Screen(o.x + o.w * .42f, front, 48),
+               Color(.07f, .09f, .10f));
+        r.Quad(Screen(o.x + 18, front, 38),
+               Screen(o.x + 40, front, 38),
+               Screen(o.x + 40, front, 62),
+               Screen(o.x + 18, front, 62),
+               Color(2.2f, 1.25f, .45f));
+        Box(o.x + o.w * .7f,
+            o.y + 18,
+            18,
+            20,
+            o.h + 70,
+            Color(.32f, .32f, .29f),
+            Color(.23f, .23f, .23f),
+            Color(.16f, .17f, .18f));
     }
-    void Tree(const Object& o) {
-        Point p=Screen(o.x+o.w*.5f,o.y+o.d*.5f);
-        r.Ellipse(p.x,p.y,27,11,Color(0,0,0,.25f));
-        r.Line(p,{p.x-4,static_cast<float>(p.y-o.h)},7,Color(.17f,.16f,.17f));
-        for(int i=0;i<4;++i) {
-            float side=i%2 ? 1.f : -1.f, level=static_cast<float>(p.y-o.h*.35-i*15);
-            Point tip={p.x+side*(23+i*3),level-28};
-            r.Line({p.x-2,level},tip,4,Color(.19f,.18f,.19f));
-            r.Line(tip,{tip.x+side*10,tip.y-21},2,Color(.22f,.21f,.22f));
+
+    void Tree(const Object& o)
+    {
+        Point p = Screen(o.x + o.w * .5f, o.y + o.d * .5f);
+        r.Ellipse(p.x, p.y, 27, 11, Color(0, 0, 0, .25f));
+        r.Line(p, {p.x - 4, static_cast<float>(p.y - o.h)}, 7, Color(.17f, .16f, .17f));
+        for (int i = 0; i < 4; ++i)
+        {
+            float side = i % 2 ? 1.f : -1.f, level = static_cast<float>(p.y - o.h * .35 - i * 15);
+            Point tip = {p.x + side * (23 + i * 3), level - 28};
+            r.Line({p.x - 2, level}, tip, 4, Color(.19f, .18f, .19f));
+            r.Line(tip, {tip.x + side * 10, tip.y - 21}, 2, Color(.22f, .21f, .22f));
         }
     }
-    void Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize=false) {
-        Point p=Screen(pos.x,pos.y);
-        const float spriteHeight=childSize?55.f:78.f;
-        if(p.x < -80 || p.x > width+80 || p.y < -20 || p.y > height+100) return;
-        r.Ellipse(p.x,p.y+1,childSize?10.f:14.f,5,Color(0,0,0,.35f));
-        if(isPlayer&&!controlling) r.Ellipse(p.x,p.y,18,7,Color(.75f,.69f,.45f,.20f));
-        SpriteAnimation animation=protagonistAnimation;
-        SpriteSheet* sheet=&protagonistSheet;
-        Color tint(1,1,1);
-        if(isPlayer&&attackTime>=0&&attackSheet.Ready()) {
-            sheet=&attackSheet; animation.facing=attackFacing; animation.moving=true;
-            animation.phase=(std::min)(3.f,std::floor(attackTime/.17f));
+
+    void Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize = false)
+    {
+        Point p = Screen(pos.x, pos.y);
+        const float spriteHeight = childSize ? 55.f : 78.f;
+        if (p.x < -80 || p.x > width + 80 || p.y < -20 || p.y > height + 100)
+            return;
+        r.Ellipse(p.x, p.y + 1, childSize ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
+        if (isPlayer && !controlling)
+            r.Ellipse(p.x, p.y, 18, 7, Color(.75f, .69f, .45f, .20f));
+        SpriteAnimation animation = protagonistAnimation;
+        SpriteSheet* sheet = &protagonistSheet;
+        Color tint =
+            isPlayer && levelOne.invulnerability > 0 ? Color(1.5f, .55f, .55f) : Color(1, 1, 1);
+        if (isPlayer && levelOne.castTime > 0 && !protagonistAnimation.moving &&
+            attackSheet.Ready())
+        {
+            sheet = &attackSheet;
+            animation.facing = levelOne.castFacing;
+            animation.moving = true;
+            animation.phase = (std::min)(3.f, std::floor((.18f - levelOne.castTime) / .045f));
         }
-        if(!isPlayer) {
-            sheet=childSize?&childSheet:&keeperSheet;
+        if (!isPlayer)
+        {
+            sheet = childSize ? &childSheet : &keeperSheet;
             // Until a dedicated image is supplied, share the protagonist texture as a placeholder.
-            if(!sheet->Ready()) {sheet=&protagonistSheet;tint=childSize?Color(1.f,.78f,.66f):Color(.72f,.9f,.78f);}
-            animation=SpriteAnimation();
-            if(Distance(pos,player)<160) {
-                double dx=player.x-pos.x,dy=player.y-pos.y;
-                animation.Update((dx-dy)*.85,(dx+dy)*.43,0,false);
-                animation.moving=false;
+            if (!sheet->Ready())
+            {
+                sheet = &protagonistSheet;
+                tint = childSize ? Color(1.f, .78f, .66f) : Color(.72f, .9f, .78f);
+            }
+            animation = SpriteAnimation();
+            if (Distance(pos, player) < 160)
+            {
+                double dx = player.x - pos.x, dy = player.y - pos.y;
+                animation.Update((dx - dy) * .85, (dx + dy) * .43, 0, false);
+                animation.moving = false;
             }
         }
-        if(sheet->Ready()) sheet->Draw(r,p,spriteHeight,animation,tint,width,height,isPlayer&&attackTime>=0?1.4f:0.f);
-        else {
+        if (sheet->Ready())
+            sheet->Draw(r,
+                        p,
+                        spriteHeight,
+                        animation,
+                        tint,
+                        width,
+                        height,
+                        isPlayer && levelOne.castTime > 0 && !protagonistAnimation.moving ? 1.4f
+                                                                                          : 0.f);
+        else
+        {
             // Keep the actor visible if an asset is missing or PNG decoding fails.
-            r.Triangle({p.x,p.y-43},{p.x-14,p.y-6},{p.x+14,p.y-6},coat);
-            r.Ellipse(p.x,p.y-44,8,10,Color(.61f,.53f,.43f));
+            r.Triangle({p.x, p.y - 43}, {p.x - 14, p.y - 6}, {p.x + 14, p.y - 6}, coat);
+            r.Ellipse(p.x, p.y - 44, 8, 10, Color(.61f, .53f, .43f));
         }
     }
-    void Wisp(int type,WorldPoint position) {
-        Point p=Screen(position.x,position.y);
-        if(p.x < -100 || p.x > width+100 || p.y < -50 || p.y > height+130) return;
-        r.Ellipse(p.x,p.y,18,6,Color(0,0,0,.3f));
+
+    void Wisp(int type, WorldPoint position)
+    {
+        Point p = Screen(position.x, position.y);
+        if (p.x < -100 || p.x > width + 100 || p.y < -50 || p.y > height + 130)
+            return;
+        r.Ellipse(p.x, p.y, 18, 6, Color(0, 0, 0, .3f));
         SpriteAnimation animation;
-        if(captured&&capturedSpirit==type) animation=companionAnimation;
-        float bob=type==2?0.f:std::sin(time*2+type)*3.f;
-        if(spiritSheets[type].Ready())
-            spiritSheets[type].Draw(r,{p.x,p.y-4+bob},type==2?67.f:72.f,animation,spiritHit[type]>0?Color(1.6f,1.6f,1.6f):Color(1,1,1),width,height,type==0?2.f:(type==1?1.f:.15f));
-        else r.Ellipse(p.x,p.y-25,12,18,Color(.4f,.7f,.8f));
+        if (captured && capturedSpirit == type)
+            animation = companionAnimation;
+        float bob = type == 2 ? 0.f : std::sin(time * 2 + type) * 3.f;
+        if (spiritSheets[type].Ready())
+            spiritSheets[type].Draw(r,
+                                    {p.x, p.y - 4 + bob},
+                                    type == 2 ? 67.f : 72.f,
+                                    animation,
+                                    Color(1, 1, 1),
+                                    width,
+                                    height,
+                                    type == 0 ? 2.f : (type == 1 ? 1.f : .15f));
+        else
+            r.Ellipse(p.x, p.y - 25, 12, 18, Color(.4f, .7f, .8f));
     }
-    void StartAttack() {
-        if(journal||controlling||attackTime>=0||attackCooldown>0) return;
-        attackTime=0;attackCooldown=1.f;attackReleased=false;
-        attackFacing=protagonistAnimation.facing;
+
+    void DrawEnemy(const LevelOne::Enemy& enemy)
+    {
+        const Point p = Screen(enemy.position.x, enemy.position.y);
+        r.Ellipse(p.x, p.y, 20, 7, Color(.65f, .08f, .1f, .6f));
+        if (spiritSheets[enemy.type].Ready())
+        {
+            spiritSheets[enemy.type].Draw(r,
+                                          p,
+                                          68,
+                                          enemy.animation,
+                                          enemy.flash > 0 ? Color(2, 2, 2)
+                                                          : Color(1.25f, .6f, .65f),
+                                          width,
+                                          height,
+                                          .4f);
+        }
+        else
+        {
+            r.Ellipse(p.x, p.y - 25, 16, 24, Color(.8f, .2f, .3f));
+        }
+        r.Rect(p.x - 20, p.y - 79, 40, 4, Color(.15f, .08f, .09f));
+        r.Rect(p.x - 20,
+               p.y - 79,
+               40 * (std::max)(0.f, enemy.health) / enemy.maximum,
+               4,
+               Color(.9f, .25f, .25f));
     }
-    void UpdateAttack(float dt) {
-        attackCooldown=(std::max)(0.f,attackCooldown-dt);
-        impactLife=(std::max)(0.f,impactLife-dt);
-        for(float& hit:spiritHit) hit=(std::max)(0.f,hit-dt);
-        if(attackTime>=0) {
-            attackTime+=dt;
-            if(!attackReleased&&attackTime>=.34f) {
-                attackReleased=true;
-                const Point directions[]={{0,1},{-.7071f,.7071f},{-1,0},{-.7071f,-.7071f},
-                    {0,-1},{.7071f,-.7071f},{1,0},{.7071f,.7071f}};
-                Point d=directions[static_cast<int>(attackFacing)];
-                bolt=player;boltLife=.7f;
-                boltVelocity={(d.x/.85+d.y/.43)*.5*420,(-d.x/.85+d.y/.43)*.5*420};
-            }
-            if(attackTime>=.68f) attackTime=-1;
+
+    void DrawLootAndProjectiles()
+    {
+        for (const LevelOne::Loot& item : levelOne.loot)
+        {
+            const Point p = Screen(item.position.x, item.position.y, 9 + std::sin(time * 4) * 2);
+            const Color colors[] = {Color(.2f, 1.2f, 2.f),
+                                    Color(2.f, 1.2f, .2f),
+                                    Color(.3f, 1.8f, .5f),
+                                    Color(1.6f, .4f, 2.f)};
+            const Color color = colors[static_cast<int>(item.kind)];
+            r.Quad({p.x, p.y - 6}, {p.x + 5, p.y}, {p.x, p.y + 6}, {p.x - 5, p.y}, color);
         }
-        // Small substeps prevent the projectile from skipping thin obstacles.
-        float remaining=(std::min)(dt,boltLife);
-        while(remaining>0&&boltLife>0) {
-            float step=(std::min)(remaining,.008f);remaining-=step;boltLife-=step;
-            bolt.x+=boltVelocity.x*step;bolt.y+=boltVelocity.y*step;
-            bool hit=Blocked(bolt);
-            for(int i=0;i<3&&!hit;++i) {
-                if(captured&&capturedSpirit==i) continue;
-                if(Distance(bolt,wildSpirits[i])<28) {spiritHit[i]=.3f;hit=true;}
-            }
-            if(hit) {impact=bolt;impactLife=.22f;boltLife=0;}
-        }
-    }
-    void SpellEffect() {
-        if(boltLife>0) {
-            Point p=Screen(bolt.x,bolt.y,32);
-            Point tail=Screen(bolt.x-boltVelocity.x*.035,bolt.y-boltVelocity.y*.035,32);
-            r.Line(tail,p,5,Color(.3f,1.5f,3.f,.8f));
-            r.Ellipse(p.x,p.y,6,6,Color(.6f,2.3f,4.f));
-        }
-        if(impactLife>0) {
-            Point p=Screen(impact.x,impact.y,32);float size=(.22f-impactLife)*95+4;
-            for(int i=0;i<8;++i) {
-                float a=i*.785398f;
-                r.Line({p.x+std::cos(a)*size*.5f,p.y+std::sin(a)*size*.5f},
-                       {p.x+std::cos(a)*size,p.y+std::sin(a)*size},2,Color(.4f,1.6f,3.f,impactLife/.22f));
-            }
-        }
-    }
-    void Hearth() {
-        Point p=Screen(0,0);
-        r.Ellipse(p.x,p.y,28,13,Color(.29f,.28f,.26f));
-        r.Ellipse(p.x,p.y,22,9,Color(.09f,.10f,.11f));
-        r.Line({p.x-15,p.y+3},{p.x+12,p.y-5},6,Color(.36f,.23f,.16f));
-        float flicker=std::sin(time*13)*3;
-        r.Triangle({p.x-13,p.y},{p.x+11,p.y},{p.x+3,p.y-40-flicker},Color(2.4f,.9f,.25f,.9f));
-        r.Triangle({p.x-7,p.y},{p.x+8,p.y},{p.x-2,p.y-25+flicker},Color(3.f,1.8f,.6f));
-        for(int i=0;i<7;++i) {
-            float t=std::fmod(time*18+i*12.f,85.f);
-            r.Ellipse(p.x+std::sin(t*.08f+i)*12,p.y-t,1.3f,2,Color(1,.66f,.30f,1-t/85));
+        for (const LevelOne::Projectile& shot : levelOne.projectiles)
+        {
+            const Point p = Screen(shot.position.x, shot.position.y, 32);
+            const Point tail = Screen(shot.position.x - shot.velocity.x * .03,
+                                      shot.position.y - shot.velocity.y * .03,
+                                      32);
+            const Color color = shot.companion ? Color(1.8f, .5f, 2.f) : Color(.4f, 1.5f, 3.f);
+            r.Line(tail, p, 4, color);
+            r.Ellipse(p.x, p.y, 5, 5, color);
         }
     }
-    void Panel(float x,float y,float w,float h) {
-        r.Rect(x,y,w,h,Color(.035f,.052f,.068f,.94f));
-        r.Rect(x,y,w,1,Color(.48f,.43f,.30f,.65f));
-        r.Rect(x,y+h-1,w,1,Color(.28f,.30f,.29f,.6f));
+
+    void DrawProgress()
+    {
+        const Color text(.9f, .85f, .7f);
+        Panel(24, 185, 370, 230);
+        r.Text(
+            40, 208, levelOne.complete ? "레벨 1 완료 · 자유 파밍" : "레벨 1 · 불씨의 수련", text);
+        std::ostringstream stats;
+        stats << "성장 " << levelOne.level << " / 20  경험치 " << levelOne.experience << " / "
+              << levelOne.RequiredExperience();
+        r.Text(40, 232, stats.str(), text);
+        r.Rect(40, 241, 330, 5, Color(.1f, .15f, .2f));
+        r.Rect(40,
+               241,
+               330.f * (levelOne.level == 20
+                            ? 1.f
+                            : float(levelOne.experience) / levelOne.RequiredExperience()),
+               5,
+               Color(.2f, .7f, .9f));
+        stats.str("");
+        stats.clear();
+        stats.precision(2);
+        stats << std::fixed;
+        stats << "피해 " << levelOne.Damage() << "  간격 " << levelOne.Interval() << "초";
+        r.Text(40, 270, stats.str(), text);
+        stats.str("");
+        stats.clear();
+        stats << "무기 +" << levelOne.weapon << "  주령 +" << levelOne.spiritRank << "  주령석 "
+              << levelOne.stones;
+        r.Text(40, 294, stats.str(), text);
+        stats.str("");
+        stats.clear();
+        stats << "목표: 성장 3 · 처치 " << levelOne.kills << "/12 · 무기 +1";
+        r.Text(40, 318, stats.str(), text);
+        r.Text(40,
+               342,
+               levelOne.automatic ? "F 자동공격 켜짐 · G 주령 강화 (70%)"
+                                  : "F 자동공격 꺼짐 · Space 누르고 연사",
+               text);
+        r.Text(40, 366, "파랑 경험치 · 금색 강화 · 초록 회복 · 보라 주령석", text);
+        stats.str("");
+        stats.clear();
+        stats << "최대 체력 " << static_cast<int>(levelOne.MaximumHealth()) << " · 사거리 "
+              << static_cast<int>(levelOne.Range());
+        r.Text(40, 390, stats.str(), text);
+        if (levelOne.Dead())
+        {
+            Panel(width * .5f - 250, height * .5f - 50, 500, 100);
+            r.Text(width * .5f - 225, height * .5f - 10, "불씨가 꺼졌습니다", text, true);
+            r.Text(width * .5f - 225, height * .5f + 22, "R: 성장 초기화 후 마을에서 재시작", text);
+        }
     }
-    void HUD() {
-        Color ivory(.86f,.84f,.74f),muted(.49f,.57f,.58f),gold(.82f,.66f,.39f);
-        Panel(24,24,268,100);
-        r.Text(42,50,"마지막 불씨",ivory,true);
-        r.Text(42,72,world.Region(controlling?spirit:player),muted);
-        r.Rect(42,87,184,7,Color(.20f,.17f,.18f));
-        r.Rect(42,87,184,7,Color(.57f,.29f,.25f));
-        r.Text(237,96,"100",ivory);
-        r.Text(42,114,controlling?std::string("조종 중: ")+SpiritName(capturedSpirit):"조종 중: 방랑자",gold);
-        Panel(float(width-285),24,261,106);
-        r.Text(float(width-267),49,"탐험 기록",gold);
-        r.Text(float(width-267),71,captured?"주령 기록       01 / 03":"주령 기록       00 / 03",ivory);
-        r.Text(float(width-267),93,captured?"체험 포획: 사용 완료":"체험 포획: 1회 가능",muted);
-        r.Text(float(width-267),115,toySword?"간직한 물건: 나무칼":"불가의 아이를 찾아보세요.",muted);
-        Panel(24,float(height-55),float(width-48),32);
-        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift 달리기    Space 주술    E 상호작용    Q  주령 조종    J  도감    P  화면 효과    B  블룸    ESC  닫기",ivory);
-        WorldPoint location=controlling?spirit:player;
+
+    void Hearth()
+    {
+        Point p = Screen(0, 0);
+        r.Ellipse(p.x, p.y, 28, 13, Color(.29f, .28f, .26f));
+        r.Ellipse(p.x, p.y, 22, 9, Color(.09f, .10f, .11f));
+        r.Line({p.x - 15, p.y + 3}, {p.x + 12, p.y - 5}, 6, Color(.36f, .23f, .16f));
+        float flicker = std::sin(time * 13) * 3;
+        r.Triangle({p.x - 13, p.y},
+                   {p.x + 11, p.y},
+                   {p.x + 3, p.y - 40 - flicker},
+                   Color(2.4f, .9f, .25f, .9f));
+        r.Triangle(
+            {p.x - 7, p.y}, {p.x + 8, p.y}, {p.x - 2, p.y - 25 + flicker}, Color(3.f, 1.8f, .6f));
+        for (int i = 0; i < 7; ++i)
+        {
+            float t = std::fmod(time * 18 + i * 12.f, 85.f);
+            r.Ellipse(p.x + std::sin(t * .08f + i) * 12,
+                      p.y - t,
+                      1.3f,
+                      2,
+                      Color(1, .66f, .30f, 1 - t / 85));
+        }
+    }
+
+    void Panel(float x, float y, float w, float h)
+    {
+        r.Rect(x, y, w, h, Color(.035f, .052f, .068f, .94f));
+        r.Rect(x, y, w, 1, Color(.48f, .43f, .30f, .65f));
+        r.Rect(x, y + h - 1, w, 1, Color(.28f, .30f, .29f, .6f));
+    }
+
+    void HUD()
+    {
+        Color ivory(.86f, .84f, .74f), muted(.49f, .57f, .58f), gold(.82f, .66f, .39f);
+        Panel(24, 24, 268, 100);
+        r.Text(42, 50, "마지막 불씨", ivory, true);
+        r.Text(42, 72, world.Region(controlling ? spirit : player), muted);
+        r.Rect(42, 87, 184, 7, Color(.20f, .17f, .18f));
+        r.Rect(
+            42, 87, 184 * levelOne.health / levelOne.MaximumHealth(), 7, Color(.57f, .29f, .25f));
+        r.Text(237, 96, std::to_string(static_cast<int>(levelOne.health)), ivory);
+        r.Text(42,
+               114,
+               controlling ? std::string("조종 중: ") + SpiritName(capturedSpirit)
+                           : "조종 중: 방랑자",
+               gold);
+        Panel(float(width - 285), 24, 261, 106);
+        r.Text(float(width - 267), 49, "탐험 기록", gold);
+        r.Text(float(width - 267),
+               71,
+               captured ? "주령 기록       01 / 03" : "주령 기록       00 / 03",
+               ivory);
+        r.Text(float(width - 267),
+               93,
+               captured ? "체험 포획: 사용 완료" : "체험 포획: 1회 가능",
+               muted);
+        r.Text(float(width - 267),
+               115,
+               toySword ? "간직한 물건: 나무칼" : "불가의 아이를 찾아보세요.",
+               muted);
+        Panel(24, float(height - 55), float(width - 48), 32);
+        r.Text(40,
+               float(height - 34),
+               "WASD / 방향키  이동    Shift 달리기    Space 연사    E 상호작용    Q  주령 조종    "
+               "J 도감  F 자동공격  G 강화  R 재시작",
+               ivory);
+        WorldPoint location = controlling ? spirit : player;
         std::ostringstream positionText;
-        positionText<<"지역 좌표 "<<World::Index(location.x)<<", "<<World::Index(location.y)<<" · 주변 구역 "<<world.chunks.size();
-        r.Text(42,146,positionText.str(),muted);
-        const double homeX=(-location.x+location.y)*.85,homeY=(-location.x-location.y)*.43;
-        const char* homeDirection=std::abs(homeX)>std::abs(homeY)?(homeX>0?"오른쪽":"왼쪽"):(homeY>0?"아래쪽":"위쪽");
-        std::ostringstream homeText; homeText<<"마을 불씨: "<<homeDirection<<" · 거리 "<<static_cast<long long>(Distance(location,fire));
-        r.Text(42,168,homeText.str(),muted);
-        int target=Nearby();
-        if(target>=0 && !journal) {
-            const char* hints[]={"[E] 미라와 대화하기","[E] 불씨지기와 대화하기","[E] 슬픔의 도깨비불 포획하기","[E] 불가에서 쉬기"};
-            Panel(width*.5f-160,float(height-104),320,32);
-            r.Text(width*.5f-143,float(height-83),target==2?std::string("[E] ")+SpiritName(NearestWild())+(captured?" 관찰하기":" 포획하기"):hints[target],gold);
+        positionText << "지역 좌표 " << World::Index(location.x) << ", " << World::Index(location.y)
+                     << " · 주변 구역 " << world.chunks.size();
+        r.Text(42, 146, positionText.str(), muted);
+        const double homeX = (-location.x + location.y) * .85,
+                     homeY = (-location.x - location.y) * .43;
+        const char* homeDirection = std::abs(homeX) > std::abs(homeY)
+                                        ? (homeX > 0 ? "오른쪽" : "왼쪽")
+                                        : (homeY > 0 ? "아래쪽" : "위쪽");
+        std::ostringstream homeText;
+        homeText << "마을 불씨: " << homeDirection << " · 거리 "
+                 << static_cast<long long>(Distance(location, fire));
+        r.Text(42, 168, homeText.str(), muted);
+        DrawProgress();
+        int target = Nearby();
+        if (target >= 0 && !journal)
+        {
+            const char* hints[] = {"[E] 미라와 대화하기",
+                                   "[E] 불씨지기와 대화하기",
+                                   "[E] 슬픔의 도깨비불 포획하기",
+                                   "[E] 불가에서 쉬기"};
+            Panel(width * .5f - 160, float(height - 104), 320, 32);
+            r.Text(width * .5f - 143,
+                   float(height - 83),
+                   target == 2 ? std::string("[E] ") + SpiritName(NearestWild()) +
+                                     (captured ? " 관찰하기" : " 포획하기")
+                               : hints[target],
+                   gold);
         }
-        if(messageTime>0 && !journal) {
-            Panel(40,float(height-206),float(width-80),88);
-            r.Text(60,float(height-179),speaker,gold);
-            r.Text(60,float(height-151),message,ivory);
+        if (messageTime > 0 && !journal)
+        {
+            Panel(40, float(height - 206), float(width - 80), 88);
+            r.Text(60, float(height - 179), speaker, gold);
+            r.Text(60, float(height - 151), message, ivory);
         }
-        if(journal) {
-            r.Rect(0,0,float(width),float(height),Color(0,0,0,.58f));
-            float x=width*.5f-315,y=height*.5f-190;
-            Panel(x,y,630,380);
-            r.Text(x+28,y+38,"도감 · 보이지 않는 존재들의 기록",gold,true);
-            for(int i=0;i<3;++i)
-                r.Text(x+28,y+76+i*25,std::string(SpiritName(i))+(captured&&capturedSpirit==i?" · 포획 완료":" · 미포획"),captured&&capturedSpirit==i?gold:muted);
-            r.Text(x+28,y+162,captured?SpiritStory(capturedSpirit):"마을 주변에서 세 주령 중 한 마리를 포획할 수 있습니다.",ivory);
-            r.Text(x+28,y+186,"포획한 주령은 Q로 조종합니다. 본체는 제자리에 남습니다.",muted);
-            r.Text(x+28,y+211,"간직한 물건",gold);
-            r.Text(x+28,y+239,toySword?"나무칼 · 미라가 건넨 선물":"아직 간직한 물건이 없습니다.",ivory);
-            r.Text(x+28,y+267,toySword?"작은 다정함의 흔적. 훗날 어떤 의미가 될지는 아직 모릅니다.":"아직 이곳을 집이라 부르는 사람들과 이야기해 보세요.",muted);
-            r.Text(x+28,y+329,"체험 기록은 종료 시 사라집니다. J 또는 ESC로 돌아갑니다.",gold);
+        if (journal)
+        {
+            r.Rect(0, 0, float(width), float(height), Color(0, 0, 0, .58f));
+            float x = width * .5f - 315, y = height * .5f - 190;
+            Panel(x, y, 630, 380);
+            r.Text(x + 28, y + 38, "도감 · 보이지 않는 존재들의 기록", gold, true);
+            for (int i = 0; i < 3; ++i)
+                r.Text(x + 28,
+                       y + 76 + i * 25,
+                       std::string(SpiritName(i)) +
+                           (captured && capturedSpirit == i ? " · 포획 완료" : " · 미포획"),
+                       captured && capturedSpirit == i ? gold : muted);
+            r.Text(x + 28,
+                   y + 162,
+                   captured ? SpiritStory(capturedSpirit)
+                            : "마을 주변에서 세 주령 중 한 마리를 포획할 수 있습니다.",
+                   ivory);
+            r.Text(
+                x + 28, y + 186, "포획한 주령은 Q로 조종합니다. 본체는 제자리에 남습니다.", muted);
+            r.Text(x + 28, y + 211, "간직한 물건", gold);
+            r.Text(x + 28,
+                   y + 239,
+                   toySword ? "나무칼 · 미라가 건넨 선물" : "아직 간직한 물건이 없습니다.",
+                   ivory);
+            r.Text(x + 28,
+                   y + 267,
+                   toySword ? "작은 다정함의 흔적. 훗날 어떤 의미가 될지는 아직 모릅니다."
+                            : "아직 이곳을 집이라 부르는 사람들과 이야기해 보세요.",
+                   muted);
+            r.Text(
+                x + 28, y + 329, "체험 기록은 종료 시 사라집니다. J 또는 ESC로 돌아갑니다.", gold);
         }
     }
-public:
-    explicit Prototype(Renderer& renderer):r(renderer) {
-        villageObjects={{0,-300,-210,140,110,92},{0,-70,-360,155,115,115},
-            {0,-440,90,130,100,85},{0,270,-250,145,110,98},
-            {2,330,240,65,35,30},{2,390,270,30,35,52},
-            {2,280,280,25,25,24}};
+
+  public:
+    explicit Prototype(Renderer& renderer) : r(renderer)
+    {
+        villageObjects = {{0, -300, -210, 140, 110, 92},
+                          {0, -70, -360, 155, 115, 115},
+                          {0, -440, 90, 130, 100, 85},
+                          {0, 270, -250, 145, 110, 98},
+                          {2, 330, 240, 65, 35, 30},
+                          {2, 390, 270, 30, 35, 52},
+                          {2, 280, 280, 25, 25, 24}};
         SpriteLayout eightDirections;
-        eightDirections.rows=8;
-        eightDirections.directionRows={{0,1,2,3,4,5,6,7}};
-        SpriteLayout protagonistLayout=eightDirections;
-        protagonistLayout.anchorAtTorso=true;
-        protagonistLayout.pingPongWalk=true;
-        if(!protagonistSheet.Load(L"Assets/Characters/protagonist.png",protagonistLayout))
-            std::cerr<<"주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다."<<std::endl;
-        if(!childSheet.Load(L"Assets/Characters/mira.png",eightDirections))
-            std::cerr<<"NPC1 스프라이트 로드 실패: 임시 외형을 사용합니다."<<std::endl;
-        if(!keeperSheet.Load(L"Assets/Characters/keeper.png",eightDirections))
-            std::cerr<<"NPC2 스프라이트 로드 실패: 임시 외형을 사용합니다."<<std::endl;
+        eightDirections.rows = 8;
+        eightDirections.directionRows = {{0, 1, 2, 3, 4, 5, 6, 7}};
+        SpriteLayout protagonistLayout = eightDirections;
+        protagonistLayout.anchorAtTorso = true;
+        protagonistLayout.pingPongWalk = true;
+        if (!protagonistSheet.Load(L"Assets/Characters/protagonist.png", protagonistLayout))
+            std::cerr << "주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다." << std::endl;
+        if (!childSheet.Load(L"Assets/Characters/mira.png", eightDirections))
+            std::cerr << "NPC1 스프라이트 로드 실패: 임시 외형을 사용합니다." << std::endl;
+        if (!keeperSheet.Load(L"Assets/Characters/keeper.png", eightDirections))
+            std::cerr << "NPC2 스프라이트 로드 실패: 임시 외형을 사용합니다." << std::endl;
         SpriteLayout attackLayout;
-        attackLayout.firstWalkFrame=0;attackLayout.walkFrames=4;attackLayout.anchorAtFeet=true;
-        if(!attackSheet.Load(L"Assets/Characters/protagonist_attack.png",attackLayout))
-            std::cerr<<"공격 스프라이트 로드 실패: 기본 외형으로 시전합니다."<<std::endl;
-        SpriteLayout spiritLayout; spiritLayout.rows=4;
-        spiritLayout.directionRows={{0,1,1,1,3,2,2,2}};
-        spiritLayout.firstWalkFrame=1; spiritLayout.walkFrames=3;
-        const wchar_t* spiritFiles[]={L"Assets/Spirits/ash_lantern_4dir.png",L"Assets/Spirits/mourning_bell_4dir.png",L"Assets/Spirits/briar_fox_4dir.png"};
-        for(int i=0;i<3;++i) if(!spiritSheets[i].Load(spiritFiles[i],spiritLayout))
-            std::cerr<<"주령 이미지 로드 실패: "<<SpiritName(i)<<std::endl;
-        world.Stream(camera,player,width,height);
+        attackLayout.firstWalkFrame = 0;
+        attackLayout.walkFrames = 4;
+        attackLayout.anchorAtFeet = true;
+        if (!attackSheet.Load(L"Assets/Characters/protagonist_attack.png", attackLayout))
+            std::cerr << "공격 스프라이트 로드 실패: 기본 외형으로 시전합니다." << std::endl;
+        SpriteLayout spiritLayout;
+        spiritLayout.rows = 4;
+        spiritLayout.directionRows = {{0, 1, 1, 1, 3, 2, 2, 2}};
+        spiritLayout.firstWalkFrame = 1;
+        spiritLayout.walkFrames = 3;
+        const wchar_t* spiritFiles[] = {L"Assets/Spirits/ash_lantern_4dir.png",
+                                        L"Assets/Spirits/mourning_bell_4dir.png",
+                                        L"Assets/Spirits/briar_fox_4dir.png"};
+        for (int i = 0; i < 3; ++i)
+            if (!spiritSheets[i].Load(spiritFiles[i], spiritLayout))
+                std::cerr << "주령 이미지 로드 실패: " << SpiritName(i) << std::endl;
+        world.Stream(camera, player, width, height);
+        Say("레벨 1 · 불씨의 수련",
+            "마을 밖의 붉은 적을 처치하세요. 자동 조준·발사 후 가까이 가면 전리품이 흡수됩니다.");
     }
-    void Resize(int w,int h) {width=w;height=h;r.Resize(w,h);}
-    void Key(unsigned char key,bool down) {
-        if(key>='A' && key<='Z') key=static_cast<unsigned char>(key-'A'+'a');
-        bool fresh=down&&!keys[key]; keys[key]=down;
-        if(!fresh) return;
-        if(key==27) { if(journal) journal=false; else messageTime=0; }
-        if(key=='p') { r.postProcess.enabled=!r.postProcess.enabled; Say("화면 효과",r.postProcess.enabled?"후처리를 켰습니다.":"후처리를 껐습니다."); }
-        if(key=='b') { r.postProcess.bloomEnabled=!r.postProcess.bloomEnabled; Say("빛 번짐",r.postProcess.bloomEnabled?"블룸을 켰습니다. 후처리도 켜져 있어야 적용됩니다.":"블룸을 껐습니다."); }
-        if(key=='j') journal=!journal;
-        if(journal) return;
-        if(key==' ') StartAttack();
-        if(key=='e'&&attackTime<0) Interact();
-        if(key=='q'&&attackTime<0) {
-            if(captured) { controlling=!controlling; Say("조종 전환",controlling?"주령을 조종합니다. WASD로 이동하고 Q로 본체에 돌아갑니다.":"방랑자의 몸으로 돌아왔습니다."); }
-            else Say("조종 전환","먼저 주령을 포획하세요. 마을 주변의 등불과 종, 여우를 찾아보세요.");
+
+    void Resize(int w, int h)
+    {
+        width = w;
+        height = h;
+        r.Resize(w, h);
+    }
+
+    void Key(unsigned char key, bool down)
+    {
+        if (key >= 'A' && key <= 'Z')
+            key = static_cast<unsigned char>(key - 'A' + 'a');
+        bool fresh = down && !keys[key];
+        keys[key] = down;
+        if (!fresh)
+            return;
+        if (key == 27)
+        {
+            if (journal)
+                journal = false;
+            else
+                messageTime = 0;
+        }
+        if (key == 'p')
+        {
+            r.postProcess.enabled = !r.postProcess.enabled;
+            Say("화면 효과", r.postProcess.enabled ? "후처리를 켰습니다." : "후처리를 껐습니다.");
+        }
+        if (key == 'b')
+        {
+            r.postProcess.bloomEnabled = !r.postProcess.bloomEnabled;
+            Say("빛 번짐",
+                r.postProcess.bloomEnabled ? "블룸을 켰습니다. 후처리도 켜져 있어야 적용됩니다."
+                                           : "블룸을 껐습니다.");
+        }
+        if (key == 'j')
+            journal = !journal;
+        if (journal)
+            return;
+        if (key == 'r' && levelOne.Dead())
+        {
+            levelOne = LevelOne();
+            player = {70, 160};
+            spirit = player;
+            camera = player;
+            controlling = false;
+            ClearInput();
+            Say("레벨 1 · 다시 피는 불씨",
+                "성장을 초기화했습니다. 마을 밖에서 파밍을 다시 시작하세요.");
+            return;
+        }
+        if (levelOne.Dead())
+            return;
+        if (key == 'f')
+            levelOne.automatic = !levelOne.automatic;
+        if (key == 'g')
+            levelOne.Upgrade(captured);
+        if (key == 'e')
+            Interact();
+        if (key == 'q')
+        {
+            if (captured)
+            {
+                controlling = !controlling;
+                Say("조종 전환",
+                    controlling ? "주령을 조종합니다. WASD로 이동하고 Q로 본체에 돌아갑니다."
+                                : "방랑자의 몸으로 돌아왔습니다.");
+            }
+            else
+                Say("조종 전환",
+                    "먼저 주령을 포획하세요. 마을 주변의 등불과 종, 여우를 찾아보세요.");
         }
     }
-    void Arrow(int key,bool down) {if(key>=0&&key<4) arrows[key]=down;}
-    void ClearInput() { for(bool& k:keys) k=false; for(bool& k:arrows) k=false; }
-    void Update(float dt, bool sprint = false) {
-        const WorldPoint previousPlayer=player;
-        const WorldPoint previousSpirit=spirit;
-        time+=dt; messageTime=(std::max)(0.f,messageTime-dt);
-        moving=false;
-        if(!journal) {
-            UpdateAttack(dt);
-            float sx=float(keys['d']||arrows[2])-float(keys['a']||arrows[0]);
-            float sy=float(keys['s']||arrows[3])-float(keys['w']||arrows[1]);
+
+    void Arrow(int key, bool down)
+    {
+        if (key >= 0 && key < 4)
+            arrows[key] = down;
+    }
+
+    void ClearInput()
+    {
+        for (bool& k : keys)
+            k = false;
+        for (bool& k : arrows)
+            k = false;
+    }
+
+    void Update(float dt, bool sprint = false)
+    {
+        dt = (std::max)(0.f, (std::min)(dt, .05f));
+        const WorldPoint previousPlayer = player;
+        const WorldPoint previousSpirit = spirit;
+        time += dt;
+        messageTime = (std::max)(0.f, messageTime - dt);
+        moving = false;
+        if (!journal && !levelOne.Dead())
+        {
+            float sx = float(keys['d'] || arrows[2]) - float(keys['a'] || arrows[0]);
+            float sy = float(keys['s'] || arrows[3]) - float(keys['w'] || arrows[1]);
             // Invert the isometric projection so keys correspond to screen directions.
-            float dx=sx/.85f+sy/.43f,dy=-sx/.85f+sy/.43f;
-            float length=std::sqrt(sx*sx+sy*sy);
-            if(length>0&&attackTime<0) {
+            float dx = sx / .85f + sy / .43f, dy = -sx / .85f + sy / .43f;
+            float length = std::sqrt(sx * sx + sy * sy);
+            if (length > 0)
+            {
                 const float pace = sprint ? 1.8f : 1.f;
-                float speed=(controlling?110.f:90.f)*pace;
-                dx=dx*.5f/length*speed*dt;dy=dy*.5f/length*speed*dt;
-                WorldPoint& actor=controlling?spirit:player;
-                WorldPoint next={actor.x+dx,actor.y}; if(!Blocked(next)) actor=next;
-                next={actor.x,actor.y+dy}; if(!Blocked(next)) actor=next;
-                moving=true; walk+=dt*10*pace;
+                float speed = (controlling ? 110.f : 90.f) * pace;
+                dx = dx * .5f / length * speed * dt;
+                dy = dy * .5f / length * speed * dt;
+                WorldPoint& actor = controlling ? spirit : player;
+                LevelOne::Move(actor,
+                               {dx, dy},
+                               [this](WorldPoint p)
+                               {
+                                   return Blocked(p);
+                               });
+                moving = true;
+                walk += dt * 10 * pace;
             }
-            if(captured&&!controlling) {
-                WorldPoint target={player.x+35,player.y+20};
-                float t=1-std::exp(-dt*3); spirit.x+=(target.x-spirit.x)*t; spirit.y+=(target.y-spirit.y)*t;
+            if (captured && !controlling)
+            {
+                WorldPoint target = {player.x + 35, player.y + 20};
+                float t = 1 - std::exp(-dt * 3);
+                LevelOne::Move(spirit,
+                               {(target.x - spirit.x) * t, (target.y - spirit.y) * t},
+                               [this](WorldPoint p)
+                               {
+                                   return Blocked(p);
+                               });
             }
         }
-        double actualX=player.x-previousPlayer.x,actualY=player.y-previousPlayer.y;
+        if (!journal)
+        {
+            levelOne.Update(dt,
+                            player,
+                            spirit,
+                            captured,
+                            controlling,
+                            keys[' '],
+                            [this](WorldPoint p)
+                            {
+                                return Blocked(p);
+                            });
+            if (!levelOne.notice.empty())
+            {
+                Say("레벨 1 · 불씨의 수련", levelOne.notice);
+                levelOne.notice.clear();
+            }
+        }
+        double actualX = player.x - previousPlayer.x, actualY = player.y - previousPlayer.y;
         // One pose per 13 screen pixels: sprinting and wall sliding follow actual travel.
         // Keep the stride phase when switching between walking and sprinting.
-        if(!journal) protagonistAnimation.Update((actualX-actualY)*.85,(actualX+actualY)*.43,dt,sprint,13.f);
-        const double spiritDX=spirit.x-previousSpirit.x,spiritDY=spirit.y-previousSpirit.y;
-        double screenDX=(spiritDX-spiritDY)*.85,screenDY=(spiritDX+spiritDY)*.43;
+        if (!journal)
+            protagonistAnimation.Update(
+                (actualX - actualY) * .85, (actualX + actualY) * .43, dt, sprint, 13.f);
+        const double spiritDX = spirit.x - previousSpirit.x, spiritDY = spirit.y - previousSpirit.y;
+        double screenDX = (spiritDX - spiritDY) * .85, screenDY = (spiritDX + spiritDY) * .43;
         // Ignore the tiny convergence tail of the following interpolation.
-        if(!controlling&&screenDX*screenDX+screenDY*screenDY<.0025) {screenDX=0;screenDY=0;}
-        if(!journal) companionAnimation.Update(screenDX,screenDY,dt,controlling&&sprint);
-        WorldPoint target=controlling?spirit:player;
-        if(Distance(target,camera)>2000) camera=target; // Distant vessel switch.
-        float t=1-std::exp(-dt*6);camera.x+=(target.x-camera.x)*t;camera.y+=(target.y-camera.y)*t;
-        world.Stream(camera,target,width,height);
+        if (!controlling && screenDX * screenDX + screenDY * screenDY < .0025)
+        {
+            screenDX = 0;
+            screenDY = 0;
+        }
+        if (!journal)
+            companionAnimation.Update(screenDX, screenDY, dt, controlling && sprint);
+        WorldPoint target = controlling ? spirit : player;
+        if (Distance(target, camera) > 2000)
+            camera = target; // Distant vessel switch.
+        float t = 1 - std::exp(-dt * 6);
+        camera.x += (target.x - camera.x) * t;
+        camera.y += (target.y - camera.y) * t;
+        world.Stream(camera, target, width, height);
     }
-    void Draw() {
-        r.Begin(Color(.035f,.052f,.069f));
-        objects=villageObjects;
-        for(const auto& pair:world.chunks) {
-            const World::Chunk& chunk=pair.second;
-            for(const Object& o:chunk.objects) objects.push_back(o);
-            for(int y=0;y<8;++y) for(int x=0;x<8;++x) {
-                World::Coordinate tx=chunk.key.first*8+x,ty=chunk.key.second*8+y;
-                double wx=double(tx)*64,wy=double(ty)*64;
-                Point p=Screen(wx,wy);
-                if(p.x < -120 || p.x > width+120 || p.y < -100 || p.y > height+100) continue;
-                auto hash=World::Hash(tx,ty,42);
-                float shade=float(hash%15)*.002f;
-                Color color=chunk.biome==0?Color(.095f+shade,.125f+shade,.13f+shade):
-                    (chunk.biome==1?Color(.12f+shade,.145f+shade,.145f+shade):Color(.15f+shade,.14f+shade,.14f+shade));
-                if(World::Village(wx,wy)) color=Color(.11f+shade,.13f+shade,.13f+shade);
-                bool road=World::Road(tx,ty);
-                if(road) color=Color(.23f+shade,.23f+shade,.20f+shade);
-                Ground(wx,wy,64,64,color);
-                if(road) Ground(wx+12+double(hash%17),wy+15,16,10,Color(.32f,.31f,.26f,.5f));
-                else r.Line(p,{p.x+3,p.y-4},1,Color(.24f,.27f,.24f,.4f));
+
+    void Draw()
+    {
+        r.Begin(Color(.035f, .052f, .069f));
+        objects = villageObjects;
+        for (const auto& pair : world.chunks)
+        {
+            const World::Chunk& chunk = pair.second;
+            for (const Object& o : chunk.objects)
+                objects.push_back(o);
+            for (int y = 0; y < 8; ++y)
+                for (int x = 0; x < 8; ++x)
+                {
+                    World::Coordinate tx = chunk.key.first * 8 + x, ty = chunk.key.second * 8 + y;
+                    double wx = double(tx) * 64, wy = double(ty) * 64;
+                    Point p = Screen(wx, wy);
+                    if (p.x < -120 || p.x > width + 120 || p.y < -100 || p.y > height + 100)
+                        continue;
+                    auto hash = World::Hash(tx, ty, 42);
+                    float shade = float(hash % 15) * .002f;
+                    Color color =
+                        chunk.biome == 0
+                            ? Color(.095f + shade, .125f + shade, .13f + shade)
+                            : (chunk.biome == 1 ? Color(.12f + shade, .145f + shade, .145f + shade)
+                                                : Color(.15f + shade, .14f + shade, .14f + shade));
+                    if (World::Village(wx, wy))
+                        color = Color(.11f + shade, .13f + shade, .13f + shade);
+                    bool road = World::Road(tx, ty);
+                    if (road)
+                        color = Color(.23f + shade, .23f + shade, .20f + shade);
+                    Ground(wx, wy, 64, 64, color);
+                    if (road)
+                        Ground(wx + 12 + double(hash % 17),
+                               wy + 15,
+                               16,
+                               10,
+                               Color(.32f, .31f, .26f, .5f));
+                    else
+                        r.Line(p, {p.x + 3, p.y - 4}, 1, Color(.24f, .27f, .24f, .4f));
+                }
+        }
+        Ground(-165, -145, 330, 290, Color(.24f, .24f, .21f));
+
+        struct Entry
+        {
+            double depth;
+            int index;
+        };
+
+        std::vector<Entry> order;
+        for (size_t i = 0; i < objects.size(); ++i)
+        {
+            const Object& o = objects[i];
+            Point bounds = Screen(o.x + o.w * .5, o.y + o.d * .5);
+            if (bounds.x < -300 || bounds.x > width + 300 || bounds.y < -250 ||
+                bounds.y > height + 350)
+                continue;
+            order.push_back({o.x + o.y + o.w + o.d, static_cast<int>(i)});
+        }
+        order.push_back({0, -1});
+        order.push_back({child.x + child.y, -2});
+        order.push_back({keeper.x + keeper.y, -3});
+        order.push_back({player.x + player.y, -4});
+        for (int i = 0; i < 3; ++i)
+            if (!captured || capturedSpirit != i)
+                order.push_back({wildSpirits[i].x + wildSpirits[i].y, -5 - i});
+        if (captured)
+            order.push_back({spirit.x + spirit.y, -8});
+        for (size_t i = 0; i < levelOne.enemies.size(); ++i)
+            order.push_back({levelOne.enemies[i].position.x + levelOne.enemies[i].position.y,
+                             -1000 - static_cast<int>(i)});
+        std::stable_sort(order.begin(),
+                         order.end(),
+                         [](const Entry& a, const Entry& b)
+                         {
+                             return a.depth < b.depth;
+                         });
+        for (const Entry& entry : order)
+        {
+            if (entry.index >= 0)
+            {
+                const Object& o = objects[entry.index];
+                if (o.kind == 0)
+                    House(o);
+                else if (o.kind == 1)
+                    Tree(o);
+                else
+                    Box(o.x,
+                        o.y,
+                        o.w,
+                        o.d,
+                        o.h,
+                        Color(.33f, .36f, .35f),
+                        Color(.23f, .27f, .28f),
+                        Color(.17f, .21f, .23f));
+            }
+            else if (entry.index == -1)
+                Hearth();
+            else if (entry.index == -2)
+                Person(child, Color(.48f, .36f, .29f), false, true);
+            else if (entry.index == -3)
+                Person(keeper, Color(.33f, .37f, .34f), false);
+            else if (entry.index == -4)
+                Person(player, Color(.44f, .49f, .52f), true);
+            else if (entry.index <= -1000)
+                DrawEnemy(levelOne.enemies[-entry.index - 1000]);
+            else if (entry.index == -8)
+                Wisp(capturedSpirit, spirit);
+            else
+            {
+                int type = -entry.index - 5;
+                Wisp(type, wildSpirits[type]);
             }
         }
-        Ground(-165,-145,330,290,Color(.24f,.24f,.21f));
-        struct Entry {double depth;int index;};
-        std::vector<Entry> order;
-        for(size_t i=0;i<objects.size();++i) {
-            const Object& o=objects[i];
-            Point bounds=Screen(o.x+o.w*.5,o.y+o.d*.5);
-            if(bounds.x < -300 || bounds.x > width+300 || bounds.y < -250 || bounds.y > height+350) continue;
-            order.push_back({o.x+o.y+o.w+o.d,static_cast<int>(i)});
-        }
-        order.push_back({0,-1});order.push_back({child.x+child.y,-2});
-        order.push_back({keeper.x+keeper.y,-3});order.push_back({player.x+player.y,-4});
-        for(int i=0;i<3;++i) if(!captured||capturedSpirit!=i)
-            order.push_back({wildSpirits[i].x+wildSpirits[i].y,-5-i});
-        if(captured) order.push_back({spirit.x+spirit.y,-8});
-        if(boltLife>0||impactLife>0) {WorldPoint effect=boltLife>0?bolt:impact;order.push_back({effect.x+effect.y,-9});}
-        std::stable_sort(order.begin(),order.end(),[](const Entry& a,const Entry& b){return a.depth<b.depth;});
-        for(const Entry& entry:order) {
-            if(entry.index>=0) {
-                const Object& o=objects[entry.index];
-                if(o.kind==0) House(o);
-                else if(o.kind==1) Tree(o);
-                else Box(o.x,o.y,o.w,o.d,o.h,Color(.33f,.36f,.35f),Color(.23f,.27f,.28f),Color(.17f,.21f,.23f));
-            } else if(entry.index==-1) Hearth();
-            else if(entry.index==-2) Person(child,Color(.48f,.36f,.29f),false,true);
-            else if(entry.index==-3) Person(keeper,Color(.33f,.37f,.34f),false);
-            else if(entry.index==-4) Person(player,Color(.44f,.49f,.52f),true);
-            else if(entry.index==-9) SpellEffect();
-            else if(entry.index==-8) Wisp(capturedSpirit,spirit);
-            else {int type=-entry.index-5; Wisp(type,wildSpirits[type]);}
-        }
+        DrawLootAndProjectiles();
         // Moving low fog and airborne ash, deliberately subtle over the scene.
-        for(int i=0;i<9;++i) {
-            float x=std::fmod(i*197.f+time*9,width+350.f)-175;
-            r.Ellipse(x,height*.25f+i*67,210,20,Color(.38f,.48f,.51f,.025f));
+        for (int i = 0; i < 9; ++i)
+        {
+            float x = std::fmod(i * 197.f + time * 9, width + 350.f) - 175;
+            r.Ellipse(x, height * .25f + i * 67, 210, 20, Color(.38f, .48f, .51f, .025f));
         }
-        for(int i=0;i<40;++i) {
-            float x=std::fmod(i*131.f+time*13,width+10.f);
-            float y=std::fmod(i*73.f+time*8,height+10.f);
-            r.Rect(x,y,2,2,Color(.67f,.65f,.55f,.2f));
+        for (int i = 0; i < 40; ++i)
+        {
+            float x = std::fmod(i * 131.f + time * 13, width + 10.f);
+            float y = std::fmod(i * 73.f + time * 8, height + 10.f);
+            r.Rect(x, y, 2, 2, Color(.67f, .65f, .55f, .2f));
         }
         r.FinishScene(); // Post-process the world before drawing crisp UI and text.
         // Framing bars keep the world visually quiet behind the interface.
-        r.Rect(0,0,float(width),10,Color(.02f,.03f,.04f));
-        HUD();r.Flush();
+        r.Rect(0, 0, float(width), 10, Color(.02f, .03f, .04f));
+        HUD();
+        r.Flush();
     }
 };
-
-
-
-
-
-
-
-
-
-
-

@@ -2,7 +2,8 @@
 #include "Dependencies/glew.h"
 #include <iostream>
 
-struct PostProcessSettings {
+struct PostProcessSettings
+{
     bool enabled = true;
     float exposure = 1.15f;
     bool bloomEnabled = true;
@@ -14,64 +15,99 @@ struct PostProcessSettings {
 };
 
 // Linear HDR scene -> half-resolution blur/bloom -> tone mapping -> display-space UI.
-class PostProcessing {
-    GLuint filter=0, composite=0, vao=0;
-    GLuint textures[7]={}, framebuffers[7]={};
-    int width=0,height=0,halfWidth=0,halfHeight=0;
-    bool ready=false;
-    static GLuint Program(const char* fragment) {
-        const char* vertex=R"GLSL(#version 330
+class PostProcessing
+{
+    GLuint filter = 0, composite = 0, vao = 0;
+    GLuint textures[7] = {}, framebuffers[7] = {};
+    int width = 0, height = 0, halfWidth = 0, halfHeight = 0;
+    bool ready = false;
+
+    static GLuint Program(const char* fragment)
+    {
+        const char* vertex = R"GLSL(#version 330
 out vec2 uv;
 void main() {
     vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);
     uv=p; gl_Position=vec4(p*2.0-1.0,0.0,1.0);
 }
 )GLSL";
-        GLuint shaders[2]={glCreateShader(GL_VERTEX_SHADER),glCreateShader(GL_FRAGMENT_SHADER)};
-        const char* sources[2]={vertex,fragment};
-        bool valid=true;
-        for(int i=0;i<2;++i) {
-            glShaderSource(shaders[i],1,&sources[i],nullptr);glCompileShader(shaders[i]);
-            GLint ok=0;glGetShaderiv(shaders[i],GL_COMPILE_STATUS,&ok);
-            if(!ok) {
-                char log[2048]={};glGetShaderInfoLog(shaders[i],sizeof(log),nullptr,log);
-                std::cerr<<"후처리 셰이더 오류: "<<log<<std::endl;valid=false;
+        GLuint shaders[2] = {glCreateShader(GL_VERTEX_SHADER), glCreateShader(GL_FRAGMENT_SHADER)};
+        const char* sources[2] = {vertex, fragment};
+        bool valid = true;
+        for (int i = 0; i < 2; ++i)
+        {
+            glShaderSource(shaders[i], 1, &sources[i], nullptr);
+            glCompileShader(shaders[i]);
+            GLint ok = 0;
+            glGetShaderiv(shaders[i], GL_COMPILE_STATUS, &ok);
+            if (!ok)
+            {
+                char log[2048] = {};
+                glGetShaderInfoLog(shaders[i], sizeof(log), nullptr, log);
+                std::cerr << "후처리 셰이더 오류: " << log << std::endl;
+                valid = false;
             }
         }
-        GLuint program=0;
-        if(valid) {
-            program=glCreateProgram();
-            for(GLuint shader:shaders) glAttachShader(program,shader);
+        GLuint program = 0;
+        if (valid)
+        {
+            program = glCreateProgram();
+            for (GLuint shader : shaders)
+                glAttachShader(program, shader);
             glLinkProgram(program);
-            GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);
-            if(!ok) {
-                char log[2048]={};glGetProgramInfoLog(program,sizeof(log),nullptr,log);
-                std::cerr<<"후처리 연결 오류: "<<log<<std::endl;
-                glDeleteProgram(program);program=0;
+            GLint ok = 0;
+            glGetProgramiv(program, GL_LINK_STATUS, &ok);
+            if (!ok)
+            {
+                char log[2048] = {};
+                glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+                std::cerr << "후처리 연결 오류: " << log << std::endl;
+                glDeleteProgram(program);
+                program = 0;
             }
         }
-        for(GLuint shader:shaders) glDeleteShader(shader);
+        for (GLuint shader : shaders)
+            glDeleteShader(shader);
         return program;
     }
-    void ReleaseTargets() {
-        glDeleteTextures(7,textures);glDeleteFramebuffers(7,framebuffers);
-        for(int i=0;i<7;++i) {textures[i]=0;framebuffers[i]=0;}
-        ready=false;
+
+    void ReleaseTargets()
+    {
+        glDeleteTextures(7, textures);
+        glDeleteFramebuffers(7, framebuffers);
+        for (int i = 0; i < 7; ++i)
+        {
+            textures[i] = 0;
+            framebuffers[i] = 0;
+        }
+        ready = false;
     }
-    void Pass(int source,int destination,bool horizontal,bool extract,float threshold,float radius=1.f) {
-        glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[destination]);
-        glViewport(0,0,halfWidth,halfHeight);
+
+    void Pass(int source,
+              int destination,
+              bool horizontal,
+              bool extract,
+              float threshold,
+              float radius = 1.f)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[destination]);
+        glViewport(0, 0, halfWidth, halfHeight);
         glUseProgram(filter);
-        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,textures[source]);
-        glUniform1i(glGetUniformLocation(filter,"sourceImage"),0);
-        glUniform2f(glGetUniformLocation(filter,"direction"),horizontal?radius:0.f,horizontal?0.f:radius);
-        glUniform1i(glGetUniformLocation(filter,"extractBright"),extract?1:0);
-        glUniform1f(glGetUniformLocation(filter,"threshold"),threshold);
-        glDrawArrays(GL_TRIANGLES,0,3);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textures[source]);
+        glUniform1i(glGetUniformLocation(filter, "sourceImage"), 0);
+        glUniform2f(glGetUniformLocation(filter, "direction"),
+                    horizontal ? radius : 0.f,
+                    horizontal ? 0.f : radius);
+        glUniform1i(glGetUniformLocation(filter, "extractBright"), extract ? 1 : 0);
+        glUniform1f(glGetUniformLocation(filter, "threshold"), threshold);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
     }
-public:
-    PostProcessing() {
-        filter=Program(R"GLSL(#version 330
+
+  public:
+    PostProcessing()
+    {
+        filter = Program(R"GLSL(#version 330
 in vec2 uv; out vec4 result;
 uniform sampler2D sourceImage;
 uniform vec2 direction;
@@ -96,7 +132,7 @@ void main() {
     result=vec4(color,1.0);
 }
 )GLSL");
-        composite=Program(R"GLSL(#version 330
+        composite = Program(R"GLSL(#version 330
 in vec2 uv; out vec4 result;
 uniform sampler2D sceneImage,blurImage,bloomImage,broadBloomImage;
 uniform float exposure,bloomStrength,vignetteStrength,edgeBlurStrength;
@@ -117,85 +153,130 @@ void main() {
     result=vec4(pow(color,vec3(1.0/2.2)),1.0);
 }
 )GLSL");
-        glGenVertexArrays(1,&vao);
+        glGenVertexArrays(1, &vao);
     }
-    ~PostProcessing() {
+
+    ~PostProcessing()
+    {
         ReleaseTargets();
-        if(filter) glDeleteProgram(filter);
-        if(composite) glDeleteProgram(composite);
-        if(vao) glDeleteVertexArrays(1,&vao);
+        if (filter)
+            glDeleteProgram(filter);
+        if (composite)
+            glDeleteProgram(composite);
+        if (vao)
+            glDeleteVertexArrays(1, &vao);
     }
-    void Resize(int w,int h) {
-        if(ready&&width==w&&height==h) return;
-        ReleaseTargets();width=w;height=h;
-        halfWidth=w/2>0?w/2:1;halfHeight=h/2>0?h/2:1;
-        if(!filter||!composite||!vao) return;
-        glGenTextures(7,textures);glGenFramebuffers(7,framebuffers);
-        ready=true;
-        for(int i=0;i<7;++i) {
-            glBindTexture(GL_TEXTURE_2D,textures[i]);
-            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA16F,i==0?w:halfWidth,i==0?h:halfHeight,
-                         0,GL_RGBA,GL_FLOAT,nullptr);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-            glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[i]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,textures[i],0);
+
+    void Resize(int w, int h)
+    {
+        if (ready && width == w && height == h)
+            return;
+        ReleaseTargets();
+        width = w;
+        height = h;
+        halfWidth = w / 2 > 0 ? w / 2 : 1;
+        halfHeight = h / 2 > 0 ? h / 2 : 1;
+        if (!filter || !composite || !vao)
+            return;
+        glGenTextures(7, textures);
+        glGenFramebuffers(7, framebuffers);
+        ready = true;
+        for (int i = 0; i < 7; ++i)
+        {
+            glBindTexture(GL_TEXTURE_2D, textures[i]);
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA16F,
+                         i == 0 ? w : halfWidth,
+                         i == 0 ? h : halfHeight,
+                         0,
+                         GL_RGBA,
+                         GL_FLOAT,
+                         nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[i]);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures[i], 0);
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
-            if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE) ready=false;
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                ready = false;
         }
-        glBindFramebuffer(GL_FRAMEBUFFER,0);glBindTexture(GL_TEXTURE_2D,0);
-        if(!ready) {
-            std::cerr<<"후처리 버퍼 생성 실패: 기본 렌더링으로 전환합니다."<<std::endl;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        if (!ready)
+        {
+            std::cerr << "후처리 버퍼 생성 실패: 기본 렌더링으로 전환합니다." << std::endl;
             ReleaseTargets();
         }
     }
-    bool Begin(bool enabled) {
-        bool active=enabled&&ready;
-        glBindFramebuffer(GL_FRAMEBUFFER,active?framebuffers[0]:0);
-        glViewport(0,0,width,height);
+
+    bool Begin(bool enabled)
+    {
+        bool active = enabled && ready;
+        glBindFramebuffer(GL_FRAMEBUFFER, active ? framebuffers[0] : 0);
+        glViewport(0, 0, width, height);
         glDisable(GL_FRAMEBUFFER_SRGB);
         return active;
     }
-    void Finish(const PostProcessSettings& settings) {
-        glDisable(GL_BLEND);glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);
+
+    void Finish(const PostProcessSettings& settings)
+    {
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
         glBindVertexArray(vao);
-        Pass(0,1,true,false,settings.bloomThreshold);
-        Pass(1,2,false,false,settings.bloomThreshold);
-        if(settings.bloomEnabled) {
-            Pass(0,3,true,true,settings.bloomThreshold);
-            Pass(3,4,false,false,settings.bloomThreshold);
-            Pass(4,3,true,false,settings.bloomThreshold);
-            Pass(3,4,false,false,settings.bloomThreshold);
+        Pass(0, 1, true, false, settings.bloomThreshold);
+        Pass(1, 2, false, false, settings.bloomThreshold);
+        if (settings.bloomEnabled)
+        {
+            Pass(0, 3, true, true, settings.bloomThreshold);
+            Pass(3, 4, false, false, settings.bloomThreshold);
+            Pass(4, 3, true, false, settings.bloomThreshold);
+            Pass(3, 4, false, false, settings.bloomThreshold);
             // Keep texture 4 intact as the tight halo; 5/6 hold the broad halo.
-            const float radius=settings.bloomRadius>0.f?settings.bloomRadius:1.f;
-            Pass(4,5,true,false,settings.bloomThreshold,radius);
-            Pass(5,6,false,false,settings.bloomThreshold,radius);
-            Pass(6,5,true,false,settings.bloomThreshold,radius);
-            Pass(5,6,false,false,settings.bloomThreshold,radius);
-        } else {
+            const float radius = settings.bloomRadius > 0.f ? settings.bloomRadius : 1.f;
+            Pass(4, 5, true, false, settings.bloomThreshold, radius);
+            Pass(5, 6, false, false, settings.bloomThreshold, radius);
+            Pass(6, 5, true, false, settings.bloomThreshold, radius);
+            Pass(5, 6, false, false, settings.bloomThreshold, radius);
+        }
+        else
+        {
             // Avoid sampling uninitialized or stale bloom when toggled off.
-            glClearColor(0,0,0,0);
-            glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[4]);glClear(GL_COLOR_BUFFER_BIT);
-            glBindFramebuffer(GL_FRAMEBUFFER,framebuffers[6]);glClear(GL_COLOR_BUFFER_BIT);
+            glClearColor(0, 0, 0, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[4]);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[6]);
+            glClear(GL_COLOR_BUFFER_BIT);
         }
-        glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,width,height);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, width, height);
         glUseProgram(composite);
-        const int indices[4]={0,2,4,6};
-        const char* names[4]={"sceneImage","blurImage","bloomImage","broadBloomImage"};
-        for(int i=0;i<4;++i) {
-            glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,textures[indices[i]]);
-            glUniform1i(glGetUniformLocation(composite,names[i]),i);
+        const int indices[4] = {0, 2, 4, 6};
+        const char* names[4] = {"sceneImage", "blurImage", "bloomImage", "broadBloomImage"};
+        for (int i = 0; i < 4; ++i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, textures[indices[i]]);
+            glUniform1i(glGetUniformLocation(composite, names[i]), i);
         }
-        glUniform1f(glGetUniformLocation(composite,"exposure"),settings.exposure);
-        glUniform1f(glGetUniformLocation(composite,"bloomStrength"),settings.bloomEnabled?settings.bloomStrength:0.f);
-        glUniform1f(glGetUniformLocation(composite,"vignetteStrength"),settings.vignetteStrength);
-        glUniform1f(glGetUniformLocation(composite,"edgeBlurStrength"),settings.edgeBlurStrength);
-        glDrawArrays(GL_TRIANGLES,0,3);
-        for(int i=3;i>=0;--i) {glActiveTexture(GL_TEXTURE0+i);glBindTexture(GL_TEXTURE_2D,0);}
-        glBindVertexArray(0);glUseProgram(0);
-        glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glUniform1f(glGetUniformLocation(composite, "exposure"), settings.exposure);
+        glUniform1f(glGetUniformLocation(composite, "bloomStrength"),
+                    settings.bloomEnabled ? settings.bloomStrength : 0.f);
+        glUniform1f(glGetUniformLocation(composite, "vignetteStrength"), settings.vignetteStrength);
+        glUniform1f(glGetUniformLocation(composite, "edgeBlurStrength"), settings.edgeBlurStrength);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        for (int i = 3; i >= 0; --i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        glBindVertexArray(0);
+        glUseProgram(0);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 };
-

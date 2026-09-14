@@ -158,6 +158,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
+    <ClInclude Include="LevelOne.h" />
     <ClInclude Include="PostProcessing.h" />
     <ClInclude Include="Prototype.h" />
     <ClInclude Include="stdafx.h" />
