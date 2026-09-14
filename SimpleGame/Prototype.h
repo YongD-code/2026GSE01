@@ -314,7 +314,10 @@ public:
         SpriteLayout eightDirections;
         eightDirections.rows=8;
         eightDirections.directionRows={{0,1,2,3,4,5,6,7}};
-        if(!protagonistSheet.Load(L"Assets/Characters/protagonist.png",eightDirections))
+        SpriteLayout protagonistLayout=eightDirections;
+        protagonistLayout.anchorAtTorso=true;
+        protagonistLayout.pingPongWalk=true;
+        if(!protagonistSheet.Load(L"Assets/Characters/protagonist.png",protagonistLayout))
             std::cerr<<"주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다."<<std::endl;
         if(!childSheet.Load(L"Assets/Characters/mira.png",eightDirections))
             std::cerr<<"NPC1 스프라이트 로드 실패: 임시 외형을 사용합니다."<<std::endl;
@@ -378,7 +381,9 @@ public:
             }
         }
         double actualX=player.x-previousPlayer.x,actualY=player.y-previousPlayer.y;
-        protagonistAnimation.Update((actualX-actualY)*.85,(actualX+actualY)*.43,dt,sprint);
+        // One pose per 13 screen pixels: sprinting and wall sliding follow actual travel.
+        // Keep the stride phase when switching between walking and sprinting.
+        if(!journal) protagonistAnimation.Update((actualX-actualY)*.85,(actualX+actualY)*.43,dt,sprint,13.f);
         const double spiritDX=spirit.x-previousSpirit.x,spiritDY=spirit.y-previousSpirit.y;
         double screenDX=(spiritDX-spiritDY)*.85,screenDY=(spiritDX+spiritDY)*.43;
         // Ignore the tiny convergence tail of the following interpolation.

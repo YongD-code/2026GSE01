@@ -17,12 +17,14 @@ struct SpriteLayout {
     std::array<int,8> directionRows={{0,1,1,1,3,2,2,2}};
     int idleFrame=0, firstWalkFrame=1, walkFrames=3;
     bool anchorAtFeet=false;
+    bool anchorAtTorso=false;
+    bool pingPongWalk=false;
 };
 struct SpriteAnimation {
     Facing facing=Facing::South;
     float phase=0;
     bool moving=false;
-    void Update(double x,double y,float dt,bool sprint) {
+    void Update(double x,double y,float dt,bool sprint,float pixelsPerFrame=0.f) {
         moving=std::abs(x)+std::abs(y)>.00001;
         if(!moving) {phase=0;return;}
         const double length=std::sqrt(x*x+y*y);
@@ -31,7 +33,9 @@ struct SpriteAnimation {
         if(sy>0) facing=sx<0?Facing::SouthWest:(sx>0?Facing::SouthEast:Facing::South);
         else if(sy<0) facing=sx<0?Facing::NorthWest:(sx>0?Facing::NorthEast:Facing::North);
         else facing=sx<0?Facing::West:Facing::East;
-        phase=std::fmod(phase+dt*(sprint?11.f:7.f),1024.f);
+        // Distance-driven playback keeps footsteps in sync with collision-limited movement.
+        const float advance=pixelsPerFrame>0.f?static_cast<float>(length)/pixelsPerFrame:dt*(sprint?11.f:7.f);
+        phase=std::fmod(phase+advance,1024.f);
     }
 };
 
@@ -104,6 +108,16 @@ public:
                 }
                 if(weight>0) anchor=static_cast<float>(sum/weight);
             }
+            if(layout.anchorAtTorso) {
+                // Coattails and outstretched boots must not pull the body sideways.
+                // Use the opaque torso rather than the changing silhouette bounds.
+                double sum=0,weight=0;
+                for(int y=minY+h*3/10;y<=minY+h/2;++y) for(int x=minX;x<=maxX;++x) {
+                    unsigned char alpha=pixels[(static_cast<size_t>(y)*width+x)*4+3];
+                    if(alpha>128) {sum+=(x-minX)*double(alpha);weight+=alpha;}
+                }
+                if(weight>0) anchor=static_cast<float>(sum/weight);
+            }
             frames.push_back({(minX+.5f)/width,(minY+.5f)/height,(maxX+.5f)/width,(maxY+.5f)/height,w,h,anchor});
             referenceHeight=(std::max)(referenceHeight,h);
         }
@@ -143,7 +157,16 @@ void main(){vec4 pixel=texture(image,uv);if(pixel.a<.01)discard;
     void Draw(Renderer& renderer,Point feet,float size,const SpriteAnimation& animation,Color tint,int width,int height,float emission=0.f) {
         if(!Ready()) return;
         int row=layout.directionRows[static_cast<int>(animation.facing)];
-        int column=animation.moving?layout.firstWalkFrame+static_cast<int>(animation.phase)%layout.walkFrames:layout.idleFrame;
+        int column=layout.idleFrame;
+        if(animation.moving) {
+            int step=0;
+            if(layout.pingPongWalk&&layout.walkFrames>1) {
+                const int period=2*(layout.walkFrames-1);
+                step=static_cast<int>(animation.phase)%period;
+                if(step>=layout.walkFrames) step=period-step;
+            } else step=static_cast<int>(animation.phase)%layout.walkFrames;
+            column=layout.firstWalkFrame+step;
+        }
         const Frame& frame=frames[row*layout.columns+column];
         float scale=size/referenceHeight,w=frame.width*scale,h=frame.height*scale;
         if(feet.x+w<0||feet.x-w>width||feet.y<0||feet.y-h>height) return;
