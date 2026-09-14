@@ -24,6 +24,7 @@ public:
     void Begin(Color background);
     void Flush();
     void FinishScene();
+    bool IsHDRScene() const { return m_InHDRScene; }
     PostProcessSettings postProcess;
     void Triangle(Point a, Point b, Point c, Color color);
     void Quad(Point a, Point b, Point c, Point d, Color color);
@@ -48,4 +49,5 @@ private:
     };
     std::map<std::string, TextBitmap> m_TextCache;
 };
+
 

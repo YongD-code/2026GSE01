@@ -1,6 +1,7 @@
 #pragma once
 #include "Renderer.h"
 #include "World.h"
+#include "SpriteSheet.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -13,6 +14,24 @@ class Prototype {
     World world;
     std::vector<Object> villageObjects;
     Renderer& r;
+    SpriteSheet protagonistSheet, childSheet, keeperSheet;
+    SpriteAnimation protagonistAnimation;
+    SpriteSheet attackSheet;
+    Facing attackFacing=Facing::South;
+    float attackTime=-1, attackCooldown=0, boltLife=0, impactLife=0;
+    float spiritHit[3]={};
+    WorldPoint bolt={0,0}, boltVelocity={0,0}, impact={0,0};
+    bool attackReleased=false;
+    SpriteSheet spiritSheets[3];
+    SpriteAnimation companionAnimation;
+    const WorldPoint wildSpirits[3]={{300,160},{-220,250},{220,360}};
+    int capturedSpirit=0;
+    const char* SpiritName(int type) const {
+        static const char* names[]={"재등불","울음종","가시여우"}; return names[type];
+    }
+    const char* SpiritStory(int type) const {
+        static const char* stories[]={"꺼진 집의 온기를 품고 떠도는 작은 등불.","돌아오지 않는 이를 기다리며 소리 없이 우는 종.","버려진 숲의 약속을 지키는 가면 쓴 여우."}; return stories[type];
+    }
     int width=1280, height=800;
     bool keys[256] = {};
     bool arrows[4] = {};
@@ -49,12 +68,20 @@ class Prototype {
         }
         return false;
     }
+    int NearestWild() const {
+        double best=90; int found=-1;
+        for(int i=0;i<3;++i) {
+            if(captured&&i==capturedSpirit) continue;
+            double d=Distance(player,wildSpirits[i]); if(d<best) {best=d;found=i;}
+        } return found;
+    }
     int Nearby() const {
         if (controlling) return -1;
         double best=90; int target=-1;
-        const WorldPoint positions[]={child,keeper,spirit,fire};
+        int nearest=NearestWild();
+        const WorldPoint positions[]={child,keeper,nearest>=0?wildSpirits[nearest]:spirit,fire};
         for(int i=0;i<4;++i) {
-            if(i==2 && captured) continue;
+            if(i==2 && nearest<0) continue;
             double d=Distance(player,positions[i]);
             if(d<best) { best=d; target=i; }
         }
@@ -70,13 +97,16 @@ class Prototype {
                 ++childTalk;
                 Say("마을 아이 · 미라", childTalk%2 ?
                     "아직 가지고 있네. 엄마가 그랬어. 작은 물건도 다정한 마음을 기억한대." :
-                    "무덤 곁의 푸른 빛 말이야… 불 가까이에는 오지 않아.");
+                    "마을 밖에서 작은 등불이 걸어 다니는 걸 봤어. 여우도 있었고…");
             }
             break;
         case 1: Say("불씨지기", "불씨 하나면 충분하오. 잠시 쉬어 가시오, 나그네. 길은 달아나지 않으니."); break;
-        case 2:
-            captured=true;
-            Say("도감 · 새로운 기록", "슬픔의 도깨비불을 포획했습니다. Q로 조종하고 J로 기록을 살펴보세요.");
+        case 2: {
+            int selected=NearestWild(); if(selected<0) break;
+            if(captured) { Say(SpiritName(selected),"이번 체험의 포획 기회를 이미 사용했습니다. 다른 주령도 관찰해 보세요."); break; }
+            capturedSpirit=selected; spirit=wildSpirits[selected]; captured=true;
+            Say("도감 · 새로운 기록",std::string(SpiritName(selected))+"을 포획했습니다. Q로 조종하고 J로 기록을 살펴보세요.");
+        }
             break;
         case 3: Say("마지막 불씨", "잠시나마 마을이 안전하게 느껴진다. 아직 누군가 이 불을 지키고 있다."); break;
         default: break;
@@ -115,36 +145,96 @@ class Prototype {
             r.Line(tip,{tip.x+side*10,tip.y-21},2,Color(.22f,.21f,.22f));
         }
     }
-    void Person(WorldPoint pos, Color coat, bool active, bool childSize=false) {
+    void Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize=false) {
         Point p=Screen(pos.x,pos.y);
-        float scale=childSize?.8f:1.f;
-        float sway=active&&moving?std::sin(walk)*2:0;
-        r.Ellipse(p.x,p.y+1,15*scale,6,Color(0,0,0,.4f));
-        if(active) r.Ellipse(p.x,p.y,19,8,Color(.75f,.69f,.45f,.22f));
-        r.Line({p.x-5,p.y-12*scale},{p.x-6+sway,p.y},4,Color(.11f,.12f,.14f));
-        r.Line({p.x+5,p.y-12*scale},{p.x+6-sway,p.y},4,Color(.11f,.12f,.14f));
-        r.Triangle({p.x,p.y-43*scale},{p.x-15*scale,p.y-8*scale},{p.x+15*scale,p.y-8*scale},coat);
-        r.Triangle({p.x,p.y-40*scale},{p.x+2,p.y-8*scale},{p.x+15*scale,p.y-8*scale},
-            Color(coat.r*.65f,coat.g*.65f,coat.b*.65f));
-        r.Ellipse(p.x,p.y-44*scale,9*scale,11*scale,Color(.17f,.18f,.20f));
-        r.Rect(p.x-4*scale,p.y-46*scale,9*scale,8*scale,Color(.61f,.53f,.43f));
-        if(active) {
-            r.Line({p.x+12,p.y-30},{p.x+18,p.y-3},3,Color(.58f,.54f,.42f));
-            r.Rect(p.x-11,p.y-34,21,4,Color(.48f,.31f,.26f));
+        const float spriteHeight=childSize?55.f:78.f;
+        if(p.x < -80 || p.x > width+80 || p.y < -20 || p.y > height+100) return;
+        r.Ellipse(p.x,p.y+1,childSize?10.f:14.f,5,Color(0,0,0,.35f));
+        if(isPlayer&&!controlling) r.Ellipse(p.x,p.y,18,7,Color(.75f,.69f,.45f,.20f));
+        SpriteAnimation animation=protagonistAnimation;
+        SpriteSheet* sheet=&protagonistSheet;
+        Color tint(1,1,1);
+        if(isPlayer&&attackTime>=0&&attackSheet.Ready()) {
+            sheet=&attackSheet; animation.facing=attackFacing; animation.moving=true;
+            animation.phase=(std::min)(3.f,std::floor(attackTime/.17f));
+        }
+        if(!isPlayer) {
+            sheet=childSize?&childSheet:&keeperSheet;
+            // Until a dedicated image is supplied, share the protagonist texture as a placeholder.
+            if(!sheet->Ready()) {sheet=&protagonistSheet;tint=childSize?Color(1.f,.78f,.66f):Color(.72f,.9f,.78f);}
+            animation=SpriteAnimation();
+            if(Distance(pos,player)<160) {
+                double dx=player.x-pos.x,dy=player.y-pos.y;
+                animation.Update((dx-dy)*.85,(dx+dy)*.43,0,false);
+                animation.moving=false;
+            }
+        }
+        if(sheet->Ready()) sheet->Draw(r,p,spriteHeight,animation,tint,width,height,isPlayer&&attackTime>=0?1.4f:0.f);
+        else {
+            // Keep the actor visible if an asset is missing or PNG decoding fails.
+            r.Triangle({p.x,p.y-43},{p.x-14,p.y-6},{p.x+14,p.y-6},coat);
+            r.Ellipse(p.x,p.y-44,8,10,Color(.61f,.53f,.43f));
         }
     }
-    void Wisp() {
-        Point p=Screen(spirit.x,spirit.y);
-        float bob=std::sin(time*2.6f)*5;
-        r.Ellipse(p.x,p.y,19,7,Color(.12f,.61f,.66f,.17f));
-        r.Triangle({p.x-12,p.y-23+bob},{p.x+12,p.y-23+bob},{p.x-4,p.y+1+bob},Color(.25f,.66f,.70f,.6f));
-        r.Ellipse(p.x,p.y-29+bob,14,17,Color(.31f,.74f,.77f,.8f));
-        r.Ellipse(p.x-2,p.y-31+bob,8,11,Color(.85f,1.8f,1.55f,.85f));
-        r.Rect(p.x-6,p.y-33+bob,3,4,Color(.06f,.17f,.22f));
-        r.Rect(p.x+3,p.y-33+bob,3,4,Color(.06f,.17f,.22f));
-        for(int i=0;i<5;++i) {
-            float a=time+i*1.25f;
-            r.Ellipse(p.x+std::cos(a)*24,p.y-25+std::sin(a*1.4f)*18,1.5f,1.5f,Color(.50f,.91f,.83f,.7f));
+    void Wisp(int type,WorldPoint position) {
+        Point p=Screen(position.x,position.y);
+        if(p.x < -100 || p.x > width+100 || p.y < -50 || p.y > height+130) return;
+        r.Ellipse(p.x,p.y,18,6,Color(0,0,0,.3f));
+        SpriteAnimation animation;
+        if(captured&&capturedSpirit==type) animation=companionAnimation;
+        float bob=type==2?0.f:std::sin(time*2+type)*3.f;
+        if(spiritSheets[type].Ready())
+            spiritSheets[type].Draw(r,{p.x,p.y-4+bob},type==2?67.f:72.f,animation,spiritHit[type]>0?Color(1.6f,1.6f,1.6f):Color(1,1,1),width,height,type==0?2.f:(type==1?1.f:.15f));
+        else r.Ellipse(p.x,p.y-25,12,18,Color(.4f,.7f,.8f));
+    }
+    void StartAttack() {
+        if(journal||controlling||attackTime>=0||attackCooldown>0) return;
+        attackTime=0;attackCooldown=1.f;attackReleased=false;
+        attackFacing=protagonistAnimation.facing;
+    }
+    void UpdateAttack(float dt) {
+        attackCooldown=(std::max)(0.f,attackCooldown-dt);
+        impactLife=(std::max)(0.f,impactLife-dt);
+        for(float& hit:spiritHit) hit=(std::max)(0.f,hit-dt);
+        if(attackTime>=0) {
+            attackTime+=dt;
+            if(!attackReleased&&attackTime>=.34f) {
+                attackReleased=true;
+                const Point directions[]={{0,1},{-.7071f,.7071f},{-1,0},{-.7071f,-.7071f},
+                    {0,-1},{.7071f,-.7071f},{1,0},{.7071f,.7071f}};
+                Point d=directions[static_cast<int>(attackFacing)];
+                bolt=player;boltLife=.7f;
+                boltVelocity={(d.x/.85+d.y/.43)*.5*420,(-d.x/.85+d.y/.43)*.5*420};
+            }
+            if(attackTime>=.68f) attackTime=-1;
+        }
+        // Small substeps prevent the projectile from skipping thin obstacles.
+        float remaining=(std::min)(dt,boltLife);
+        while(remaining>0&&boltLife>0) {
+            float step=(std::min)(remaining,.008f);remaining-=step;boltLife-=step;
+            bolt.x+=boltVelocity.x*step;bolt.y+=boltVelocity.y*step;
+            bool hit=Blocked(bolt);
+            for(int i=0;i<3&&!hit;++i) {
+                if(captured&&capturedSpirit==i) continue;
+                if(Distance(bolt,wildSpirits[i])<28) {spiritHit[i]=.3f;hit=true;}
+            }
+            if(hit) {impact=bolt;impactLife=.22f;boltLife=0;}
+        }
+    }
+    void SpellEffect() {
+        if(boltLife>0) {
+            Point p=Screen(bolt.x,bolt.y,32);
+            Point tail=Screen(bolt.x-boltVelocity.x*.035,bolt.y-boltVelocity.y*.035,32);
+            r.Line(tail,p,5,Color(.3f,1.5f,3.f,.8f));
+            r.Ellipse(p.x,p.y,6,6,Color(.6f,2.3f,4.f));
+        }
+        if(impactLife>0) {
+            Point p=Screen(impact.x,impact.y,32);float size=(.22f-impactLife)*95+4;
+            for(int i=0;i<8;++i) {
+                float a=i*.785398f;
+                r.Line({p.x+std::cos(a)*size*.5f,p.y+std::sin(a)*size*.5f},
+                       {p.x+std::cos(a)*size,p.y+std::sin(a)*size},2,Color(.4f,1.6f,3.f,impactLife/.22f));
+            }
         }
     }
     void Hearth() {
@@ -173,14 +263,14 @@ class Prototype {
         r.Rect(42,87,184,7,Color(.20f,.17f,.18f));
         r.Rect(42,87,184,7,Color(.57f,.29f,.25f));
         r.Text(237,96,"100",ivory);
-        r.Text(42,114,controlling?"조종 중: 슬픔의 도깨비불":"조종 중: 방랑자",gold);
+        r.Text(42,114,controlling?std::string("조종 중: ")+SpiritName(capturedSpirit):"조종 중: 방랑자",gold);
         Panel(float(width-285),24,261,106);
         r.Text(float(width-267),49,"탐험 기록",gold);
-        r.Text(float(width-267),71,captured?"주령 기록       01 / 01":"주령 미발견     00 / 01",ivory);
+        r.Text(float(width-267),71,captured?"주령 기록       01 / 03":"주령 기록       00 / 03",ivory);
         r.Text(float(width-267),93,captured?"체험 포획: 사용 완료":"체험 포획: 1회 가능",muted);
         r.Text(float(width-267),115,toySword?"간직한 물건: 나무칼":"불가의 아이를 찾아보세요.",muted);
         Panel(24,float(height-55),float(width-48),32);
-        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift  달리기    E  상호작용    Q  주령 조종    J  도감    P  화면 효과    B  블룸    ESC  닫기",ivory);
+        r.Text(40,float(height-34),"WASD / 방향키  이동    Shift 달리기    Space 주술    E 상호작용    Q  주령 조종    J  도감    P  화면 효과    B  블룸    ESC  닫기",ivory);
         WorldPoint location=controlling?spirit:player;
         std::ostringstream positionText;
         positionText<<"지역 좌표 "<<World::Index(location.x)<<", "<<World::Index(location.y)<<" · 주변 구역 "<<world.chunks.size();
@@ -193,7 +283,7 @@ class Prototype {
         if(target>=0 && !journal) {
             const char* hints[]={"[E] 미라와 대화하기","[E] 불씨지기와 대화하기","[E] 슬픔의 도깨비불 포획하기","[E] 불가에서 쉬기"};
             Panel(width*.5f-160,float(height-104),320,32);
-            r.Text(width*.5f-143,float(height-83),hints[target],gold);
+            r.Text(width*.5f-143,float(height-83),target==2?std::string("[E] ")+SpiritName(NearestWild())+(captured?" 관찰하기":" 포획하기"):hints[target],gold);
         }
         if(messageTime>0 && !journal) {
             Panel(40,float(height-206),float(width-80),88);
@@ -205,10 +295,10 @@ class Prototype {
             float x=width*.5f-315,y=height*.5f-190;
             Panel(x,y,630,380);
             r.Text(x+28,y+38,"도감 · 보이지 않는 존재들의 기록",gold,true);
-            r.Text(x+28,y+76,captured?"01  슬픔의 도깨비불 · 포획 완료":"01  미지의 존재 · 푸른 빛을 따라가세요",ivory);
-            r.Text(x+28,y+108,captured?"돌아오지 못한 이들의 슬픔에서 태어난 주령.":"불가의 동쪽 어딘가에서 작은 빛이 기다리고 있습니다.",muted);
-            r.Text(x+28,y+135,captured?"발견 장소: 잿빛 마을, 오래된 무덤 곁.":"가까이 다가가 E를 누르면 포획할 수 있습니다.",muted);
-            r.Text(x+28,y+162,captured?"Q로 조종을 전환합니다. 본체는 그 자리에 남습니다.":"아직 이 존재의 이야기가 기록되지 않았습니다.",muted);
+            for(int i=0;i<3;++i)
+                r.Text(x+28,y+76+i*25,std::string(SpiritName(i))+(captured&&capturedSpirit==i?" · 포획 완료":" · 미포획"),captured&&capturedSpirit==i?gold:muted);
+            r.Text(x+28,y+162,captured?SpiritStory(capturedSpirit):"마을 주변에서 세 주령 중 한 마리를 포획할 수 있습니다.",ivory);
+            r.Text(x+28,y+186,"포획한 주령은 Q로 조종합니다. 본체는 제자리에 남습니다.",muted);
             r.Text(x+28,y+211,"간직한 물건",gold);
             r.Text(x+28,y+239,toySword?"나무칼 · 미라가 건넨 선물":"아직 간직한 물건이 없습니다.",ivory);
             r.Text(x+28,y+267,toySword?"작은 다정함의 흔적. 훗날 어떤 의미가 될지는 아직 모릅니다.":"아직 이곳을 집이라 부르는 사람들과 이야기해 보세요.",muted);
@@ -221,6 +311,25 @@ public:
             {0,-440,90,130,100,85},{0,270,-250,145,110,98},
             {2,330,240,65,35,30},{2,390,270,30,35,52},
             {2,280,280,25,25,24}};
+        SpriteLayout eightDirections;
+        eightDirections.rows=8;
+        eightDirections.directionRows={{0,1,2,3,4,5,6,7}};
+        if(!protagonistSheet.Load(L"Assets/Characters/protagonist.png",eightDirections))
+            std::cerr<<"주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다."<<std::endl;
+        if(!childSheet.Load(L"Assets/Characters/mira.png",eightDirections))
+            std::cerr<<"NPC1 스프라이트 로드 실패: 임시 외형을 사용합니다."<<std::endl;
+        if(!keeperSheet.Load(L"Assets/Characters/keeper.png",eightDirections))
+            std::cerr<<"NPC2 스프라이트 로드 실패: 임시 외형을 사용합니다."<<std::endl;
+        SpriteLayout attackLayout;
+        attackLayout.firstWalkFrame=0;attackLayout.walkFrames=4;attackLayout.anchorAtFeet=true;
+        if(!attackSheet.Load(L"Assets/Characters/protagonist_attack.png",attackLayout))
+            std::cerr<<"공격 스프라이트 로드 실패: 기본 외형으로 시전합니다."<<std::endl;
+        SpriteLayout spiritLayout; spiritLayout.rows=4;
+        spiritLayout.directionRows={{0,1,1,1,3,2,2,2}};
+        spiritLayout.firstWalkFrame=1; spiritLayout.walkFrames=3;
+        const wchar_t* spiritFiles[]={L"Assets/Spirits/ash_lantern_4dir.png",L"Assets/Spirits/mourning_bell_4dir.png",L"Assets/Spirits/briar_fox_4dir.png"};
+        for(int i=0;i<3;++i) if(!spiritSheets[i].Load(spiritFiles[i],spiritLayout))
+            std::cerr<<"주령 이미지 로드 실패: "<<SpiritName(i)<<std::endl;
         world.Stream(camera,player,width,height);
     }
     void Resize(int w,int h) {width=w;height=h;r.Resize(w,h);}
@@ -233,27 +342,31 @@ public:
         if(key=='b') { r.postProcess.bloomEnabled=!r.postProcess.bloomEnabled; Say("빛 번짐",r.postProcess.bloomEnabled?"블룸을 켰습니다. 후처리도 켜져 있어야 적용됩니다.":"블룸을 껐습니다."); }
         if(key=='j') journal=!journal;
         if(journal) return;
-        if(key=='e') Interact();
-        if(key=='q') {
+        if(key==' ') StartAttack();
+        if(key=='e'&&attackTime<0) Interact();
+        if(key=='q'&&attackTime<0) {
             if(captured) { controlling=!controlling; Say("조종 전환",controlling?"주령을 조종합니다. WASD로 이동하고 Q로 본체에 돌아갑니다.":"방랑자의 몸으로 돌아왔습니다."); }
-            else Say("조종 전환","먼저 주령을 포획하세요. 불가 동쪽의 푸른 빛을 따라가 보세요.");
+            else Say("조종 전환","먼저 주령을 포획하세요. 마을 주변의 등불과 종, 여우를 찾아보세요.");
         }
     }
     void Arrow(int key,bool down) {if(key>=0&&key<4) arrows[key]=down;}
     void ClearInput() { for(bool& k:keys) k=false; for(bool& k:arrows) k=false; }
     void Update(float dt, bool sprint = false) {
+        const WorldPoint previousPlayer=player;
+        const WorldPoint previousSpirit=spirit;
         time+=dt; messageTime=(std::max)(0.f,messageTime-dt);
         moving=false;
         if(!journal) {
+            UpdateAttack(dt);
             float sx=float(keys['d']||arrows[2])-float(keys['a']||arrows[0]);
             float sy=float(keys['s']||arrows[3])-float(keys['w']||arrows[1]);
             // Invert the isometric projection so keys correspond to screen directions.
             float dx=sx/.85f+sy/.43f,dy=-sx/.85f+sy/.43f;
-            float length=std::sqrt(dx*dx+dy*dy);
-            if(length>0) {
+            float length=std::sqrt(sx*sx+sy*sy);
+            if(length>0&&attackTime<0) {
                 const float pace = sprint ? 1.8f : 1.f;
-                float speed=(controlling?160.f:125.f)*pace;
-                dx=dx/length*speed*dt;dy=dy/length*speed*dt;
+                float speed=(controlling?110.f:90.f)*pace;
+                dx=dx*.5f/length*speed*dt;dy=dy*.5f/length*speed*dt;
                 WorldPoint& actor=controlling?spirit:player;
                 WorldPoint next={actor.x+dx,actor.y}; if(!Blocked(next)) actor=next;
                 next={actor.x,actor.y+dy}; if(!Blocked(next)) actor=next;
@@ -264,6 +377,13 @@ public:
                 float t=1-std::exp(-dt*3); spirit.x+=(target.x-spirit.x)*t; spirit.y+=(target.y-spirit.y)*t;
             }
         }
+        double actualX=player.x-previousPlayer.x,actualY=player.y-previousPlayer.y;
+        protagonistAnimation.Update((actualX-actualY)*.85,(actualX+actualY)*.43,dt,sprint);
+        const double spiritDX=spirit.x-previousSpirit.x,spiritDY=spirit.y-previousSpirit.y;
+        double screenDX=(spiritDX-spiritDY)*.85,screenDY=(spiritDX+spiritDY)*.43;
+        // Ignore the tiny convergence tail of the following interpolation.
+        if(!controlling&&screenDX*screenDX+screenDY*screenDY<.0025) {screenDX=0;screenDY=0;}
+        if(!journal) companionAnimation.Update(screenDX,screenDY,dt,controlling&&sprint);
         WorldPoint target=controlling?spirit:player;
         if(Distance(target,camera)>2000) camera=target; // Distant vessel switch.
         float t=1-std::exp(-dt*6);camera.x+=(target.x-camera.x)*t;camera.y+=(target.y-camera.y)*t;
@@ -303,7 +423,10 @@ public:
         }
         order.push_back({0,-1});order.push_back({child.x+child.y,-2});
         order.push_back({keeper.x+keeper.y,-3});order.push_back({player.x+player.y,-4});
-        order.push_back({spirit.x+spirit.y,-5});
+        for(int i=0;i<3;++i) if(!captured||capturedSpirit!=i)
+            order.push_back({wildSpirits[i].x+wildSpirits[i].y,-5-i});
+        if(captured) order.push_back({spirit.x+spirit.y,-8});
+        if(boltLife>0||impactLife>0) {WorldPoint effect=boltLife>0?bolt:impact;order.push_back({effect.x+effect.y,-9});}
         std::stable_sort(order.begin(),order.end(),[](const Entry& a,const Entry& b){return a.depth<b.depth;});
         for(const Entry& entry:order) {
             if(entry.index>=0) {
@@ -314,8 +437,10 @@ public:
             } else if(entry.index==-1) Hearth();
             else if(entry.index==-2) Person(child,Color(.48f,.36f,.29f),false,true);
             else if(entry.index==-3) Person(keeper,Color(.33f,.37f,.34f),false);
-            else if(entry.index==-4) Person(player,Color(.44f,.49f,.52f),!controlling);
-            else Wisp();
+            else if(entry.index==-4) Person(player,Color(.44f,.49f,.52f),true);
+            else if(entry.index==-9) SpellEffect();
+            else if(entry.index==-8) Wisp(capturedSpirit,spirit);
+            else {int type=-entry.index-5; Wisp(type,wildSpirits[type]);}
         }
         // Moving low fog and airborne ash, deliberately subtle over the scene.
         for(int i=0;i<9;++i) {
@@ -333,6 +458,12 @@ public:
         HUD();r.Flush();
     }
 };
+
+
+
+
+
+
 
 
 

@@ -156,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
     <ClInclude Include="PostProcessing.h" />
     <ClInclude Include="Prototype.h" />
@@ -184,6 +185,19 @@
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <SpriteAssets Include="Assets\**\*.png" />
+    <None Include="Assets\Characters\protagonist.png" />
+    <None Include="Assets\Characters\mira.png" />
+    <None Include="Assets\Characters\keeper.png" />
+  </ItemGroup>
+  <Target Name="CopySpriteAssets" AfterTargets="Build">
+    <Copy SourceFiles="@(SpriteAssets)"
+          DestinationFiles="@(SpriteAssets->'$(OutDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
+
+
 
 
