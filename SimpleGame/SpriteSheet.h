@@ -1,4 +1,5 @@
 #pragma once
+#include "FrameProfiler.h"
 #include "Renderer.h"
 #include "ShaderFiles.h"
 #include <windows.h>
@@ -321,7 +322,7 @@ class SpriteSheet
             glGetUniformLocation(program, "uvRect"), frame.u0, frame.v0, frame.u1, frame.v1);
         glUniform4f(glGetUniformLocation(program, "tint"), tint.r, tint.g, tint.b, tint.a);
         glUniform1i(glGetUniformLocation(program, "linearScene"), renderer.IsHDRScene() ? 1 : 0);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindVertexArray(0);
         glUseProgram(0);

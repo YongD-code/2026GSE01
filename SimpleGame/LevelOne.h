@@ -37,6 +37,7 @@ class LevelOne
         float remaining, damage;
         bool companion;
         bool hostile = false;
+        unsigned long long actorId = 0;
     };
 
     enum class LootKind
@@ -54,6 +55,7 @@ class LevelOne
         LootKind kind;
         float age = 0;
         bool attracted = false;
+        unsigned long long actorId = 0;
     };
 
     std::vector<Enemy> enemies;

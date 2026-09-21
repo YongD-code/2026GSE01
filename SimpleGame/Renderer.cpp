@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "FrameProfiler.h"
 #include "Renderer.h"
 #include "ShaderFiles.h"
 #include "Dependencies/freeglut.h"
@@ -90,7 +91,7 @@ void Renderer::Flush()
     glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
     glBufferData(
         GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_Vertices.size()));
+    FrameProfiler::DrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_Vertices.size()));
     glBindVertexArray(0);
     glUseProgram(0);
     m_Vertices.clear();
@@ -168,7 +169,7 @@ void Renderer::DrawCachedMesh(const std::string& key, Point origin)
     glUniform2f(m_MeshOffset, origin.x, origin.y);
     glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
     glBindVertexArray(mesh.array);
-    glDrawArrays(GL_TRIANGLES, 0, mesh.count);
+    FrameProfiler::DrawArrays(GL_TRIANGLES, 0, mesh.count);
     glBindVertexArray(0);
     glUseProgram(0);
 }
@@ -330,7 +331,8 @@ void Renderer::Text(float x, float y, const std::string& text, Color c, bool lar
     glPixelTransferf(GL_GREEN_SCALE, c.g);
     glPixelTransferf(GL_BLUE_SCALE, c.b);
     glPixelTransferf(GL_ALPHA_SCALE, c.a);
-    glDrawPixels(bitmap.width, bitmap.height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.pixels.data());
+    FrameProfiler::DrawPixels(
+        bitmap.width, bitmap.height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.pixels.data());
     glPixelTransferf(GL_RED_SCALE, 1);
     glPixelTransferf(GL_GREEN_SCALE, 1);
     glPixelTransferf(GL_BLUE_SCALE, 1);

@@ -1,7 +1,7 @@
 // Included inside Prototype. Disk state is separate from rendering and input state.
 bool CanSaveProgress() const
 {
-    if (levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
+    if (titleScreen || levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
         levelOne.invulnerability > 0 || !levelOne.projectiles.empty())
     {
         return false;
@@ -23,8 +23,12 @@ void ProgressNotice(const std::string& text)
     saveStatusTime = 6;
 }
 
-bool SaveProgress(bool manual)
+bool SaveProgress(bool manual, int slot = 0)
 {
+    if (slot == 0)
+        slot = activeSlot;
+    if (slot < 1 || slot > 3)
+        return false;
     if (!manual && !automaticSaveAllowed)
     {
         return false;
@@ -71,33 +75,33 @@ bool SaveProgress(bool manual)
             state.level.camps[enemy.camp].health[enemy.slot] = enemy.health;
         }
     }
-    if (!SaveGame::Write(std::move(state), chapter))
+    if (!SaveGame::Write(std::move(state), chapter, slot))
     {
         automaticSaveAllowed = false;
         ProgressNotice("저장 실패 · 기존 기록 유지. 경로·용량을 확인한 뒤 F5로 재시도하세요.");
         return false;
     }
     automaticSaveAllowed = true;
+    activeSlot = slot;
     autoSaveTime = 0;
     ProgressNotice(manual ? "진행을 저장했습니다." : "진행을 자동 저장했습니다.");
     return true;
 }
 
-bool LoadProgress(bool startup = false)
+bool LoadProgress(bool startup = false, int slot = 0)
 {
+    if (slot == 0)
+        slot = activeSlot;
     if (!startup && !levelOne.Dead() && !CanSaveProgress())
     {
         ProgressNotice("전투가 끝난 뒤 불러오세요. 사망 후에도 F9로 돌아갈 수 있습니다.");
         return false;
     }
     SaveGame::State state;
-    const auto result = SaveGame::Load(chapter, state);
+    const auto result = SaveGame::Load(chapter, state, slot);
     if (result == SaveGame::Result::Missing)
     {
-        if (!startup)
-        {
-            ProgressNotice("아직 저장된 진행이 없습니다.");
-        }
+        ProgressNotice("이 슬롯에는 저장된 진행이 없습니다.");
         return false;
     }
     if (result == SaveGame::Result::Invalid)
@@ -171,6 +175,8 @@ bool LoadProgress(bool startup = false)
     world.Stream(camera, camera, width, height);
     autoSaveTime = 0;
     automaticSaveAllowed = true;
+    activeSlot = slot;
+    titleScreen = false;
     ProgressNotice(result == SaveGame::Result::Backup ? "이전 백업에서 진행을 복구했습니다."
                                                       : "저장된 여정을 이어갑니다.");
     return true;

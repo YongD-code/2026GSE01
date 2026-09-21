@@ -59,8 +59,10 @@ class SaveGame
         return Hash(out.str());
     }
 
-    static std::wstring Path()
+    static std::wstring Path(int slot = 1)
     {
+        if (slot < 1 || slot > 3)
+            return L"";
         PWSTR folder = nullptr;
         if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &folder)))
         {
@@ -72,7 +74,8 @@ class SaveGame
         {
             return L"";
         }
-        return path + L"\\progress.sav";
+        return path +
+               (slot == 1 ? L"\\progress.sav" : L"\\progress" + std::to_wstring(slot) + L".sav");
     }
 
   private:
@@ -511,9 +514,9 @@ class SaveGame
     }
 
   public:
-    static Result Load(const Chapter& authored, State& output)
+    static Result Load(const Chapter& authored, State& output, int slot = 1)
     {
-        const std::wstring path = Path();
+        const std::wstring path = Path(slot);
         if (path.empty())
         {
             return Result::Invalid;
@@ -542,9 +545,9 @@ class SaveGame
         return Result::Invalid;
     }
 
-    static bool Write(State state, const Chapter& authored)
+    static bool Write(State state, const Chapter& authored, int slot = 1)
     {
-        const std::wstring path = Path();
+        const std::wstring path = Path(slot);
         if (path.empty() || !Validate(state, authored))
         {
             return false;

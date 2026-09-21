@@ -1,4 +1,5 @@
 #pragma once
+#include "FrameProfiler.h"
 #include "Dependencies/glew.h"
 #include <iostream>
 #include "ShaderFiles.h"
@@ -53,7 +54,7 @@ class PostProcessing
                     horizontal ? 0.f : radius);
         glUniform1i(glGetUniformLocation(filter, "extractBright"), extract ? 1 : 0);
         glUniform1f(glGetUniformLocation(filter, "threshold"), threshold);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, 3);
     }
 
   public:
@@ -176,7 +177,7 @@ class PostProcessing
                     settings.bloomEnabled ? settings.bloomStrength : 0.f);
         glUniform1f(glGetUniformLocation(composite, "vignetteStrength"), settings.vignetteStrength);
         glUniform1f(glGetUniformLocation(composite, "edgeBlurStrength"), settings.edgeBlurStrength);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, 3);
         for (int i = 3; i >= 0; --i)
         {
             glActiveTexture(GL_TEXTURE0 + i);

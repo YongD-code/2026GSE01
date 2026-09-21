@@ -70,8 +70,9 @@ void ActivateMenu(int item)
     {
         if (item == 0)
         {
-            if (!SaveProgress(true))
-                return;
+            OpenSlots(SlotMode::Save);
+            exitAfterSave = true;
+            return;
         }
         else if (item != 1)
         {
@@ -97,10 +98,10 @@ void ActivateMenu(int item)
         journal = true;
         break;
     case 5:
-        SaveProgress(true);
+        OpenSlots(SlotMode::Save);
         break;
     case 6:
-        LoadProgress();
+        OpenSlots(SlotMode::Load);
         break;
     case 8:
         exitConfirm = true;

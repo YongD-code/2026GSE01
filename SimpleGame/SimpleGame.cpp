@@ -10,6 +10,7 @@ but WITHOUT ANY WARRANTY.
 #include "Dependencies/freeglut.h"
 #include "Renderer.h"
 #include "Prototype.h"
+#include "FrameProfiler.h"
 #include <iostream>
 #include <memory>
 #include <windows.h>
@@ -28,8 +29,10 @@ void Display()
 {
     if (game)
     {
+        FrameProfiler::BeginFrame();
         game->Draw();
         glutSwapBuffers();
+        FrameProfiler::EndFrame();
     }
 }
 
@@ -72,7 +75,7 @@ void Mouse(int button, int state, int x, int y)
 {
     if (game && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
     {
-        game->MenuClick(x, y);
+        game->PointerDown(x, y);
     }
 }
 
@@ -139,6 +142,7 @@ void Close()
 
 int main(int argc, char** argv)
 {
+    SetConsoleOutputCP(CP_UTF8);
     glutInit(&argc, argv);
     glutInitContextVersion(3, 3);
     glutInitContextProfile(GLUT_COMPATIBILITY_PROFILE);

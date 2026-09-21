@@ -156,6 +156,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="Actor.h" />
+    <ClInclude Include="FrameProfiler.h" />
+    <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
     <ClInclude Include="LevelOne.h" />
@@ -173,6 +176,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="PrototypeScene.cpp" />
+    <ClCompile Include="PrototypeFront.cpp" />
+    <ClCompile Include="PrototypeRendering.cpp" />
+    <ClCompile Include="PrototypeSimulation.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -49,6 +49,11 @@ std::string ObjectiveHint() const
 
 void HUD()
 {
+    if (titleScreen || slotMode != SlotMode::Closed)
+    {
+        DrawFront();
+        return;
+    }
     const Color ivory(.88f, .85f, .77f), muted(.57f, .63f, .65f), gold(.85f, .7f, .43f);
     const float screenWidth = static_cast<float>(width), screenHeight = static_cast<float>(height);
     if (width < 480 || height < 360)
@@ -257,7 +262,7 @@ void HUD()
             line("파랑 경험치 · 금색 무기 · 초록 회복 · 보라 주령석 · 흰색 봉인권");
             line("약화된 적은 자동 공격에서 제외됩니다. E 포획 / X 정화를 선택하세요.");
             line("F5 저장 · F9 불러오기 · 안전할 때 30초마다/정상 종료 시 자동 저장");
-            line("저장 위치: %LOCALAPPDATA%/2026GSE01/progress.sav");
+            line("저장 슬롯 3개 · 현재 슬롯 " + std::to_string(activeSlot));
         }
         WrappedText(x + 20, y + h - 23, w - 40, saveStatus + " · F5 저장 / F9 불러오기", muted, 1);
     }

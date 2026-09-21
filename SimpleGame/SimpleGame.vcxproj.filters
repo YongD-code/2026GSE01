@@ -24,6 +24,9 @@
     <ClInclude Include="stdafx.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Actor.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="FrameProfiler.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="SceneGraph.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -49,6 +52,10 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="PrototypeScene.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PrototypeFront.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PrototypeRendering.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="PrototypeSimulation.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="SimpleGame.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
