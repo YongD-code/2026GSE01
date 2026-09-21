@@ -669,16 +669,9 @@ class Prototype
             }
             return;
         }
-        const auto box = MenuBounds();
-        if (x < box.x + 16 || x > box.x + box.w - 16)
-        {
-            return;
-        }
-        const int row = int(std::floor((y - box.y - 55) / box.step));
-        if (row >= 0 && row < (exitConfirm ? 2 : 9))
-        {
-            ActivateMenu(row);
-        }
+        const int action = MenuActionAt(x, y);
+        if (action >= 0)
+            ActivateMenu(action);
     }
 
     void Resize(int w, int h)

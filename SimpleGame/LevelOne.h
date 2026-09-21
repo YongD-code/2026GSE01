@@ -647,6 +647,15 @@ class LevelOne
         }
         if (enemy.phase == 2)
         {
+            // The charge expired before this simulation step. Do not sweep its
+            // hit area one extra frame while transitioning into recovery.
+            if (enemy.phaseTime <= 0)
+            {
+                enemy.phase = 3;
+                enemy.phaseTime = 1.05f;
+                return;
+            }
+
             const WorldPoint before = enemy.position;
             Move(enemy.position,
                  {enemy.aim.x * combat.chargeSpeed * dt * (enemy.slowed > 0 ? .35 : 1.),
