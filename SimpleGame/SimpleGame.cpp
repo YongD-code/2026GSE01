@@ -22,6 +22,7 @@ namespace
 std::unique_ptr<Renderer> renderer;
 std::unique_ptr<Prototype> game;
 int previousTime = 0;
+void Close();
 
 void Display()
 {
@@ -36,6 +37,12 @@ void Timer(int)
 {
     if (!game)
         return;
+    if (game->WantsExit())
+    {
+        Close();
+        glutLeaveMainLoop();
+        return;
+    }
     int now = glutGet(GLUT_ELAPSED_TIME);
     float dt = (std::min)(.05f, (std::max)(0.f, (now - previousTime) * .001f));
     // Poll Shift every frame so pressing/releasing it while moving takes effect immediately.
@@ -59,6 +66,14 @@ void KeyDown(unsigned char key, int, int)
 {
     if (game)
         game->Key(key, true);
+}
+
+void Mouse(int button, int state, int x, int y)
+{
+    if (game && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+    {
+        game->MenuClick(x, y);
+    }
 }
 
 void KeyUp(unsigned char key, int, int)
@@ -87,7 +102,16 @@ int ArrowIndex(int key)
 void SpecialDown(int key, int, int)
 {
     if (game)
-        game->Arrow(ArrowIndex(key), true);
+    {
+        if (key == GLUT_KEY_F5 || key == GLUT_KEY_F9)
+        {
+            game->ProgressKey(key == GLUT_KEY_F9);
+        }
+        else
+        {
+            game->Arrow(ArrowIndex(key), true);
+        }
+    }
 }
 
 void SpecialUp(int key, int, int)
@@ -104,6 +128,10 @@ void Entry(int state)
 
 void Close()
 {
+    if (game)
+    {
+        game->SaveBeforeClose();
+    }
     game.reset();
     renderer.reset();
 } // Release GPU objects while context is alive.
@@ -138,6 +166,7 @@ int main(int argc, char** argv)
     glutReshapeFunc(Reshape);
     glutKeyboardFunc(KeyDown);
     glutKeyboardUpFunc(KeyUp);
+    glutMouseFunc(Mouse);
     glutSpecialFunc(SpecialDown);
     glutSpecialUpFunc(SpecialUp);
     glutEntryFunc(Entry);

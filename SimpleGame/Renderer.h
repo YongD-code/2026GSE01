@@ -5,6 +5,7 @@
 #include <map>
 #include "PostProcessing.h"
 #include <memory>
+#include <cstdint>
 
 struct Color
 {
@@ -38,6 +39,9 @@ class Renderer
     void Begin(Color background);
     void Flush();
     void FinishScene();
+    bool BeginCachedMesh(const std::string& key, Point origin);
+    void EndCachedMesh();
+    void DrawCachedMesh(const std::string& key, Point origin);
 
     bool IsHDRScene() const
     {
@@ -67,6 +71,20 @@ class Renderer
     GLint m_LinearScene = -1;
     std::unique_ptr<PostProcessing> m_Post;
     std::vector<Vertex> m_Vertices;
+
+    struct CachedMesh
+    {
+        GLuint buffer = 0, array = 0;
+        GLsizei count = 0;
+        std::uint64_t lastUsed = 0;
+    };
+
+    std::map<std::string, CachedMesh> m_MeshCache;
+    std::uint64_t m_Frame = 0;
+    GLint m_MeshOffset = -1;
+    bool m_Capturing = false;
+    Point m_CaptureOrigin = {0, 0};
+    std::string m_CaptureKey;
 
     struct TextBitmap
     {

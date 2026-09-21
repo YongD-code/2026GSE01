@@ -34,7 +34,7 @@ class World
     };
 
     std::map<Key, Chunk> chunks;
-    const std::uint64_t seed = std::random_device{}();
+    std::uint64_t seed = std::random_device{}();
 
     static Coordinate Index(double value)
     {

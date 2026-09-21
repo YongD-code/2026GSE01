@@ -1,6 +1,7 @@
 #pragma once
 #include "Dependencies/glew.h"
 #include <iostream>
+#include "ShaderFiles.h"
 
 struct PostProcessSettings
 {
@@ -21,55 +22,6 @@ class PostProcessing
     GLuint textures[7] = {}, framebuffers[7] = {};
     int width = 0, height = 0, halfWidth = 0, halfHeight = 0;
     bool ready = false;
-
-    static GLuint Program(const char* fragment)
-    {
-        const char* vertex = R"GLSL(#version 330
-out vec2 uv;
-void main() {
-    vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);
-    uv=p; gl_Position=vec4(p*2.0-1.0,0.0,1.0);
-}
-)GLSL";
-        GLuint shaders[2] = {glCreateShader(GL_VERTEX_SHADER), glCreateShader(GL_FRAGMENT_SHADER)};
-        const char* sources[2] = {vertex, fragment};
-        bool valid = true;
-        for (int i = 0; i < 2; ++i)
-        {
-            glShaderSource(shaders[i], 1, &sources[i], nullptr);
-            glCompileShader(shaders[i]);
-            GLint ok = 0;
-            glGetShaderiv(shaders[i], GL_COMPILE_STATUS, &ok);
-            if (!ok)
-            {
-                char log[2048] = {};
-                glGetShaderInfoLog(shaders[i], sizeof(log), nullptr, log);
-                std::cerr << "후처리 셰이더 오류: " << log << std::endl;
-                valid = false;
-            }
-        }
-        GLuint program = 0;
-        if (valid)
-        {
-            program = glCreateProgram();
-            for (GLuint shader : shaders)
-                glAttachShader(program, shader);
-            glLinkProgram(program);
-            GLint ok = 0;
-            glGetProgramiv(program, GL_LINK_STATUS, &ok);
-            if (!ok)
-            {
-                char log[2048] = {};
-                glGetProgramInfoLog(program, sizeof(log), nullptr, log);
-                std::cerr << "후처리 연결 오류: " << log << std::endl;
-                glDeleteProgram(program);
-                program = 0;
-            }
-        }
-        for (GLuint shader : shaders)
-            glDeleteShader(shader);
-        return program;
-    }
 
     void ReleaseTargets()
     {
@@ -107,52 +59,8 @@ void main() {
   public:
     PostProcessing()
     {
-        filter = Program(R"GLSL(#version 330
-in vec2 uv; out vec4 result;
-uniform sampler2D sourceImage;
-uniform vec2 direction;
-uniform bool extractBright;
-uniform float threshold;
-vec3 sampleColor(vec2 p) {
-    vec3 c=texture(sourceImage,p).rgb;
-    if(extractBright) {
-        float brightness=max(c.r,max(c.g,c.b));
-        float knee=max(threshold*.5,.001);
-        float soft=clamp(brightness-threshold+knee,0.0,2.0*knee);
-        soft=soft*soft/(4.0*knee);
-        c*=max(brightness-threshold,soft)/max(brightness,.0001);
-    }
-    return c;
-}
-void main() {
-    vec2 stepUV=direction/vec2(textureSize(sourceImage,0));
-    vec3 color=sampleColor(uv)*.227027;
-    color+=(sampleColor(uv+stepUV*1.384615)+sampleColor(uv-stepUV*1.384615))*.316216;
-    color+=(sampleColor(uv+stepUV*3.230769)+sampleColor(uv-stepUV*3.230769))*.070270;
-    result=vec4(color,1.0);
-}
-)GLSL");
-        composite = Program(R"GLSL(#version 330
-in vec2 uv; out vec4 result;
-uniform sampler2D sceneImage,blurImage,bloomImage,broadBloomImage;
-uniform float exposure,bloomStrength,vignetteStrength,edgeBlurStrength;
-vec3 toneMap(vec3 c) {
-    return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.0,1.0);
-}
-void main() {
-    // Elliptical screen-space falloff: clear center, gradually softer/darker edges.
-    float radius=length((uv-.5)*2.0);
-    float edge=smoothstep(.45,1.25,radius);
-    vec3 color=mix(texture(sceneImage,uv).rgb,texture(blurImage,uv).rgb,
-                   clamp(edge*edgeBlurStrength,0.0,1.0));
-    // Retain a tight halo while adding a softer, wider scattering component.
-    vec3 bloom=texture(bloomImage,uv).rgb*.4+texture(broadBloomImage,uv).rgb*.6;
-    color+=bloom*bloomStrength;
-    color*=1.0-clamp(vignetteStrength,0.0,.9)*smoothstep(.35,1.35,radius);
-    color=toneMap(color*max(exposure,.01));
-    result=vec4(pow(color,vec3(1.0/2.2)),1.0);
-}
-)GLSL");
+        filter = ShaderFiles::Program(L"Shaders/Fullscreen.vs", L"Shaders/BloomFilter.fs");
+        composite = ShaderFiles::Program(L"Shaders/Fullscreen.vs", L"Shaders/Composite.fs");
         glGenVertexArrays(1, &vao);
     }
 

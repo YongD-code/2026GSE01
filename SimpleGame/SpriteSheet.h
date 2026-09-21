@@ -1,5 +1,6 @@
 #pragma once
 #include "Renderer.h"
+#include "ShaderFiles.h"
 #include <windows.h>
 #include <wincodec.h>
 #include <wrl/client.h>
@@ -31,6 +32,9 @@ struct SpriteLayout
     bool anchorAtFeet = false;
     bool anchorAtTorso = false;
     bool pingPongWalk = false;
+    // Authored Blender sheets share a camera and ground origin across every frame.
+    bool fixedCanvas = false;
+    float canvasAnchorY = .845f, canvasCharacterHeight = .78f;
 };
 
 struct SpriteAnimation
@@ -69,31 +73,13 @@ class SpriteSheet
     {
         float u0, v0, u1, v1;
         int width, height;
-        float anchorX;
+        float anchorX, anchorY;
     };
 
     GLuint texture = 0, program = 0, vao = 0;
     std::vector<Frame> frames;
     SpriteLayout layout;
     int referenceHeight = 1;
-
-    static GLuint Compile(GLenum kind, const char* source)
-    {
-        GLuint shader = glCreateShader(kind);
-        glShaderSource(shader, 1, &source, nullptr);
-        glCompileShader(shader);
-        GLint ok = 0;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-        if (!ok)
-        {
-            char log[2048] = {};
-            glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-            std::cerr << log << std::endl;
-            glDeleteShader(shader);
-            return 0;
-        }
-        return shader;
-    }
 
   public:
     SpriteSheet() = default;
@@ -214,6 +200,13 @@ class SpriteSheet
                     minY = top;
                     maxY = top;
                 }
+                if (layout.fixedCanvas)
+                {
+                    minX = left;
+                    maxX = right - 1;
+                    minY = top;
+                    maxY = bottom - 1;
+                }
                 int w = maxX - minX + 1, h = maxY - minY + 1;
                 float anchor = w * .5f;
                 if (layout.anchorAtFeet)
@@ -258,8 +251,11 @@ class SpriteSheet
                                   (maxY + .5f) / height,
                                   w,
                                   h,
-                                  anchor});
-                referenceHeight = (std::max)(referenceHeight, h);
+                                  anchor,
+                                  layout.fixedCanvas ? h * layout.canvasAnchorY : float(h)});
+                referenceHeight =
+                    (std::max)(referenceHeight,
+                               layout.fixedCanvas ? int(h * layout.canvasCharacterHeight) : h);
             }
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -270,49 +266,9 @@ class SpriteSheet
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
-        const char* vs = R"GLSL(#version 330
-uniform vec2 viewport; uniform vec4 rectangle,uvRect;
-out vec2 uv;
-void main(){
-    vec2 corners[6]=vec2[6](vec2(0,0),vec2(1,0),vec2(1,1),vec2(0,0),vec2(1,1),vec2(0,1));
-    vec2 p=corners[gl_VertexID];vec2 screen=rectangle.xy+p*rectangle.zw;
-    uv=mix(uvRect.xy,uvRect.zw,p);
-    gl_Position=vec4(screen.x/viewport.x*2.-1.,1.-screen.y/viewport.y*2.,0,1);
-}
-)GLSL";
-        const char* fs = R"GLSL(#version 330
-uniform sampler2D image;uniform vec4 tint;uniform bool linearScene;uniform float emission;
-in vec2 uv;out vec4 result;
-void main(){vec4 pixel=texture(image,uv);if(pixel.a<.01)discard;
-    vec3 color=pixel.rgb*tint.rgb;
-    vec3 linearColor=pow(max(color,vec3(0)),vec3(2.2));
-    float bright=smoothstep(.45,.9,max(color.r,max(color.g,color.b)));
-    result=vec4(linearScene?linearColor*(1.0+emission*bright):color,pixel.a*tint.a);
-}
-)GLSL";
-        GLuint vertex = Compile(GL_VERTEX_SHADER, vs), fragment = Compile(GL_FRAGMENT_SHADER, fs);
-        if (!vertex || !fragment)
-        {
-            if (vertex)
-                glDeleteShader(vertex);
-            if (fragment)
-                glDeleteShader(fragment);
+        program = ShaderFiles::Program(L"Shaders/Sprite.vs", L"Shaders/Sprite.fs");
+        if (!program)
             return false;
-        }
-        program = glCreateProgram();
-        glAttachShader(program, vertex);
-        glAttachShader(program, fragment);
-        glLinkProgram(program);
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        GLint ok = 0;
-        glGetProgramiv(program, GL_LINK_STATUS, &ok);
-        if (!ok)
-        {
-            glDeleteProgram(program);
-            program = 0;
-            return false;
-        }
         glGenVertexArrays(1, &vao);
         return Ready();
     }
@@ -358,7 +314,7 @@ void main(){vec4 pixel=texture(image,uv);if(pixel.a<.01)discard;
         glUniform2f(glGetUniformLocation(program, "viewport"), float(width), float(height));
         glUniform4f(glGetUniformLocation(program, "rectangle"),
                     feet.x - frame.anchorX * scale,
-                    feet.y - h,
+                    feet.y - frame.anchorY * scale,
                     w,
                     h);
         glUniform4f(

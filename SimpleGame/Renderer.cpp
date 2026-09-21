@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Renderer.h"
+#include "ShaderFiles.h"
 #include "Dependencies/freeglut.h"
 #include <cmath>
 #include <cstddef>
@@ -9,61 +10,12 @@
 
 #pragma comment(lib, "gdi32.lib")
 
-namespace
-{
-GLuint Shader(GLenum kind, const char* source)
-{
-    GLuint shader = glCreateShader(kind);
-    glShaderSource(shader, 1, &source, nullptr);
-    glCompileShader(shader);
-    GLint ok = 0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-    if (!ok)
-    {
-        char log[2048] = {};
-        glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-        std::cerr << log << std::endl;
-        glDeleteShader(shader);
-        return 0;
-    }
-    return shader;
-}
-} // namespace
-
 Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height)
 {
-    // Embedded shaders make startup independent of the working directory.
-    const char* vs = "#version 330\nlayout(location=0) in vec2 position;\n"
-                     "layout(location=1) in vec4 color; out vec4 tint; uniform vec2 viewport;\n"
-                     "void main(){ gl_Position=vec4(position.x/viewport.x*2.-1.,"
-                     "1.-position.y/viewport.y*2.,0.,1.); tint=color; }";
-    const char* fs = "#version 330\nin vec4 tint; out vec4 outputColor;\n"
-                     "uniform bool linearScene; void main(){ outputColor=vec4(linearScene ? "
-                     "pow(max(tint.rgb,vec3(0)),vec3(2.2)) : tint.rgb,tint.a); }";
-    GLuint vertex = Shader(GL_VERTEX_SHADER, vs), fragment = Shader(GL_FRAGMENT_SHADER, fs);
-    if (!vertex || !fragment)
-    {
-        if (vertex)
-            glDeleteShader(vertex);
-        if (fragment)
-            glDeleteShader(fragment);
+    m_Program = ShaderFiles::Program(L"Shaders/Geometry.vs", L"Shaders/Geometry.fs");
+    if (!m_Program)
         return;
-    }
-    m_Program = glCreateProgram();
-    glAttachShader(m_Program, vertex);
-    glAttachShader(m_Program, fragment);
-    glLinkProgram(m_Program);
-    glDeleteShader(vertex);
-    glDeleteShader(fragment);
-    GLint ok = 0;
-    glGetProgramiv(m_Program, GL_LINK_STATUS, &ok);
-    if (!ok)
-    {
-        char log[2048] = {};
-        glGetProgramInfoLog(m_Program, sizeof(log), nullptr, log);
-        std::cerr << log << std::endl;
-        return;
-    }
+    m_MeshOffset = glGetUniformLocation(m_Program, "meshOffset");
     m_Viewport = glGetUniformLocation(m_Program, "viewport");
     glGenVertexArrays(1, &m_Array);
     glBindVertexArray(m_Array);
@@ -84,6 +36,11 @@ Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height)
 
 Renderer::~Renderer()
 {
+    for (const auto& entry : m_MeshCache)
+    {
+        glDeleteBuffers(1, &entry.second.buffer);
+        glDeleteVertexArrays(1, &entry.second.array);
+    }
     m_Post.reset();
     if (m_Buffer)
         glDeleteBuffers(1, &m_Buffer);
@@ -104,6 +61,7 @@ void Renderer::Resize(int width, int height)
 
 void Renderer::Begin(Color c)
 {
+    ++m_Frame;
     m_Vertices.clear();
     m_InHDRScene = m_Post && m_Post->Begin(postProcess.enabled);
     if (m_InHDRScene)
@@ -122,11 +80,12 @@ void Renderer::Begin(Color c)
 
 void Renderer::Flush()
 {
-    if (m_Vertices.empty() || !m_Initialized)
+    if (m_Capturing || m_Vertices.empty() || !m_Initialized)
         return;
     glUseProgram(m_Program);
     glUniform2f(m_Viewport, float(m_Width), float(m_Height));
     glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
+    glUniform2f(m_MeshOffset, 0, 0);
     glBindVertexArray(m_Array);
     glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
     glBufferData(
@@ -143,6 +102,75 @@ void Renderer::FinishScene()
     if (m_InHDRScene)
         m_Post->Finish(postProcess);
     m_InHDRScene = false;
+}
+
+bool Renderer::BeginCachedMesh(const std::string& key, Point origin)
+{
+    if (!m_Initialized || m_Capturing || m_MeshCache.find(key) != m_MeshCache.end())
+        return false;
+    Flush();
+    m_Capturing = true;
+    m_CaptureKey = key;
+    m_CaptureOrigin = origin;
+    return true;
+}
+
+void Renderer::EndCachedMesh()
+{
+    if (!m_Capturing)
+        return;
+    m_Capturing = false;
+    // Bound GPU memory during infinite-world exploration. Evicted meshes rebuild on demand.
+    if (m_MeshCache.size() >= 256)
+    {
+        auto oldest = m_MeshCache.begin();
+        for (auto it = m_MeshCache.begin(); it != m_MeshCache.end(); ++it)
+            if (it->second.lastUsed < oldest->second.lastUsed)
+                oldest = it;
+        glDeleteBuffers(1, &oldest->second.buffer);
+        glDeleteVertexArrays(1, &oldest->second.array);
+        m_MeshCache.erase(oldest);
+    }
+    for (Vertex& vertex : m_Vertices)
+    {
+        vertex.x -= m_CaptureOrigin.x;
+        vertex.y -= m_CaptureOrigin.y;
+    }
+    CachedMesh mesh;
+    mesh.count = static_cast<GLsizei>(m_Vertices.size());
+    mesh.lastUsed = m_Frame;
+    glGenVertexArrays(1, &mesh.array);
+    glGenBuffers(1, &mesh.buffer);
+    glBindVertexArray(mesh.array);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.buffer);
+    glBufferData(
+        GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+    glVertexAttribPointer(
+        1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, r)));
+    glBindVertexArray(0);
+    m_MeshCache.emplace(m_CaptureKey, mesh);
+    m_Vertices.clear();
+}
+
+void Renderer::DrawCachedMesh(const std::string& key, Point origin)
+{
+    auto found = m_MeshCache.find(key);
+    if (found == m_MeshCache.end() || !m_Initialized)
+        return;
+    Flush();
+    CachedMesh& mesh = found->second;
+    mesh.lastUsed = m_Frame;
+    glUseProgram(m_Program);
+    glUniform2f(m_Viewport, float(m_Width), float(m_Height));
+    glUniform2f(m_MeshOffset, origin.x, origin.y);
+    glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
+    glBindVertexArray(mesh.array);
+    glDrawArrays(GL_TRIANGLES, 0, mesh.count);
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 void Renderer::Triangle(Point a, Point b, Point c, Color col)
@@ -165,13 +193,22 @@ void Renderer::Rect(float x, float y, float w, float h, Color c)
 
 void Renderer::Ellipse(float x, float y, float rx, float ry, Color c)
 {
-    const int segments = 24;
-    for (int i = 0; i < segments; ++i)
+    // Reuse the unit circle; only instance transforms vary per frame.
+    static const std::vector<Point> circle = []()
     {
-        float a = i * 6.2831853f / segments, b = (i + 1) * 6.2831853f / segments;
+        std::vector<Point> points;
+        for (int i = 0; i <= 24; ++i)
+        {
+            const float angle = i * 6.2831853f / 24;
+            points.push_back({std::cos(angle), std::sin(angle)});
+        }
+        return points;
+    }();
+    for (int i = 0; i < 24; ++i)
+    {
         Triangle({x, y},
-                 {x + std::cos(a) * rx, y + std::sin(a) * ry},
-                 {x + std::cos(b) * rx, y + std::sin(b) * ry},
+                 {x + circle[i].x * rx, y + circle[i].y * ry},
+                 {x + circle[i + 1].x * rx, y + circle[i + 1].y * ry},
                  c);
     }
 }

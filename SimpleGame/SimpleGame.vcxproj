@@ -159,6 +159,13 @@
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
     <ClInclude Include="LevelOne.h" />
+    <ClInclude Include="SaveGame.h" />
+    <ClInclude Include="PrototypeSave.inl" />
+    <ClInclude Include="Chapter.h" />
+    <ClInclude Include="CaptureRules.h" />
+    <ClInclude Include="PrototypeMenu.inl" />
+    <ClInclude Include="PrototypeUI.inl" />
+    <ClInclude Include="ShaderFiles.h" />
     <ClInclude Include="PostProcessing.h" />
     <ClInclude Include="Prototype.h" />
     <ClInclude Include="stdafx.h" />
@@ -177,6 +184,13 @@
   <ItemGroup>
     <None Include="Shaders\SolidRect.fs" />
     <None Include="Shaders\SolidRect.vs" />
+    <None Include="Shaders\Geometry.vs" />
+    <None Include="Shaders\Geometry.fs" />
+    <None Include="Shaders\Sprite.vs" />
+    <None Include="Shaders\Sprite.fs" />
+    <None Include="Shaders\Fullscreen.vs" />
+    <None Include="Shaders\BloomFilter.fs" />
+    <None Include="Shaders\Composite.fs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemDefinitionGroup>
@@ -188,13 +202,24 @@
   </ImportGroup>
   <ItemGroup>
     <SpriteAssets Include="Assets\**\*.png" />
+    <ShaderAssets Include="Shaders\**\*.vs;Shaders\**\*.fs" />
+    <GameData Include="Data\**\*.tsv;Data\**\*.ini" />
+    <None Include="Data\Chapter1.tsv" />
+    <None Include="Data\Capture.ini" />
+    <None Include="Data\Combat.ini" />
     <None Include="Assets\Characters\protagonist.png" />
     <None Include="Assets\Characters\mira.png" />
     <None Include="Assets\Characters\keeper.png" />
   </ItemGroup>
   <Target Name="CopySpriteAssets" AfterTargets="Build">
+    <Copy SourceFiles="@(GameData)"
+          DestinationFiles="@(GameData->'$(OutDir)Data\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(SpriteAssets)"
           DestinationFiles="@(SpriteAssets->'$(OutDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ShaderAssets)"
+          DestinationFiles="@(ShaderAssets->'$(OutDir)Shaders\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

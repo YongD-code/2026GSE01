@@ -30,6 +30,13 @@
     <ClInclude Include="PostProcessing.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="World.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="LevelOne.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="SaveGame.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PrototypeSave.inl"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="Chapter.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="CaptureRules.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PrototypeMenu.inl"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="PrototypeUI.inl"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ShaderFiles.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="SpriteSheet.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>헤더 파일</Filter>
@@ -53,6 +60,13 @@
     <None Include="Shaders\SolidRect.fs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
+    <None Include="Shaders\Geometry.vs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\Geometry.fs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\Sprite.vs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\Sprite.fs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\Fullscreen.vs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\BloomFilter.fs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\Composite.fs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\SolidRect.vs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
