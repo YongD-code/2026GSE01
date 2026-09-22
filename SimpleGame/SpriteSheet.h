@@ -77,7 +77,7 @@ class SpriteSheet
         float anchorX, anchorY;
     };
 
-    GLuint texture = 0, program = 0, vao = 0;
+    GLuint texture = 0;
     std::vector<Frame> frames;
     SpriteLayout layout;
     int referenceHeight = 1;
@@ -91,15 +91,11 @@ class SpriteSheet
     {
         if (texture)
             glDeleteTextures(1, &texture);
-        if (program)
-            glDeleteProgram(program);
-        if (vao)
-            glDeleteVertexArrays(1, &vao);
     }
 
     bool Ready() const
     {
-        return texture && program && vao;
+        return texture && !frames.empty();
     }
 
     bool Load(const std::wstring& relativePath, const SpriteLayout& definition = SpriteLayout())
@@ -267,10 +263,6 @@ class SpriteSheet
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
-        program = ShaderFiles::Program(L"Shaders/Sprite.vs", L"Shaders/Sprite.fs");
-        if (!program)
-            return false;
-        glGenVertexArrays(1, &vao);
         return Ready();
     }
 
@@ -305,26 +297,16 @@ class SpriteSheet
         float scale = size / referenceHeight, w = frame.width * scale, h = frame.height * scale;
         if (feet.x + w < 0 || feet.x - w > width || feet.y < 0 || feet.y - h > height)
             return;
-        renderer.Flush();
-        glUseProgram(program);
-        glBindVertexArray(vao);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glUniform1i(glGetUniformLocation(program, "image"), 0);
-        glUniform1f(glGetUniformLocation(program, "emission"), emission);
-        glUniform2f(glGetUniformLocation(program, "viewport"), float(width), float(height));
-        glUniform4f(glGetUniformLocation(program, "rectangle"),
-                    feet.x - frame.anchorX * scale,
-                    feet.y - frame.anchorY * scale,
-                    w,
-                    h);
-        glUniform4f(
-            glGetUniformLocation(program, "uvRect"), frame.u0, frame.v0, frame.u1, frame.v1);
-        glUniform4f(glGetUniformLocation(program, "tint"), tint.r, tint.g, tint.b, tint.a);
-        glUniform1i(glGetUniformLocation(program, "linearScene"), renderer.IsHDRScene() ? 1 : 0);
-        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, 6);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindVertexArray(0);
-        glUseProgram(0);
+        renderer.Sprite(texture,
+                        feet.x - frame.anchorX * scale,
+                        feet.y - frame.anchorY * scale,
+                        w,
+                        h,
+                        frame.u0,
+                        frame.v0,
+                        frame.u1,
+                        frame.v1,
+                        tint,
+                        emission);
     }
 };

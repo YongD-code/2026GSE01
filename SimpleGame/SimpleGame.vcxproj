@@ -159,6 +159,7 @@
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
     <ClInclude Include="FrameProfiler.h" />
+    <ClInclude Include="RenderStorage.h" />
     <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
@@ -193,6 +194,8 @@
     <None Include="Shaders\SolidRect.fs" />
     <None Include="Shaders\SolidRect.vs" />
     <None Include="Shaders\Geometry.vs" />
+    <None Include="Shaders\Batch.vs" />
+    <None Include="Shaders\Batch.fs" />
     <None Include="Shaders\Geometry.fs" />
     <None Include="Shaders\Sprite.vs" />
     <None Include="Shaders\Sprite.fs" />

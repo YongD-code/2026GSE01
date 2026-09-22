@@ -1,61 +1,77 @@
 #include "stdafx.h"
-#include "FrameProfiler.h"
 #include "Renderer.h"
+#include "FrameProfiler.h"
+#include "RenderStorage.h"
 #include "ShaderFiles.h"
-#include "Dependencies/freeglut.h"
 #include <cmath>
-#include <cstddef>
-#include <iostream>
-#include <utility>
+#include <algorithm>
 #include <windows.h>
-
 #pragma comment(lib, "gdi32.lib")
 
 Renderer::Renderer(int width, int height) : m_Width(width), m_Height(height)
 {
-    m_Program = ShaderFiles::Program(L"Shaders/Geometry.vs", L"Shaders/Geometry.fs");
+    m_Program = ShaderFiles::Program(L"Shaders/Batch.vs", L"Shaders/Batch.fs");
     if (!m_Program)
         return;
-    m_MeshOffset = glGetUniformLocation(m_Program, "meshOffset");
     m_Viewport = glGetUniformLocation(m_Program, "viewport");
-    glGenVertexArrays(1, &m_Array);
-    glBindVertexArray(m_Array);
-    glGenBuffers(1, &m_Buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-    glVertexAttribPointer(
-        1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, r)));
-    glBindVertexArray(0);
     m_LinearScene = glGetUniformLocation(m_Program, "linearScene");
+    glGenVertexArrays(1, &m_Array);
+    glGenBuffers(1, &m_Buffer);
+    glGenBuffers(1, &m_PoolBuffer);
+    glGenTextures(1, &m_PoolTexture);
+    glBindVertexArray(m_Array);
+    glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
+    for (GLuint i = 0; i < 5; ++i)
+    {
+        glEnableVertexAttribArray(i);
+        glVertexAttribPointer(i,
+                              4,
+                              GL_FLOAT,
+                              GL_FALSE,
+                              sizeof(Instance),
+                              reinterpret_cast<void*>(size_t(i) * 4 * sizeof(float)));
+        glVertexAttribDivisor(i, 1);
+    }
+    glBindVertexArray(0);
+    glUseProgram(m_Program);
+    glUniform1i(glGetUniformLocation(m_Program, "meshPool"), 8);
+    for (int i = 0; i < 8; ++i)
+    {
+        const auto name = "image" + std::to_string(i);
+        glUniform1i(glGetUniformLocation(m_Program, name.c_str()), i);
+    }
+    glUseProgram(0);
+    m_Batching = RenderStorage::Enabled(L"GSE_RENDER_BATCH");
+    GLint maximumTexels = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &maximumTexels);
+    m_PoolVertexLimit = (std::min)(size_t(maximumTexels / 2), size_t(524288));
+    m_Instances.reserve(2048);
     m_Post.reset(new PostProcessing());
-    m_Vertices.reserve(40000);
     m_Initialized = true;
+    Templates();
     Resize(width, height);
 }
 
 Renderer::~Renderer()
 {
-    for (const auto& entry : m_MeshCache)
-    {
-        glDeleteBuffers(1, &entry.second.buffer);
-        glDeleteVertexArrays(1, &entry.second.array);
-    }
+    for (auto& entry : m_TextCache)
+        glDeleteTextures(1, &entry.second.texture);
     m_Post.reset();
-    if (m_Buffer)
-        glDeleteBuffers(1, &m_Buffer);
-    if (m_Array)
-        glDeleteVertexArrays(1, &m_Array);
+    glDeleteBuffers(1, &m_Buffer);
+    glDeleteBuffers(1, &m_PoolBuffer);
+    glDeleteTextures(1, &m_PoolTexture);
+    glDeleteVertexArrays(1, &m_Array);
     if (m_Program)
         glDeleteProgram(m_Program);
 }
 
 void Renderer::Resize(int width, int height)
 {
-    m_Width = width > 0 ? width : 1;
-    m_Height = height > 0 ? height : 1;
+    Flush();
+    m_Width = (std::max)(1, width);
+    m_Height = (std::max)(1, height);
     glViewport(0, 0, m_Width, m_Height);
+    FrameProfiler::Event("viewport", std::to_string(m_Width) + "x" + std::to_string(m_Height), 0);
     if (m_Post)
         m_Post->Resize(m_Width, m_Height);
 }
@@ -63,7 +79,6 @@ void Renderer::Resize(int width, int height)
 void Renderer::Begin(Color c)
 {
     ++m_Frame;
-    m_Vertices.clear();
     m_InHDRScene = m_Post && m_Post->Begin(postProcess.enabled);
     if (m_InHDRScene)
     {
@@ -81,20 +96,33 @@ void Renderer::Begin(Color c)
 
 void Renderer::Flush()
 {
-    if (m_Capturing || m_Vertices.empty() || !m_Initialized)
+    if (m_Instances.empty() || !m_Initialized)
         return;
     glUseProgram(m_Program);
     glUniform2f(m_Viewport, float(m_Width), float(m_Height));
-    glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
-    glUniform2f(m_MeshOffset, 0, 0);
+    glUniform1i(m_LinearScene, m_InHDRScene);
+    glActiveTexture(GL_TEXTURE8);
+    glBindTexture(GL_TEXTURE_BUFFER, m_PoolTexture);
+    for (size_t i = 0; i < m_Textures.size(); ++i)
+    {
+        glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(i));
+        glBindTexture(GL_TEXTURE_2D, m_Textures[i]);
+    }
     glBindVertexArray(m_Array);
     glBindBuffer(GL_ARRAY_BUFFER, m_Buffer);
     glBufferData(
-        GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STREAM_DRAW);
-    FrameProfiler::DrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_Vertices.size()));
+        GL_ARRAY_BUFFER, m_Instances.size() * sizeof(Instance), m_Instances.data(), GL_STREAM_DRAW);
+    FrameProfiler::Upload(m_Instances.size() * sizeof(Instance));
+    size_t useful = 0;
+    for (const auto& instance : m_Instances)
+        useful += size_t(instance.placement[3]);
+    FrameProfiler::DrawInstanced(m_BatchVertices, static_cast<GLsizei>(m_Instances.size()), useful);
     glBindVertexArray(0);
     glUseProgram(0);
-    m_Vertices.clear();
+    glActiveTexture(GL_TEXTURE0);
+    m_Instances.clear();
+    m_Textures.clear();
+    m_BatchVertices = 0;
 }
 
 void Renderer::FinishScene()
@@ -105,14 +133,84 @@ void Renderer::FinishScene()
     m_InHDRScene = false;
 }
 
+void Renderer::UploadPool()
+{
+    std::vector<float> data;
+    for (auto& entry : m_MeshCache)
+    {
+        entry.second.first = static_cast<int>(data.size() / 8);
+        for (const Vertex& v : entry.second.vertices)
+            data.insert(data.end(), {v.x, v.y, 0, 0, v.r, v.g, v.b, v.a});
+    }
+    glBindBuffer(GL_TEXTURE_BUFFER, m_PoolBuffer);
+    glBufferData(GL_TEXTURE_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
+    glActiveTexture(GL_TEXTURE8);
+    glBindTexture(GL_TEXTURE_BUFFER, m_PoolTexture);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_PoolBuffer);
+    glActiveTexture(GL_TEXTURE0);
+    FrameProfiler::Upload(data.size() * sizeof(float));
+    FrameProfiler::Event("mesh_pool_upload", "", data.size() * sizeof(float));
+}
+
+void Renderer::InstallMesh(const std::string& key, std::vector<Vertex> vertices)
+{
+    Flush();
+    size_t totalVertices = vertices.size();
+    for (const auto& entry : m_MeshCache)
+        totalVertices += entry.second.vertices.size();
+    while (m_MeshCache.size() >= 256 || totalVertices > m_PoolVertexLimit)
+    {
+        auto oldest = m_MeshCache.end();
+        for (auto it = m_MeshCache.begin(); it != m_MeshCache.end(); ++it)
+            if (it->first.find("unit:") != 0 &&
+                (oldest == m_MeshCache.end() || it->second.lastUsed < oldest->second.lastUsed))
+                oldest = it;
+        if (oldest != m_MeshCache.end())
+        {
+            totalVertices -= oldest->second.vertices.size();
+            FrameProfiler::Event(
+                "mesh_evict", oldest->first, oldest->second.vertices.size() * sizeof(Vertex));
+            m_MeshCache.erase(oldest);
+        }
+        else
+        {
+            FrameProfiler::Event("mesh_pool_rejected", key, vertices.size() * sizeof(Vertex));
+            return;
+        }
+    }
+    CachedMesh mesh;
+    mesh.vertices = std::move(vertices);
+    mesh.lastUsed = m_Frame;
+    m_MeshCache.emplace(key, std::move(mesh));
+    UploadPool();
+}
+
 bool Renderer::BeginCachedMesh(const std::string& key, Point origin)
 {
-    if (!m_Initialized || m_Capturing || m_MeshCache.find(key) != m_MeshCache.end())
+    if (!m_Initialized || m_Capturing)
         return false;
-    Flush();
+    if (m_MeshCache.count(key))
+    {
+        FrameProfiler::CacheHit();
+        return false;
+    }
+    const auto start = FrameProfiler::Clock::now();
+    std::vector<Vertex> loaded;
+    if (RenderStorage::Read(key, loaded))
+    {
+        FrameProfiler::Event("mesh_disk_hit",
+                             key,
+                             loaded.size() * sizeof(Vertex),
+                             FrameProfiler::Milliseconds(start));
+        InstallMesh(key, std::move(loaded));
+        return false;
+    }
+    FrameProfiler::Event("mesh_disk_miss", key, 0, FrameProfiler::Milliseconds(start));
     m_Capturing = true;
+    m_CaptureStart = FrameProfiler::Clock::now();
     m_CaptureKey = key;
     m_CaptureOrigin = origin;
+    m_Vertices.clear();
     return true;
 }
 
@@ -121,64 +219,107 @@ void Renderer::EndCachedMesh()
     if (!m_Capturing)
         return;
     m_Capturing = false;
-    // Bound GPU memory during infinite-world exploration. Evicted meshes rebuild on demand.
-    if (m_MeshCache.size() >= 256)
+    for (auto& v : m_Vertices)
     {
-        auto oldest = m_MeshCache.begin();
-        for (auto it = m_MeshCache.begin(); it != m_MeshCache.end(); ++it)
-            if (it->second.lastUsed < oldest->second.lastUsed)
-                oldest = it;
-        glDeleteBuffers(1, &oldest->second.buffer);
-        glDeleteVertexArrays(1, &oldest->second.array);
-        m_MeshCache.erase(oldest);
+        v.x -= m_CaptureOrigin.x;
+        v.y -= m_CaptureOrigin.y;
     }
-    for (Vertex& vertex : m_Vertices)
-    {
-        vertex.x -= m_CaptureOrigin.x;
-        vertex.y -= m_CaptureOrigin.y;
-    }
-    CachedMesh mesh;
-    mesh.count = static_cast<GLsizei>(m_Vertices.size());
-    mesh.lastUsed = m_Frame;
-    glGenVertexArrays(1, &mesh.array);
-    glGenBuffers(1, &mesh.buffer);
-    glBindVertexArray(mesh.array);
-    glBindBuffer(GL_ARRAY_BUFFER, mesh.buffer);
-    glBufferData(
-        GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(Vertex), m_Vertices.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-    glVertexAttribPointer(
-        1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, r)));
-    glBindVertexArray(0);
-    m_MeshCache.emplace(m_CaptureKey, mesh);
+    FrameProfiler::Event("mesh_build_cpu",
+                         m_CaptureKey,
+                         m_Vertices.size() * sizeof(Vertex),
+                         FrameProfiler::Milliseconds(m_CaptureStart));
+    const auto start = FrameProfiler::Clock::now();
+    const bool written = RenderStorage::Write(m_CaptureKey, m_Vertices);
+    FrameProfiler::Event(written ? "mesh_built_saved" : "mesh_built_unsaved",
+                         m_CaptureKey,
+                         m_Vertices.size() * sizeof(Vertex),
+                         FrameProfiler::Milliseconds(start));
+    InstallMesh(m_CaptureKey, std::move(m_Vertices));
     m_Vertices.clear();
+}
+
+void Renderer::Templates()
+{
+    if (BeginCachedMesh("unit:triangle", {0, 0}))
+    {
+        Triangle({0, 0}, {1, 0}, {0, 1}, Color(1, 1, 1));
+        EndCachedMesh();
+    }
+    if (BeginCachedMesh("unit:quad", {0, 0}))
+    {
+        Rect(0, 0, 1, 1, Color(1, 1, 1));
+        EndCachedMesh();
+    }
+    if (BeginCachedMesh("unit:circle24", {0, 0}))
+    {
+        Ellipse(0, 0, 1, 1, Color(1, 1, 1));
+        EndCachedMesh();
+    }
+}
+
+void Renderer::Submit(const std::string& key, Instance instance, GLuint texture)
+{
+    auto found = m_MeshCache.find(key);
+    if (found == m_MeshCache.end())
+        return;
+    auto& mesh = found->second;
+    mesh.lastUsed = m_Frame;
+    const int count = static_cast<int>(mesh.vertices.size());
+    // Bound padding overhead: large terrain meshes cannot inflate tiny sprite batches.
+    if (!m_Instances.empty() &&
+        (m_Instances.size() >= 2048 || count > (std::max)(72, m_BatchVertices) * 4 ||
+         m_BatchVertices > (std::max)(72, count) * 4))
+    {
+        FrameProfiler::Event("batch_flush", "capacity_or_vertex_ratio", m_Instances.size());
+        Flush();
+    }
+    int slot = -1;
+    if (texture)
+    {
+        auto it = std::find(m_Textures.begin(), m_Textures.end(), texture);
+        if (it == m_Textures.end())
+        {
+            if (m_Textures.size() == 8)
+            {
+                FrameProfiler::Event("batch_flush", "texture_limit", m_Instances.size());
+                Flush();
+            }
+            slot = static_cast<int>(m_Textures.size());
+            m_Textures.push_back(texture);
+        }
+        else
+            slot = static_cast<int>(it - m_Textures.begin());
+    }
+    instance.placement[2] = float(mesh.first);
+    instance.placement[3] = float(count);
+    instance.material[0] = float(slot);
+    m_BatchVertices = (std::max)(m_BatchVertices, count);
+    m_Instances.push_back(instance);
+    if (!m_Batching)
+        Flush();
 }
 
 void Renderer::DrawCachedMesh(const std::string& key, Point origin)
 {
-    auto found = m_MeshCache.find(key);
-    if (found == m_MeshCache.end() || !m_Initialized)
-        return;
-    Flush();
-    CachedMesh& mesh = found->second;
-    mesh.lastUsed = m_Frame;
-    glUseProgram(m_Program);
-    glUniform2f(m_Viewport, float(m_Width), float(m_Height));
-    glUniform2f(m_MeshOffset, origin.x, origin.y);
-    glUniform1i(m_LinearScene, m_InHDRScene ? 1 : 0);
-    glBindVertexArray(mesh.array);
-    FrameProfiler::DrawArrays(GL_TRIANGLES, 0, mesh.count);
-    glBindVertexArray(0);
-    glUseProgram(0);
+    Submit(key,
+           {{1, 0, 0, 1}, {origin.x, origin.y, 0, 0}, {1, 1, 1, 1}, {0, 0, 1, 1}, {-1, 0, 0, 0}});
 }
 
 void Renderer::Triangle(Point a, Point b, Point c, Color col)
 {
-    m_Vertices.push_back({a.x, a.y, col.r, col.g, col.b, col.a});
-    m_Vertices.push_back({b.x, b.y, col.r, col.g, col.b, col.a});
-    m_Vertices.push_back({c.x, c.y, col.r, col.g, col.b, col.a});
+    if (m_Capturing)
+    {
+        m_Vertices.push_back({a.x, a.y, col.r, col.g, col.b, col.a});
+        m_Vertices.push_back({b.x, b.y, col.r, col.g, col.b, col.a});
+        m_Vertices.push_back({c.x, c.y, col.r, col.g, col.b, col.a});
+        return;
+    }
+    Submit("unit:triangle",
+           {{b.x - a.x, b.y - a.y, c.x - a.x, c.y - a.y},
+            {a.x, a.y, 0, 0},
+            {col.r, col.g, col.b, col.a},
+            {0, 0, 1, 1},
+            {-1, 0, 0, 0}});
 }
 
 void Renderer::Quad(Point a, Point b, Point c, Point d, Color col)
@@ -189,27 +330,29 @@ void Renderer::Quad(Point a, Point b, Point c, Point d, Color col)
 
 void Renderer::Rect(float x, float y, float w, float h, Color c)
 {
-    Quad({x, y}, {x + w, y}, {x + w, y + h}, {x, y + h}, c);
+    if (m_Capturing)
+    {
+        Quad({x, y}, {x + w, y}, {x + w, y + h}, {x, y + h}, c);
+        return;
+    }
+    Submit("unit:quad",
+           {{w, 0, 0, h}, {x, y, 0, 0}, {c.r, c.g, c.b, c.a}, {0, 0, 1, 1}, {-1, 0, 0, 0}});
 }
 
 void Renderer::Ellipse(float x, float y, float rx, float ry, Color c)
 {
-    // Reuse the unit circle; only instance transforms vary per frame.
-    static const std::vector<Point> circle = []()
+    if (!m_Capturing)
     {
-        std::vector<Point> points;
-        for (int i = 0; i <= 24; ++i)
-        {
-            const float angle = i * 6.2831853f / 24;
-            points.push_back({std::cos(angle), std::sin(angle)});
-        }
-        return points;
-    }();
+        Submit("unit:circle24",
+               {{rx, 0, 0, ry}, {x, y, 0, 0}, {c.r, c.g, c.b, c.a}, {0, 0, 1, 1}, {-1, 0, 0, 0}});
+        return;
+    }
     for (int i = 0; i < 24; ++i)
     {
+        float a = i * 6.2831853f / 24, b = (i + 1) * 6.2831853f / 24;
         Triangle({x, y},
-                 {x + circle[i].x * rx, y + circle[i].y * ry},
-                 {x + circle[i + 1].x * rx, y + circle[i + 1].y * ry},
+                 {x + std::cos(a) * rx, y + std::sin(a) * ry},
+                 {x + std::cos(b) * rx, y + std::sin(b) * ry},
                  c);
     }
 }
@@ -220,7 +363,37 @@ void Renderer::Line(Point a, Point b, float w, Color c)
     if (length < .001f)
         return;
     float nx = -dy / length * w * .5f, ny = dx / length * w * .5f;
-    Quad({a.x + nx, a.y + ny}, {b.x + nx, b.y + ny}, {b.x - nx, b.y - ny}, {a.x - nx, a.y - ny}, c);
+    if (m_Capturing)
+        Quad({a.x + nx, a.y + ny},
+             {b.x + nx, b.y + ny},
+             {b.x - nx, b.y - ny},
+             {a.x - nx, a.y - ny},
+             c);
+    else
+        Submit("unit:quad",
+               {{dx, dy, -2 * nx, -2 * ny},
+                {a.x + nx, a.y + ny, 0, 0},
+                {c.r, c.g, c.b, c.a},
+                {0, 0, 1, 1},
+                {-1, 0, 0, 0}});
+}
+
+void Renderer::Sprite(GLuint texture,
+                      float x,
+                      float y,
+                      float w,
+                      float h,
+                      float u0,
+                      float v0,
+                      float u1,
+                      float v1,
+                      Color c,
+                      float emission)
+{
+    Submit(
+        "unit:quad",
+        {{w, 0, 0, h}, {x, y, 0, 0}, {c.r, c.g, c.b, c.a}, {u0, v0, u1, v1}, {0, emission, 0, 0}},
+        texture);
 }
 
 void Renderer::Text(float x, float y, const std::string& text, Color c, bool large)
@@ -319,24 +492,42 @@ void Renderer::Text(float x, float y, const std::string& text, Color c, bool lar
             return;
         // Bound memory use when future dialogue introduces many unique lines.
         if (m_TextCache.size() >= 128)
+        {
+            Flush();
+            for (auto& entry : m_TextCache)
+                glDeleteTextures(1, &entry.second.texture);
             m_TextCache.clear();
+        }
+        glGenTextures(1, &bitmap.texture);
+        glBindTexture(GL_TEXTURE_2D, bitmap.texture);
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     GL_RGBA8,
+                     bitmap.width,
+                     bitmap.height,
+                     0,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     bitmap.pixels.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        FrameProfiler::Upload(bitmap.pixels.size());
+        bitmap.pixels.clear();
         found = m_TextCache.emplace(key, std::move(bitmap)).first;
     }
-    Flush();
     const TextBitmap& bitmap = found->second;
-    glUseProgram(0);
-    glWindowPos2i(static_cast<int>(x), m_Height - static_cast<int>(y) - bitmap.descent);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glPixelTransferf(GL_RED_SCALE, c.r);
-    glPixelTransferf(GL_GREEN_SCALE, c.g);
-    glPixelTransferf(GL_BLUE_SCALE, c.b);
-    glPixelTransferf(GL_ALPHA_SCALE, c.a);
-    FrameProfiler::DrawPixels(
-        bitmap.width, bitmap.height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.pixels.data());
-    glPixelTransferf(GL_RED_SCALE, 1);
-    glPixelTransferf(GL_GREEN_SCALE, 1);
-    glPixelTransferf(GL_BLUE_SCALE, 1);
-    glPixelTransferf(GL_ALPHA_SCALE, 1);
+    Sprite(bitmap.texture,
+           float(int(x)),
+           float(int(y) + bitmap.descent - bitmap.height),
+           float(bitmap.width),
+           float(bitmap.height),
+           0,
+           1,
+           1,
+           0,
+           c);
 }
 
 void Renderer::DrawSolidRect(

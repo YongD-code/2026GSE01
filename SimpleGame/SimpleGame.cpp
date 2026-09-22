@@ -31,6 +31,7 @@ void Display()
     {
         FrameProfiler::BeginFrame();
         game->Draw();
+        FrameProfiler::BeforeSwap();
         glutSwapBuffers();
         FrameProfiler::EndFrame();
     }
@@ -54,7 +55,9 @@ void Timer(int)
     if (!focused)
         game->ClearInput();
     previousTime = now;
+    const auto updateStart = FrameProfiler::Clock::now();
     game->Update(dt, sprint);
+    FrameProfiler::UpdateTime(FrameProfiler::Milliseconds(updateStart));
     glutPostRedisplay();
     glutTimerFunc(16, Timer, 0);
 }
@@ -137,6 +140,7 @@ void Close()
     }
     game.reset();
     renderer.reset();
+    FrameProfiler::Close();
 } // Release GPU objects while context is alive.
 } // namespace
 
