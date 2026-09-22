@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="UILayout.h" />
     <ClInclude Include="FrameProfiler.h" />
     <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="SpriteSheet.h" />

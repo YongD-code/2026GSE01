@@ -5,6 +5,7 @@
 #include "LevelOne.h"
 #include "SaveGame.h"
 #include "SceneGraph.h"
+#include "UILayout.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -35,6 +36,7 @@ class Prototype
     int activeSlot = 0, frontSelection = 0;
     std::string slotLabels[3];
     int pauseSelection = 0, eventPage = 0;
+    int menuPage = 0, journalPage = 0;
     bool automaticSaveAllowed = true;
     float autoSaveTime = 0, saveStatusTime = 0;
     std::string saveStatus = "자동 저장 대기";
@@ -265,9 +267,32 @@ class Prototype
 
     void Panel(float x, float y, float w, float h)
     {
+        r.Rect(x + 4, y + 5, w, h, Color(0, 0, 0, .32f));
         r.Rect(x, y, w, h, Color(.035f, .052f, .068f, .94f));
+        r.Rect(x, y, 1, h, Color(.32f, .38f, .39f, .8f));
+        r.Rect(x + w - 1, y, 1, h, Color(.32f, .38f, .39f, .8f));
         r.Rect(x, y, w, 1, Color(.48f, .43f, .30f, .65f));
         r.Rect(x, y + h - 1, w, 1, Color(.28f, .30f, .29f, .6f));
+    }
+
+    void UIButton(UIRect box, const std::string& label, bool selected = false)
+    {
+        r.Rect(box.x,
+               box.y,
+               box.w,
+               box.h,
+               selected ? Color(.18f, .30f, .32f, .98f) : Color(.075f, .115f, .14f, .98f));
+        r.Rect(box.x,
+               box.y,
+               selected ? 3.f : 1.f,
+               box.h,
+               selected ? Color(.85f, .7f, .43f) : Color(.28f, .36f, .38f));
+        WrappedText(box.x + 12,
+                    box.y + box.h * .5f + 6,
+                    box.w - 24,
+                    label,
+                    selected ? Color(.92f, .78f, .52f) : Color(.85f, .86f, .82f),
+                    1);
     }
 
 #include "PrototypeSave.inl"
@@ -353,13 +378,18 @@ class Prototype
         lootLayout.directionRows.fill(0);
         lootLayout.firstWalkFrame = 0;
         lootLayout.walkFrames = 1;
+        lootLayout.anchorAtFeet = true;
         const wchar_t* lootFiles[] = {L"Assets/Items/experience.png",
                                       L"Assets/Items/weapon_stone.png",
                                       L"Assets/Items/healing.png",
                                       L"Assets/Items/spirit_stone.png",
                                       L"Assets/Items/seal_ticket.png"};
         for (int i = 0; i < 5; ++i)
-            lootSheets[i].Load(lootFiles[i], lootLayout);
+        {
+            if (!lootSheets[i].Load(lootFiles[i], lootLayout))
+                std::cerr << "드롭 이미지 로드 실패: 종류 " << i
+                          << " · 실행 폴더의 Assets/Items를 확인하세요." << std::endl;
+        }
         levelOne.captureRules.Load();
         levelOne.LoadCombat();
         world.Stream(camera, player, width, height);
@@ -394,20 +424,13 @@ class Prototype
 
     void MenuClick(int x, int y)
     {
-        if (!pauseMenu || width < 480 || height < 360)
+        if ((!pauseMenu && !journal) || width < 480 || height < 360)
         {
             return;
         }
         if (journal)
         {
-            const float w = (std::min)(850.f, float(width) - 36);
-            const float h = (std::min)(590.f, float(height) - 36);
-            const float left = (width - w) * .5f;
-            const float top = (height - h) * .5f;
-            if (y >= top && y < top + 44 && x >= left + 16 && x < left + w - 16)
-            {
-                menuTab = (std::min)(4, int((x - left - 16) / ((w - 32) / 5)));
-            }
+            JournalClick(x, y);
             return;
         }
         const int action = MenuActionAt(x, y);
@@ -455,6 +478,11 @@ class Prototype
         }
         if (pauseMenu && !journal)
         {
+            if (!exitConfirm && (key == '[' || key == ']'))
+            {
+                ChangeMenuPage(key == ']' ? 1 : -1);
+                return;
+            }
             const int count = exitConfirm ? 2 : 9;
             if (key >= '1' && key < '1' + count)
             {
@@ -513,21 +541,12 @@ class Prototype
         if (journal)
         {
             if (key >= '1' && key <= '5')
-                menuTab = key - '1';
-            const int perPage =
-                (std::max)(1, static_cast<int>(((std::min)(590, height - 36) - 180) / 29));
-            const int lastPage = levelOne.collection.empty()
-                                     ? 0
-                                     : (static_cast<int>(levelOne.collection.size()) - 1) / perPage;
-            if (menuTab == 3 && (key == '[' || key == ']'))
             {
-                const int last = (std::max)(0, (chapter.step - 1) / 3);
-                eventPage = (std::max)(0, (std::min)(last, eventPage + (key == ']' ? 1 : -1)));
+                menuTab = key - '1';
+                journalPage = 0;
             }
-            if (menuTab == 2 && key == '[')
-                collectionPage = (std::max)(0, collectionPage - 1);
-            if (menuTab == 2 && key == ']')
-                collectionPage = (std::min)(lastPage, collectionPage + 1);
+            if (key == '[' || key == ']')
+                ChangeJournalPage(key == ']' ? 1 : -1);
             if (menuTab == 2 && key == 'n' && !levelOne.collection.empty())
             {
                 selectedCompanion =
@@ -612,8 +631,7 @@ class Prototype
         {
             if (down && (key == 1 || key == 3))
             {
-                const int count = exitConfirm ? 2 : 9;
-                pauseSelection = (pauseSelection + (key == 1 ? count - 1 : 1)) % count;
+                MoveMenuSelection(key == 1 ? -1 : 1);
             }
             return;
         }
@@ -633,6 +651,9 @@ class Prototype
     void Draw();
 
   private:
+    UIRect FrontBounds() const;
+    UIRect FrontButton(int index) const;
+    bool GameUIClick(int x, int y);
     void OpenSlots(SlotMode mode);
     void FrontKey(unsigned char key);
     bool FrontClick(int x, int y);

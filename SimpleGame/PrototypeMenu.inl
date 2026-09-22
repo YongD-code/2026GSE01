@@ -1,7 +1,8 @@
-// Included inside Prototype. The pause menu groups existing game features by purpose.
+// Member menu implementation. Controls share layout between drawing and input.
 struct PauseBounds
 {
-    float x, y, w, h, columnWidth, rowHeight;
+    float x, y, w, h;
+    int columns, rows;
 };
 
 struct PauseEntry
@@ -19,9 +20,16 @@ struct PauseColumn
 
 PauseBounds MenuBounds() const
 {
-    const float w = (std::min)(1160.f, float(width) - 36.f);
-    const float h = (std::min)(590.f, float(height) - 30.f);
-    return {(width - w) * .5f, (height - h) * .5f, w, h, w / 6.f, 43.f};
+    const float w = (std::min)(1100.f, float(width) - 40);
+    const float h = (std::min)(650.f, float(height) - 40);
+    return {(width - w) / 2,
+            (height - h) / 2,
+            w,
+            h,
+            w >= 960   ? 3
+            : w >= 640 ? 2
+                       : 1,
+            h >= 570 ? 2 : 1};
 }
 
 const PauseColumn* PauseColumns() const
@@ -41,26 +49,83 @@ const PauseColumn* PauseColumns() const
     return columns;
 }
 
-int MenuActionAt(int x, int y) const
+UIRect MenuCategory(int index) const
 {
-    const auto box = MenuBounds();
+    const auto b = MenuBounds();
+    const int slot = index % (b.columns * b.rows);
+    const float w = (b.w - 32 - (b.columns - 1) * 18) / b.columns;
+    const float h = (b.h - 158 - (b.rows - 1) * 18) / b.rows;
+    return {
+        b.x + 16 + (slot % b.columns) * (w + 18), b.y + 58 + (slot / b.columns) * (h + 18), w, h};
+}
+
+UIRect MenuEntryRect(int category, int row) const
+{
+    const auto p = MenuCategory(category);
+    const float step = (std::min)(48.f, (p.h - 42) / 3);
+    return {p.x + 10, p.y + 36 + row * step, p.w - 20, step - 6};
+}
+
+UIRect MenuFooter(int index) const
+{
+    const auto b = MenuBounds();
+    const float w = (b.w - 56) / 3;
+    return {b.x + 16 + index * (w + 12), b.y + b.h - 44, w, 32};
+}
+
+int MenuPages() const
+{
+    const auto b = MenuBounds();
+    return (6 + b.columns * b.rows - 1) / (b.columns * b.rows);
+}
+
+void ChangeMenuPage(int direction)
+{
+    menuPage = (menuPage + direction + MenuPages()) % MenuPages();
+    const auto b = MenuBounds();
+    pauseSelection = PauseColumns()[menuPage * b.columns * b.rows].entries[0].action;
+}
+
+void MoveMenuSelection(int direction)
+{
     if (exitConfirm)
     {
-        const int row = int((y - box.y - 88.f) / box.rowHeight);
-        return x >= box.x + 28 && x <= box.x + box.w - 28 && row >= 0 && row < 2 ? row : -1;
+        pauseSelection = (pauseSelection + 1) % 2;
+        return;
     }
+    const auto b = MenuBounds();
+    const int size = b.columns * b.rows;
+    const int first = (std::min)(menuPage, MenuPages() - 1) * size;
+    std::vector<int> actions;
+    for (int c = first; c < (std::min)(6, first + size); ++c)
+        for (int i = 0; i < PauseColumns()[c].count; ++i)
+            actions.push_back(PauseColumns()[c].entries[i].action);
+    actions.push_back(0);
+    const auto found = std::find(actions.begin(), actions.end(), pauseSelection);
+    const int index = found == actions.end() ? 0 : int(found - actions.begin());
+    pauseSelection = actions[(index + direction + int(actions.size())) % int(actions.size())];
+}
 
-    if (y >= box.y + box.h - 39.f && y <= box.y + box.h - 13.f)
+int MenuActionAt(int x, int y) const
+{
+    const auto b = MenuBounds();
+    if (exitConfirm)
     {
-        return 0;
-    }
-
-    const int column = int((x - box.x) / box.columnWidth);
-    const int row = int((y - box.y - 87.f) / box.rowHeight);
-    if (column < 0 || column >= 6 || row < 0)
+        for (int i = 0; i < 2; ++i)
+            if (UIRect{b.x + 24, b.y + 64 + i * 62, b.w - 48, 48}.Contains(x, y))
+                return i;
         return -1;
-    const PauseColumn& panel = PauseColumns()[column];
-    return row < panel.count ? panel.entries[row].action : -1;
+    }
+    for (int i = 0; i < 3; ++i)
+        if (MenuFooter(i).Contains(x, y))
+            return i == 1 ? 0 : i == 0 ? 14 : 15;
+    const int pageSize = b.columns * b.rows;
+    const int first = (std::min)(menuPage, MenuPages() - 1) * pageSize;
+    for (int c = first; c < (std::min)(6, first + pageSize); ++c)
+        for (int row = 0; row < PauseColumns()[c].count; ++row)
+            if (MenuEntryRect(c, row).Contains(x, y))
+                return PauseColumns()[c].entries[row].action;
+    return -1;
 }
 
 void ActivateMenu(int item)
@@ -96,6 +161,7 @@ void ActivateMenu(int item)
     case 7:
         menuTab = item == 1 ? 1 : item == 2 ? 2 : item == 3 ? 3 : item == 4 ? 0 : 4;
         journal = true;
+        journalPage = 0;
         break;
     case 5:
         OpenSlots(SlotMode::Save);
@@ -128,6 +194,12 @@ void ActivateMenu(int item)
             Say("조종 전환", "봉인한 주령이 있어야 조종할 수 있습니다.");
         }
         break;
+    case 14:
+        ChangeMenuPage(-1);
+        break;
+    case 15:
+        ChangeMenuPage(1);
+        break;
     case 13:
         hudVisible = !hudVisible;
         break;
@@ -138,57 +210,50 @@ void ActivateMenu(int item)
 
 void DrawPauseMenu()
 {
-    const auto box = MenuBounds();
-    const Color ivory(.91f, .94f, .91f), muted(.56f, .71f, .73f), cyan(.26f, .77f, .84f);
-    r.Rect(0, 0, float(width), float(height), Color(.01f, .04f, .06f, .72f));
-    r.Rect(box.x, box.y, box.w, box.h, Color(.05f, .15f, .18f, .96f));
-    r.Rect(box.x, box.y, box.w, 42, Color(.08f, .48f, .57f, .96f));
-    r.Text(box.x + 17, box.y + 28, exitConfirm ? "게임 종료" : "메뉴", ivory, true);
-
+    const auto b = MenuBounds();
+    const Color ivory(.88f, .88f, .82f), gold(.85f, .7f, .43f), muted(.6f, .67f, .69f);
+    r.Rect(0, 0, float(width), float(height), Color(0, 0, 0, .76f));
+    Panel(b.x, b.y, b.w, b.h);
+    r.Text(b.x + 20, b.y + 32, exitConfirm ? "여정 종료" : "메뉴", gold, true);
     if (exitConfirm)
     {
-        r.Text(box.x + 30, box.y + 72, "여정을 마칠까요?", cyan, true);
-        const char* choices[] = {"저장하고 종료", "저장하지 않고 종료"};
+        const char* labels[] = {"1  저장하고 종료", "2  저장하지 않고 종료"};
         for (int i = 0; i < 2; ++i)
-        {
-            const float y = box.y + 88.f + i * box.rowHeight;
-            r.Rect(box.x + 28, y, box.w - 56, box.rowHeight - 4, Color(.12f, .25f, .29f, .96f));
-            r.Text(box.x + 43, y + 28, choices[i], pauseSelection == i ? cyan : ivory);
-        }
-        WrappedText(box.x + 30,
-                    box.y + 205,
-                    box.w - 60,
-                    CanSaveProgress() ? "저장하지 않고 종료하면 마지막 저장 이후의 진행을 잃습니다."
-                                      : "현재는 저장할 수 없습니다. 전투가 끝난 뒤 저장하고 "
-                                        "종료하거나 저장하지 않고 종료하세요.",
+            UIButton({b.x + 24, b.y + 64 + i * 62, b.w - 48, 48}, labels[i], pauseSelection == i);
+        WrappedText(b.x + 24,
+                    b.y + 200,
+                    b.w - 48,
+                    "저장하지 않으면 마지막 저장 이후의 진행을 잃습니다. ESC로 돌아갑니다.",
                     ivory,
-                    3);
+                    2);
     }
     else
     {
-        const PauseColumn* columns = PauseColumns();
-        for (int column = 0; column < 6; ++column)
+        menuPage = (std::min)(menuPage, MenuPages() - 1);
+        const int pageSize = b.columns * b.rows;
+        for (int c = menuPage * pageSize; c < (std::min)(6, (menuPage + 1) * pageSize); ++c)
         {
-            const float x = box.x + column * box.columnWidth;
-            const PauseColumn& panel = columns[column];
-            r.Rect(
-                x + 3, box.y + 47, box.columnWidth - 6, box.h - 96, Color(.08f, .2f, .23f, .94f));
-            r.Rect(x + 3, box.y + 47, box.columnWidth - 6, 34, Color(.08f, .43f, .51f, .98f));
-            r.Text(x + 14, box.y + 70, panel.title, ivory, true);
-            for (int row = 0; row < panel.count; ++row)
+            const auto p = MenuCategory(c);
+            Panel(p.x, p.y, p.w, p.h);
+            r.Text(p.x + 14, p.y + 24, PauseColumns()[c].title, gold);
+            for (int row = 0; row < PauseColumns()[c].count; ++row)
             {
-                const float y = box.y + 87.f + row * box.rowHeight;
-                const bool selected = pauseSelection == panel.entries[row].action;
-                r.Rect(x + 10,
-                       y,
-                       box.columnWidth - 20,
-                       box.rowHeight - 4,
-                       selected ? Color(.16f, .43f, .48f, .98f) : Color(.12f, .28f, .31f, .9f));
-                r.Text(x + 20, y + 28, panel.entries[row].label, selected ? cyan : ivory);
+                const auto& entry = PauseColumns()[c].entries[row];
+                UIButton(MenuEntryRect(c, row), entry.label, pauseSelection == entry.action);
             }
         }
-        r.Rect(box.x + 18, box.y + box.h - 39, box.w - 36, 26, Color(.07f, .32f, .38f, .94f));
-        r.Text(box.x + 30, box.y + box.h - 20, "계속하기 · 클릭 또는 ESC", muted);
+        UIButton(MenuFooter(0), "이전 [");
+        UIButton(MenuFooter(1), "계속 · ESC");
+        UIButton(MenuFooter(2), "다음 ]");
     }
-    WrappedText(box.x + 20, box.y + box.h - 68, box.w - 40, saveStatus, ivory, 1);
+    r.Rect(b.x + 16, b.y + b.h - 88, b.w - 32, 32, Color(.08f, .12f, .14f));
+    WrappedText(b.x + 28,
+                b.y + b.h - 66,
+                b.w - 56,
+                (exitConfirm
+                     ? ""
+                     : std::to_string(menuPage + 1) + "/" + std::to_string(MenuPages()) + " · ") +
+                    saveStatus,
+                muted,
+                1);
 }

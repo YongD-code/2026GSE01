@@ -247,32 +247,17 @@ void Prototype::SynchronizeScene()
              [this, kind](const Actor& node)
              {
                  const auto pos = node.WorldPosition();
-                 const Point p = Screen(pos.x, pos.y, 9 + std::sin(time * 4) * 2);
-                 const Color colors[] = {Color(.2f, 1.2f, 2.f),
-                                         Color(2.f, 1.2f, .2f),
-                                         Color(.3f, 1.8f, .5f),
-                                         Color(1.6f, .4f, 2.f),
-                                         Color(1.6f, 1.6f, 1.6f)};
+                 const Point ground = Screen(pos.x, pos.y);
+                 const Point p = Screen(pos.x, pos.y, 3 + std::sin(time * 3) * 1.5);
                  const int index = static_cast<int>(kind);
+                 const char* names[] = {"경험치 조각", "무기 강화석", "회복약", "주령석", "봉인권"};
+                 const float sizes[] = {30, 44, 44, 40, 48};
+                 r.Ellipse(ground.x, ground.y + 2, 15, 5, Color(0, 0, 0, .35f));
                  if (lootSheets[index].Ready())
                      lootSheets[index].Draw(
-                         r, p, 36, SpriteAnimation(), Color(1, 1, 1), width, height, .12f);
+                         r, p, sizes[index], SpriteAnimation(), Color(1, 1, 1), width, height, 0.f);
                  else
-                     r.Quad({p.x, p.y - 6},
-                            {p.x + 5, p.y},
-                            {p.x, p.y + 6},
-                            {p.x - 5, p.y},
-                            colors[index]);
-                 const WorldPoint collector = controlling ? spirit : player;
-                 if (Distance({pos.x, pos.y}, collector) < 65)
-                 {
-                     const char* names[] = {
-                         "경험치 조각", "무기 강화석", "회복약", "주령석", "봉인권"};
-                     r.Text(p.x - 30,
-                            p.y + 30,
-                            std::string(names[index]) + " · Z",
-                            Color(.9f, .87f, .75f));
-                 }
+                     r.Text(p.x - 30, p.y - 10, names[index], Color(.9f, .87f, .75f));
              });
     }
     for (auto& shot : levelOne.projectiles)
@@ -341,8 +326,8 @@ void Prototype::SynchronizeScene()
     {
         if (titleScreen || slotMode != SlotMode::Closed)
             return FrontClick(x, y);
-        if (!pauseMenu)
-            return false;
+        if (!pauseMenu && !journal)
+            return GameUIClick(x, y);
         MenuClick(x, y);
         return true;
     };
