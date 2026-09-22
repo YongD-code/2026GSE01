@@ -219,6 +219,7 @@ class LevelOne
         if (!purified)
             return;
         ++kills;
+        const size_t firstDrop = loot.size();
         loot.push_back({enemy.position, LootKind::Experience});
         if (kills == 1 || Roll() < .35f)
             loot.push_back({enemy.position, LootKind::Weapon});
@@ -232,6 +233,13 @@ class LevelOne
         {
             stones += 2;
             ++tickets[2];
+        }
+        for (size_t i = firstDrop; i < loot.size(); ++i)
+        {
+            const double angle = (i - firstDrop) * 2.39996;
+            const double radius = 18 + (i - firstDrop) * 5;
+            loot[i].position.x += std::cos(angle) * radius;
+            loot[i].position.y += std::sin(angle) * radius;
         }
     }
 
@@ -488,11 +496,11 @@ class LevelOne
         case LootKind::Weapon:
             if (weapon < 20)
                 ++weapon;
-            notice = "강화 파편 흡수! 무기 피해량이 증가했습니다.";
+            notice = "무기 강화석 획득! 무기 피해량이 증가했습니다.";
             break;
         case LootKind::Healing:
             health = (std::min)(MaximumHealth(), health + MaximumHealth() * .3f);
-            notice = "생명의 불씨를 흡수해 최대 체력의 30%를 회복했습니다.";
+            notice = "회복약을 사용해 최대 체력의 30%를 회복했습니다.";
             break;
         case LootKind::Stone:
             ++stones;
@@ -746,6 +754,8 @@ class LevelOne
                 bool captured,
                 bool controlling,
                 bool fireHeld,
+                bool pickupHeld,
+                bool lootAbsorption,
                 std::uint64_t worldSeed,
                 Collision blocked)
     {
@@ -911,8 +921,8 @@ class LevelOne
         {
             item.age += dt;
             const double distance = Distance(item.position, collector);
-            if (distance < MagnetRange())
-                item.attracted = true;
+            // Only the equipped gathering spirit grants passive collection.
+            item.attracted = lootAbsorption && !summonBlocked && distance < MagnetRange();
             // Pickups are ethereal: attraction passes through scenery to avoid unreachable rewards.
             if (item.attracted && distance > 0)
             {
@@ -920,7 +930,8 @@ class LevelOne
                 item.position.x += (collector.x - item.position.x) * t;
                 item.position.y += (collector.y - item.position.y) * t;
             }
-            if (Distance(item.position, collector) < 18)
+            if ((pickupHeld && distance < 65) ||
+                (item.attracted && Distance(item.position, collector) < 18))
             {
                 Collect(item.kind);
                 item.age = 1000;

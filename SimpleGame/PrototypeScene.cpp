@@ -253,11 +253,26 @@ void Prototype::SynchronizeScene()
                                          Color(.3f, 1.8f, .5f),
                                          Color(1.6f, .4f, 2.f),
                                          Color(1.6f, 1.6f, 1.6f)};
-                 r.Quad({p.x, p.y - 6},
-                        {p.x + 5, p.y},
-                        {p.x, p.y + 6},
-                        {p.x - 5, p.y},
-                        colors[static_cast<int>(kind)]);
+                 const int index = static_cast<int>(kind);
+                 if (lootSheets[index].Ready())
+                     lootSheets[index].Draw(
+                         r, p, 36, SpriteAnimation(), Color(1, 1, 1), width, height, .12f);
+                 else
+                     r.Quad({p.x, p.y - 6},
+                            {p.x + 5, p.y},
+                            {p.x, p.y + 6},
+                            {p.x - 5, p.y},
+                            colors[index]);
+                 const WorldPoint collector = controlling ? spirit : player;
+                 if (Distance({pos.x, pos.y}, collector) < 65)
+                 {
+                     const char* names[] = {
+                         "경험치 조각", "무기 강화석", "회복약", "주령석", "봉인권"};
+                     r.Text(p.x - 30,
+                            p.y + 30,
+                            std::string(names[index]) + " · Z",
+                            Color(.9f, .87f, .75f));
+                 }
              });
     }
     for (auto& shot : levelOne.projectiles)

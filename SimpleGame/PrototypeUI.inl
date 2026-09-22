@@ -180,7 +180,7 @@ void HUD()
                  std::to_string(levelOne.weapon));
             line("발사 간격 " + std::to_string(levelOne.Interval()).substr(0, 4) + "초 · 사거리 " +
                  std::to_string(int(levelOne.Range())));
-            line("흡수 범위 " + std::to_string(int(levelOne.MagnetRange())) + " · 처치 " +
+            line("주령 흡수 범위 " + std::to_string(int(levelOne.MagnetRange())) + " · 처치 " +
                  std::to_string(levelOne.kills));
             line(levelOne.automatic ? "자동 발사: 켜짐" : "자동 발사: 꺼짐 (Space로 공격)");
             line("V 붙잡는 손 · 남은 대기 " +
@@ -222,6 +222,7 @@ void HUD()
             if (captured)
                 line(std::string("동행: ") + SpiritName(capturedSpirit) + " · 강화 +" +
                      std::to_string(levelOne.spiritRank));
+            line("남겨진 자 · 동행 중 주변 전리품 자동 흡수");
         }
         else if (menuTab == 3)
         {
@@ -253,6 +254,7 @@ void HUD()
         else
         {
             line("Ctrl 회피 · K 피격 화면 흔들림 켜기/끄기");
+            line("Z 주변 아이템 줍기 · 남겨진 자 동행 시 범위 내 자동 흡수");
             line("WASD / 방향키 이동 · Shift 달리기 · Space 자동 조준 연사");
             line("E 대화/포획 · X 약화된 주령 정화 · T 봉인권 선택");
             line("Q 동행 주령 조종 · V 붙잡는 손 · G 주령석 강화");

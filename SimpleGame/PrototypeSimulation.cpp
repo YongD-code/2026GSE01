@@ -77,6 +77,8 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                             captured,
                             controlling,
                             keys[' '],
+                            keys['z'],
+                            captured && capturedSpirit == 0,
                             world.seed,
                             [this](WorldPoint p)
                             {

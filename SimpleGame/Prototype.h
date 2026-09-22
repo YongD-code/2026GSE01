@@ -46,6 +46,7 @@ class Prototype
     SpriteSheet attackSheet, protagonistRunSheet;
     bool blenderProtagonist = false, protagonistSprinting = false;
     SpriteSheet spiritSheets[3];
+    SpriteSheet lootSheets[5];
     SpriteAnimation companionAnimation;
     const WorldPoint wildSpirits[3] = {{300, 160}, {-220, 250}, {220, 360}};
     int capturedSpirit = 0;
@@ -347,6 +348,18 @@ class Prototype
             if (!spiritSheets[i].Load(spiritFiles[i], spiritLayout))
                 std::cerr << "주령 이미지 로드 실패: " << SpiritName(i) << std::endl;
         chapter.Load();
+        SpriteLayout lootLayout;
+        lootLayout.columns = lootLayout.rows = 1;
+        lootLayout.directionRows.fill(0);
+        lootLayout.firstWalkFrame = 0;
+        lootLayout.walkFrames = 1;
+        const wchar_t* lootFiles[] = {L"Assets/Items/experience.png",
+                                      L"Assets/Items/weapon_stone.png",
+                                      L"Assets/Items/healing.png",
+                                      L"Assets/Items/spirit_stone.png",
+                                      L"Assets/Items/seal_ticket.png"};
+        for (int i = 0; i < 5; ++i)
+            lootSheets[i].Load(lootFiles[i], lootLayout);
         levelOne.captureRules.Load();
         levelOne.LoadCombat();
         world.Stream(camera, player, width, height);
