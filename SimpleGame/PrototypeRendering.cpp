@@ -3,64 +3,292 @@
 
 void Prototype::House(const Object& o)
 {
-    Box(o.x,
-        o.y,
+    // Keep solid details inside the existing collision footprint.
+    // Dimensions select the style so identical cached meshes remain reusable.
+    const bool hall = o.w >= 190;
+    const bool tall = !hall && o.h >= 105;
+    const double x = o.x;
+    const double y = o.y;
+    const double front = y + o.d;
+    const double wallFront = front - 12;
+    const double base = 10;
+    const double eave = o.h;
+    const double rise = hall ? 58 : (tall ? 44 : 34);
+    const double overhang = hall ? 12 : 8;
+    const Color wood(.15f, .12f, .105f);
+    const Color woodLight(.29f, .23f, .17f);
+    const Color plaster = hall ? Color(.43f, .42f, .36f) : Color(.32f, .34f, .32f);
+
+    auto frontPanel = [&](double left, double right, double low, double high, Color color)
+    {
+        r.Quad(Screen(left, wallFront, low),
+               Screen(right, wallFront, low),
+               Screen(right, wallFront, high),
+               Screen(left, wallFront, high),
+               color);
+    };
+
+    // Stone plinth, recessed facade and a shallow timber veranda.
+    Box(x,
+        y,
         o.w,
         o.d,
-        o.h,
-        Color(.23f, .25f, .25f),
-        Color(.19f, .21f, .22f),
-        Color(.12f, .15f, .17f));
-    Point a = Screen(o.x - 12, o.y - 12, o.h), b = Screen(o.x + o.w + 12, o.y - 12, o.h);
-    Point c = Screen(o.x + o.w + 12, o.y + o.d + 12, o.h),
-          d = Screen(o.x - 12, o.y + o.d + 12, o.h);
-    Point ridgeA = Screen(o.x - 12, o.y + o.d * .5f, o.h + 65),
-          ridgeB = Screen(o.x + o.w + 12, o.y + o.d * .5f, o.h + 65);
-    r.Triangle(a, d, ridgeA, Color(.16f, .19f, .20f));
-    r.Quad(ridgeA, ridgeB, c, d, Color(.27f, .19f, .18f));
-    r.Triangle(b, c, ridgeB, Color(.19f, .13f, .14f));
-    r.Line(ridgeA, ridgeB, 3, Color(.38f, .29f, .24f));
-    for (int i = 1; i < 5; ++i)
+        base,
+        Color(.32f, .34f, .34f),
+        Color(.22f, .24f, .25f),
+        Color(.16f, .19f, .21f));
+    Box(x + 3, y + 3, o.w - 6, o.d - 15, eave, plaster, plaster, Color(.23f, .26f, .26f));
+    for (double offset = 16; offset < o.w; offset += 22)
     {
-        float u = float(i) / 5;
-        r.Line({ridgeA.x + (ridgeB.x - ridgeA.x) * u, ridgeA.y + (ridgeB.y - ridgeA.y) * u},
-               {d.x + (c.x - d.x) * u, d.y + (c.y - d.y) * u},
-               2,
-               Color(.16f, .13f, .14f));
+        r.Line(Screen(x + offset, front, 1),
+               Screen(x + offset, front, base - 1),
+               1,
+               Color(.12f, .15f, .16f));
     }
-    // Front-wall door and windows lie on the same projected plane as the wall.
-    double front = o.y + o.d;
-    r.Quad(Screen(o.x + o.w * .42f, front, 0),
-           Screen(o.x + o.w * .65f, front, 0),
-           Screen(o.x + o.w * .65f, front, 48),
-           Screen(o.x + o.w * .42f, front, 48),
-           Color(.07f, .09f, .10f));
-    r.Quad(Screen(o.x + 18, front, 38),
-           Screen(o.x + 40, front, 38),
-           Screen(o.x + 40, front, 62),
-           Screen(o.x + 18, front, 62),
-           Color(2.2f, 1.25f, .45f));
-    Box(o.x + o.w * .7f,
-        o.y + 18,
-        18,
-        20,
-        o.h + 70,
-        Color(.32f, .32f, .29f),
-        Color(.23f, .23f, .23f),
-        Color(.16f, .17f, .18f));
+    for (double offset = 4; offset < o.w - 4; offset += 9)
+    {
+        r.Line(Screen(x + offset, wallFront, base + 1),
+               Screen(x + offset, front, base + 1),
+               1,
+               woodLight);
+    }
+
+    const int bays = hall ? 7 : (o.w >= 100 ? 5 : 3);
+    const double bayWidth = (o.w - 12) / bays;
+    for (int bay = 0; bay < bays; ++bay)
+    {
+        const double left = x + 6 + bay * bayWidth;
+        const double right = left + bayWidth;
+        const bool door = bay == bays / 2;
+        const double low = door ? base + 1 : base + 17;
+        const double high = tall ? eave * .53 : eave - 16;
+        frontPanel(left + 2, right - 2, low, high, Color(.055f, .075f, .085f));
+        frontPanel(left + 4,
+                   right - 4,
+                   low + 3,
+                   high - 3,
+                   door ? Color(.20f, .18f, .14f) : Color(.64f, .46f, .25f));
+        for (int slat = 1; slat < 4; ++slat)
+        {
+            const double sx = left + (right - left) * slat / 4;
+            r.Line(Screen(sx, wallFront, low), Screen(sx, wallFront, high), 1, wood);
+        }
+        r.Line(Screen(left + 2, wallFront, (low + high) * .5),
+               Screen(right - 2, wallFront, (low + high) * .5),
+               1,
+               wood);
+        if (tall)
+        {
+            frontPanel(left + 3, right - 3, eave * .65, eave - 14, Color(.12f, .16f, .17f));
+            r.Line(Screen((left + right) * .5, wallFront, eave * .65),
+                   Screen((left + right) * .5, wallFront, eave - 14),
+                   2,
+                   woodLight);
+        }
+    }
+    for (int post = 0; post <= bays; ++post)
+    {
+        const double px = x + 6 + post * bayWidth;
+        frontPanel(px - 2, px + 2, base, eave, wood);
+    }
+    frontPanel(x + 3, x + o.w - 3, base + 2, base + 7, wood);
+    frontPanel(x + 3, x + o.w - 3, eave - 9, eave - 3, woodLight);
+    if (tall)
+    {
+        frontPanel(x + 3, x + o.w - 3, eave * .57, eave * .62, wood);
+    }
+
+    // Side-wall framing is drawn on the actual side plane.
+    for (int post = 0; post <= 4; ++post)
+    {
+        const double py = y + 4 + (o.d - 17) * post / 4;
+        r.Line(Screen(x + o.w - 3, py, base), Screen(x + o.w - 3, py, eave), 3, wood);
+    }
+    r.Line(Screen(x + o.w - 3, y + 3, eave * .55),
+           Screen(x + o.w - 3, wallFront, eave * .55),
+           3,
+           woodLight);
+
+    // Hip roof: two bent slope bands, raised ridge and individual tile courses.
+    const double midY = y + (o.d - 12) * .5;
+    const double hip = o.w * .18;
+    auto roofPoint = [&](double u, double t, bool nearSide)
+    {
+        const double ridgeX = x + hip + (o.w - 2 * hip) * u;
+        const double edgeX = x - overhang + (o.w + 2 * overhang) * u;
+        const double edgeY = nearSide ? front + overhang : y - overhang;
+        const double height = eave + rise * (1 - t) + 7 * t * t * t;
+        return Screen(ridgeX + (edgeX - ridgeX) * t, midY + (edgeY - midY) * t, height);
+    };
+    for (int side = 0; side < 2; ++side)
+    {
+        const bool nearSide = side == 1;
+        for (int band = 0; band < 2; ++band)
+        {
+            const double t0 = band * .5;
+            const double t1 = t0 + .5;
+            r.Quad(roofPoint(0, t0, nearSide),
+                   roofPoint(1, t0, nearSide),
+                   roofPoint(1, t1, nearSide),
+                   roofPoint(0, t1, nearSide),
+                   nearSide ? Color(.23f + band * .025f, .27f, .29f) : Color(.12f, .16f, .19f));
+        }
+    }
+    r.Triangle(roofPoint(1, 0, true),
+               roofPoint(1, 1, false),
+               roofPoint(1, 1, true),
+               Color(.16f, .20f, .23f));
+    const int tiles = hall ? 22 : (o.w >= 100 ? 16 : 8);
+    for (int tile = 0; tile <= tiles; ++tile)
+    {
+        const double u = double(tile) / tiles;
+        r.Line(roofPoint(u, 0, true), roofPoint(u, .5, true), 1, Color(.34f, .38f, .39f));
+        r.Line(roofPoint(u, .5, true), roofPoint(u, 1, true), 1, Color(.29f, .33f, .35f));
+    }
+    for (int course = 1; course <= 6; ++course)
+    {
+        const double t = double(course) / 6;
+        r.Line(roofPoint(0, t, true), roofPoint(1, t, true), 1, Color(.12f, .16f, .18f));
+    }
+    r.Line(roofPoint(0, 0, true), roofPoint(1, 0, true), hall ? 6.f : 4.f, Color(.39f, .41f, .39f));
+    r.Line(roofPoint(0, 1, true), roofPoint(1, 1, true), 4, wood);
+    r.Line(roofPoint(1, 1, false), roofPoint(1, 1, true), 3, wood);
+
+    // Entrance canopy and steps stay within the original footprint.
+    const double entryLeft = x + o.w * .34;
+    const double entryRight = x + o.w * .66;
+    const double canopy = tall ? eave * .55 : eave * .67;
+    r.Quad(Screen(entryLeft, wallFront, canopy + 7),
+           Screen(entryRight, wallFront, canopy + 7),
+           Screen(entryRight + 3, front, canopy),
+           Screen(entryLeft - 3, front, canopy),
+           Color(.23f, .27f, .28f));
+    r.Line(
+        Screen(entryLeft - 3, front, canopy), Screen(entryRight + 3, front, canopy), 3, woodLight);
+    for (int side = 0; side < 2; ++side)
+    {
+        const double px = side == 0 ? entryLeft : entryRight;
+        r.Line(Screen(px, front - 2, base), Screen(px, front - 2, canopy), 3, wood);
+    }
+    r.Quad(Screen(entryLeft, front - 5, 5),
+           Screen(entryRight, front - 5, 5),
+           Screen(entryRight, front, 5),
+           Screen(entryLeft, front, 5),
+           Color(.37f, .38f, .35f));
+}
+
+void Prototype::Stone(const Object& o)
+{
+    // Tall existing markers become lanterns; broad obstacles remain natural stone.
+    // Both use their existing collision footprint and SceneGraph actor.
+    auto point = [&](double u, double v, double z)
+    {
+        return Screen(o.x + o.w * u, o.y + o.d * v, o.h * z);
+    };
+    auto tier = [&](double inset, double low, double high, Color top)
+    {
+        const double far = 1 - inset;
+        r.Quad(point(inset, far, low),
+               point(far, far, low),
+               point(far, far, high),
+               point(inset, far, high),
+               Color(.24f, .28f, .27f));
+        r.Quad(point(far, inset, low),
+               point(far, far, low),
+               point(far, far, high),
+               point(far, inset, high),
+               Color(.16f, .20f, .21f));
+        r.Quad(point(inset, inset, high),
+               point(far, inset, high),
+               point(far, far, high),
+               point(inset, far, high),
+               top);
+    };
+
+    if (o.h > (std::max)(o.w, o.d) * 1.65)
+    {
+        tier(0, 0, .10, Color(.39f, .42f, .38f));
+        tier(.10, .10, .18, Color(.32f, .36f, .33f));
+        tier(.34, .18, .57, Color(.37f, .40f, .36f));
+        tier(.12, .54, .62, Color(.42f, .44f, .39f));
+        tier(.22, .62, .84, Color(.29f, .33f, .30f));
+        r.Quad(point(.30, .785, .65),
+               point(.70, .785, .65),
+               point(.70, .785, .79),
+               point(.30, .785, .79),
+               Color(.85f, .53f, .23f));
+        r.Line(point(.50, .79, .65), point(.50, .79, .79), 1, Color(.16f, .20f, .19f));
+        r.Triangle(
+            point(0, 1, .84), point(1, 1, .84), point(.50, .50, .98), Color(.40f, .44f, .40f));
+        r.Triangle(
+            point(1, 0, .84), point(1, 1, .84), point(.50, .50, .98), Color(.24f, .29f, .28f));
+        r.Line(point(0, 1, .84), point(1, 1, .84), 2, Color(.16f, .23f, .19f));
+        r.Line(point(.50, .50, .96), point(.50, .50, 1), 3, Color(.45f, .47f, .40f));
+        return;
+    }
+
+    const Point a = point(.06, .28, .15);
+    const Point b = point(.28, .06, .35);
+    const Point c = point(.80, .12, .26);
+    const Point d = point(.98, .65, .08);
+    const Point e = point(.64, .98, .04);
+    const Point f = point(.08, .82, .07);
+    const Point peak = point(.43, .42, 1);
+    const Point shoulder = point(.77, .56, .72);
+    r.Triangle(a, b, peak, Color(.34f, .38f, .37f));
+    r.Triangle(b, c, peak, Color(.43f, .46f, .42f));
+    r.Triangle(c, shoulder, peak, Color(.36f, .40f, .38f));
+    r.Triangle(c, d, shoulder, Color(.22f, .27f, .28f));
+    r.Triangle(d, e, shoulder, Color(.17f, .22f, .24f));
+    r.Triangle(e, f, peak, Color(.29f, .34f, .32f));
+    r.Triangle(e, peak, shoulder, Color(.25f, .30f, .29f));
+    r.Triangle(f, a, peak, Color(.32f, .37f, .34f));
+    // Moss follows the rock facets rather than floating above the silhouette.
+    r.Triangle(a, b, point(.36, .35, .79), Color(.22f, .32f, .20f));
+    r.Triangle(f, point(.20, .65, .37), point(.34, .87, .20), Color(.19f, .28f, .18f));
+    r.Line(peak, point(.52, .68, .46), 1, Color(.16f, .21f, .21f));
+    r.Line(point(.52, .68, .46), e, 1, Color(.19f, .24f, .23f));
 }
 
 void Prototype::Tree(const Object& o)
 {
-    Point p = Screen(o.x + o.w * .5f, o.y + o.d * .5f);
-    r.Ellipse(p.x, p.y, 27, 11, Color(0, 0, 0, .25f));
-    r.Line(p, {p.x - 4, static_cast<float>(p.y - o.h)}, 7, Color(.17f, .16f, .17f));
-    for (int i = 0; i < 4; ++i)
+    const double cx = o.x + o.w * .5;
+    const double cy = o.y + o.d * .5;
+    const Point base = Screen(cx, cy);
+    const bool cedar = static_cast<int>(o.h) % 3 == 0;
+    const Color bark(.22f, .19f, .15f);
+    r.Ellipse(base.x, base.y, 22, 9, Color(.035f, .065f, .055f, .45f));
+    const Point bend = Screen(cx - 4, cy + 2, o.h * .53);
+    const Point crown = Screen(cx + 3, cy, o.h * .90);
+    r.Line(base, bend, 7, bark);
+    r.Line(bend, crown, 4, Color(.29f, .25f, .19f));
+    r.Line(Screen(cx + 2, cy, 3), Screen(cx - 2, cy + 2, o.h * .50), 1, Color(.42f, .36f, .25f));
+    for (int root = 0; root < 3; ++root)
     {
-        float side = i % 2 ? 1.f : -1.f, level = static_cast<float>(p.y - o.h * .35 - i * 15);
-        Point tip = {p.x + side * (23 + i * 3), level - 28};
-        r.Line({p.x - 2, level}, tip, 4, Color(.19f, .18f, .19f));
-        r.Line(tip, {tip.x + side * 10, tip.y - 21}, 2, Color(.22f, .21f, .22f));
+        r.Line(base, Screen(o.x + o.w * root * .5, o.y + o.d, 0), 3, bark);
+    }
+
+    // Layered cedar crowns and asymmetric pine boughs share the same tree actor.
+    for (int layer = 0; layer < 4; ++layer)
+    {
+        const double height = o.h * (.40 + layer * .16);
+        const double side = layer % 2 == 0 ? -1 : 1;
+        const double spread = cedar ? 30 - layer * 5 : 27 - layer * 3;
+        const Point center = Screen(cx + (cedar ? 0 : side * 10), cy, height);
+        const Point trunk = Screen(cx, cy, height - 8);
+        r.Line(trunk, {center.x + float(side * spread * .6), center.y}, 3, bark);
+        const Point left = {center.x - float(spread), center.y + 3};
+        const Point right = {center.x + float(spread), center.y + 3};
+        const Point top = {center.x + float(side * 4), center.y - float(cedar ? 27 : 13)};
+        r.Triangle(left, right, top, Color(.085f, .17f, .14f));
+        r.Triangle(left, {center.x, center.y + 8}, right, Color(.055f, .12f, .105f));
+        r.Triangle(
+            {left.x + 5, left.y - 1}, {right.x - 9, right.y - 3}, top, Color(.15f, .24f, .18f));
+        for (int needle = 0; needle < 5; ++needle)
+        {
+            const float nx = center.x - float(spread * .7) + float(needle * spread * .32);
+            r.Line({nx, center.y}, {nx - 3, center.y - 5}, 1, Color(.25f, .32f, .22f));
+        }
     }
 }
 
@@ -240,9 +468,28 @@ void Prototype::DrawCombatWarnings()
 void Prototype::Hearth(WorldPoint position)
 {
     Point p = Screen(position.x, position.y);
-    r.Ellipse(p.x, p.y, 28, 13, Color(.29f, .28f, .26f));
-    r.Ellipse(p.x, p.y, 22, 9, Color(.09f, .10f, .11f));
-    r.Line({p.x - 15, p.y + 3}, {p.x + 12, p.y - 5}, 6, Color(.36f, .23f, .16f));
+    const std::string key = "hearth:stone-basin:environment-v3";
+    if (r.BeginCachedMesh(key, p))
+    {
+        r.Ellipse(p.x, p.y + 3, 32, 14, Color(.045f, .06f, .055f, .6f));
+        r.Ellipse(p.x, p.y, 28, 12, Color(.30f, .33f, .30f));
+        r.Ellipse(p.x, p.y - 3, 23, 9, Color(.055f, .075f, .075f));
+        for (int stone = 0; stone < 12; ++stone)
+        {
+            const double angle = stone * 6.283185307179586 / 12;
+            const float sx = p.x + float(std::cos(angle) * 26);
+            const float sy = p.y + float(std::sin(angle) * 10);
+            r.Quad({sx - 5, sy},
+                   {sx, sy - 4},
+                   {sx + 6, sy - 2},
+                   {sx + 3, sy + 3},
+                   stone % 3 == 0 ? Color(.24f, .32f, .22f) : Color(.41f, .43f, .37f));
+        }
+        r.Line({p.x - 15, p.y + 3}, {p.x + 12, p.y - 5}, 6, Color(.26f, .18f, .12f));
+        r.Line({p.x - 11, p.y - 5}, {p.x + 10, p.y + 3}, 4, Color(.33f, .23f, .14f));
+        r.EndCachedMesh();
+    }
+    r.DrawCachedMesh(key, p);
     float flicker = std::sin(time * 13) * 3;
     r.Triangle({p.x - 13, p.y},
                {p.x + 11, p.y},

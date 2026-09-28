@@ -259,6 +259,7 @@ class Prototype
 
     void House(const Object& o);
     void Tree(const Object& o);
+    void Stone(const Object& o);
     void Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize = false);
     void Wisp(int type, WorldPoint position);
     void DrawEnemy(const LevelOne::Enemy& enemy);

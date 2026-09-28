@@ -3,8 +3,8 @@
 
 void Prototype::DrawTerrain(const World::Chunk& chunk, ActorPosition position)
 {
-    const std::string terrainKey = "terrain:" + std::to_string(chunk.key.first) + ":" +
-                                   std::to_string(chunk.key.second) + ":" +
+    const std::string terrainKey = "terrain:environment-v3:" + std::to_string(chunk.key.first) +
+                                   ":" + std::to_string(chunk.key.second) + ":" +
                                    std::to_string(world.seed);
     const double offsetX = position.x - double(chunk.key.first) * World::ChunkSize;
     const double offsetY = position.y - double(chunk.key.second) * World::ChunkSize;
@@ -16,8 +16,6 @@ void Prototype::DrawTerrain(const World::Chunk& chunk, ActorPosition position)
             {
                 World::Coordinate tx = chunk.key.first * 8 + x, ty = chunk.key.second * 8 + y;
                 double wx = double(tx) * 64, wy = double(ty) * 64;
-                Point p = Screen(wx + offsetX, wy + offsetY);
-
                 auto hash = World::Hash(tx, ty, 42);
                 float shade = float(hash % 15) * .002f;
                 Color color =
@@ -31,14 +29,63 @@ void Prototype::DrawTerrain(const World::Chunk& chunk, ActorPosition position)
                 if (road)
                     color = Color(.23f + shade, .23f + shade, .20f + shade);
                 Ground(wx + offsetX, wy + offsetY, 64, 64, color);
+                const double tileX = wx + offsetX;
+                const double tileY = wy + offsetY;
                 if (road)
-                    Ground(wx + offsetX + 12 + double(hash % 17),
-                           wy + offsetY + 15,
-                           16,
-                           10,
-                           Color(.32f, .31f, .26f, .5f));
+                {
+                    // Inset flagstones leave dark joints without altering walkability.
+                    for (int row = 0; row < 3; ++row)
+                    {
+                        for (int col = 0; col < 3; ++col)
+                        {
+                            const double sx = tileX + 3 + col * 20;
+                            const double sy = tileY + 3 + row * 20;
+                            const float tint = float((hash >> (row * 3 + col)) % 5) * .012f;
+                            r.Quad(Screen(sx + 2, sy),
+                                   Screen(sx + 17, sy + 1),
+                                   Screen(sx + 18, sy + 17),
+                                   Screen(sx, sy + 18),
+                                   Color(.29f + tint, .31f + tint, .29f + tint));
+                            r.Line(Screen(sx + 2, sy),
+                                   Screen(sx + 17, sy + 1),
+                                   1,
+                                   Color(.41f, .43f, .38f));
+                        }
+                    }
+                    if (hash % 4 == 0)
+                    {
+                        Ground(tileX + 21, tileY + 8, 2, 10, Color(.15f, .23f, .14f));
+                    }
+                }
                 else
-                    r.Line(p, {p.x + 3, p.y - 4}, 1, Color(.24f, .27f, .24f, .4f));
+                {
+                    // Flat moss, fallen needles and gravel are part of the terrain mesh.
+                    for (int detail = 0; detail < 5; ++detail)
+                    {
+                        const auto bits = World::Hash(tx, ty, 83 + detail);
+                        const double sx = tileX + 5 + double(bits % 47);
+                        const double sy = tileY + 5 + double((bits >> 9) % 47);
+                        if (detail < 2)
+                        {
+                            r.Quad(Screen(sx, sy + 3),
+                                   Screen(sx + 6, sy),
+                                   Screen(sx + 11, sy + 5),
+                                   Screen(sx + 3, sy + 9),
+                                   Color(.13f + shade, .21f + shade, .135f));
+                        }
+                        else
+                        {
+                            r.Triangle(Screen(sx, sy),
+                                       Screen(sx + 4, sy + 1),
+                                       Screen(sx + 2, sy + 4),
+                                       Color(.28f, .30f, .26f));
+                            r.Line(Screen(sx + 3, sy + 7),
+                                   Screen(sx + 9, sy + 10),
+                                   1,
+                                   Color(.27f, .23f, .14f));
+                        }
+                    }
+                }
             }
         r.EndCachedMesh();
     }
@@ -50,8 +97,9 @@ void Prototype::DrawObject(const Object& o)
     const Point bounds = Screen(o.x + o.w * .5, o.y + o.d * .5);
     if (bounds.x < -300 || bounds.x > width + 300 || bounds.y < -250 || bounds.y > height + 350)
         return;
-    const std::string meshKey = "object:" + std::to_string(o.kind) + ":" + std::to_string(o.w) +
-                                ":" + std::to_string(o.d) + ":" + std::to_string(o.h);
+    const std::string meshKey = "object:environment-v3:" + std::to_string(o.kind) + ":" +
+                                std::to_string(o.w) + ":" + std::to_string(o.d) + ":" +
+                                std::to_string(o.h);
     const Point origin = Screen(o.x, o.y);
     if (r.BeginCachedMesh(meshKey, origin))
     {
@@ -60,14 +108,7 @@ void Prototype::DrawObject(const Object& o)
         else if (o.kind == 1)
             Tree(o);
         else
-            Box(o.x,
-                o.y,
-                o.w,
-                o.d,
-                o.h,
-                Color(.33f, .36f, .35f),
-                Color(.23f, .27f, .28f),
-                Color(.17f, .21f, .23f));
+            Stone(o);
         r.EndCachedMesh();
     }
     r.DrawCachedMesh(meshKey, origin);
@@ -153,7 +194,25 @@ void Prototype::SynchronizeScene()
          [this](const Actor& node)
          {
              const auto p = node.WorldPosition();
-             Ground(p.x, p.y, 330, 290, Color(.24f, .24f, .21f));
+             const Point origin = Screen(p.x, p.y);
+             const std::string key = "village:square:environment-v3";
+             if (r.BeginCachedMesh(key, origin))
+             {
+                 Ground(p.x, p.y, 330, 290, Color(.17f, .20f, .18f));
+                 for (int row = 0; row < 10; ++row)
+                 {
+                     for (int col = 0; col < 11; ++col)
+                     {
+                         const double sx = p.x + col * 30 + 1;
+                         const double sy = p.y + row * 29 + 1;
+                         const float tone = float((row * 7 + col * 3) % 5) * .012f;
+                         Ground(sx, sy, 28, 27, Color(.29f + tone, .31f + tone, .28f + tone));
+                         r.Line(Screen(sx, sy), Screen(sx + 28, sy), 1, Color(.39f, .41f, .36f));
+                     }
+                 }
+                 r.EndCachedMesh();
+             }
+             r.DrawCachedMesh(key, origin);
          })
         .depthOffset = 1.e12;
 
