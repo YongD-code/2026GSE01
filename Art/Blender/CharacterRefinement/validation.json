@@ -1,0 +1,26 @@
+{
+  "walk": {
+    "size": [
+      3264,
+      1536
+    ],
+    "frames": 136,
+    "all_frames_have_margin": true
+  },
+  "run": {
+    "size": [
+      3264,
+      1536
+    ],
+    "frames": 136,
+    "all_frames_have_margin": true
+  },
+  "cast": {
+    "size": [
+      768,
+      1536
+    ],
+    "frames": 32,
+    "all_frames_have_margin": true
+  }
+}
