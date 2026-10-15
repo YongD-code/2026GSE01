@@ -1,0 +1,47 @@
+{
+  "title": "주흔 — 잊힌 이름",
+  "selected_concept": "B",
+  "generation_method": "built-in image_gen",
+  "source_concept": "Art/TitleScreen/title_domain_v1.png",
+  "assets": [
+    {
+      "file": "SimpleGame/Assets/Presentation/title_domain.png",
+      "role": "타이틀 및 오프닝 마지막 장면",
+      "prompt": "Use case: text-localization / precise-object-edit.\nEdit target: supplied image is the SELECTED final composition for a Korean supernatural battle-anime RPG title background.\nRemove ONLY all large foreground title typography and all interface elements on the left: the white Korean brush title, subtitle, horizontal title ornaments, three Korean menu lines, menu selection underline, tiny menu marker. Reconstruct the underlying shrine architecture, shadowed atmospheric depth, ink-like spirits, floor and mist naturally where the letters and UI were. Keep that left area quiet and dark, appropriate for later game-rendered UI, but beautifully integrated with the rest of the painting.\nPRESERVE the full exact composition, character identity and pose on right (spiky white hair, black blindfold, high-collar purple uniform), immense enclosed spherical barrier, ghost masks on curved wall, temple eaves, torii, hanging talismans, cyan-violet rift, amber lanterns and wet reflections. Preserve anime linework, lighting, color palette, aspect ratio and all character anatomy. No camera change, no new foreground objects, no added people, no new title, no menu or watermark. Small decorative occult marks on hanging talismans may remain. One polished opaque landscape background, 16:9."
+    },
+    {
+      "file": "SimpleGame/Assets/Presentation/opening_memory.png",
+      "role": "둘만의 표시 / 6.5초",
+      "prompt": "Use case: illustration-story.\nAsset type: one opaque landscape 16:9 opening-cinematic keyframe for Korean supernatural battle-anime RPG \"주흔 — 잊힌 이름\". NO TEXT anywhere.\nReference image supplied establishes the SAME beautiful dark anime illustration style, detailed Japanese architecture and cyan-violet/amber color language, not the literal setting to copy.\nScene: an intimate memory at dusk, two siblings leaving a small shared trail mark on an old wooden roadside shrine post. Tight cinematic close-up of an adult's hand emerging from a plain dark purple uniform sleeve and a smaller younger sibling's hand emerging from a neutral cream sleeve; both hands gently touch a small already carved crossed-path mark on the weathered wood. Natural hands with correct anatomy. No carving tool or fresh injury. No faces visible, no invented sibling gender or costume identity.\nThe protagonist's larger hand is lower right and the smaller hand above left. The little crossed-path mark and the space between their hands are the emotional focus. Behind, out-of-focus Japanese village eaves, one warm stone lantern, a quiet narrow path leading into blue-indigo evening mist. Subtle falling dust or petals. Warm amber light on fingertips, cool indigo shadows, restrained muted purple fabric. Tenderness with a trace of ominous mystery, premium hand-painted 2D anime-film detail and expressive shadows. Not chibi, not a cartoon, not photorealism. Leave low-contrast dark space near the bottom for separately rendered Korean subtitles. No logos, captions, letters, watermark, UI, split panel, blood or monsters."
+    },
+    {
+      "file": "SimpleGame/Assets/Presentation/opening_absence.png",
+      "role": "동생의 부재 / 7초",
+      "prompt": "Use case: illustration-story.\nAsset type: one opaque landscape 16:9 opening-cinematic keyframe, premium hand-painted 2D Japanese supernatural battle-anime game. NO TEXT anywhere.\nReference image is style and palette reference only; create a new scene.\nA younger sibling's room has been left empty inside an old Japanese timber-and-plaster village house at midnight. Cinematic low three-quarter viewpoint from the doorway. On the right, a small neatly folded cream outer garment on a low wooden chest, a simple futon folded nearby and a worn small shoulder pouch on a desk. In the middle, the very clear empty space where someone should have been. On the left, a half-open shoji screen, a corridor receding into shadow, a cold blue shaft of light slanting through wooden lattice onto tatami. A small amber oil lamp burns low, dust suspended in the air, a paper talisman on a lintel barely lifting in a draft. Objects remain real and intact; absence is expressed by composition and stillness, not disappearing objects or magical erasure of evidence. No bodies, no people, no faces, no photos, no villain. The mood is disturbing intimate loss and a memory that nobody will acknowledge. Restrained indigo, charcoal, dim amber, faint purple shadows, superb anime background craftsmanship, detailed wood grain and fabric, dark low-contrast lower strip for separately rendered subtitles. One coherent scene, no collage, no captions, no readable writing, no logos or watermark."
+    },
+    {
+      "file": "SimpleGame/Assets/Presentation/opening_cemetery.png",
+      "role": "공동묘지의 주령 / 7.5초",
+      "prompt": "Use case: illustration-story.\nAsset type: one opaque landscape 16:9 premium 2D anime-film opening keyframe for dark supernatural battle RPG \"주흔 — 잊힌 이름\". NO TEXT.\nReference image supplied is the established style and protagonist identity: spiky white hair, black blindfold, high-collar dark purple sorcerer's uniform. This is a new story scene outside the final title-screen domain.\nA deserted Japanese village cemetery at deep night. Cinematic three-quarter wide composition: protagonist in the lower right, seen from behind and side, one hand raised defensively as thin cyan-violet cursed light winds organically around his fingertips. Do not change his hair, black blindfold, high purple collar or outfit. Correct normal adult proportions, not chibi. In the center-left distance among crooked stone gravestones, an eerie translucent ghost with a softly dissolving human-shaped silhouette and long wisps of mist emerges; mysterious and mournful rather than gory or monstrous. Do not depict an identifiable villain, no torture or child.\nA barely visible second distant silhouette near the far cemetery gate suggests a coming encounter without revealing a face or costume. Tall dark cedars, worn stone path, paper talismans on old ropes, dense rolling low mist, small amber lanterns, cold moonlit indigo sky mostly concealed by branches, organic black ink-like shadows leaning toward the ghost. Strong atmospheric depth and contrast, beautiful crisp anime character linework and richly painted environment consistent with the supplied title concept. The main focus is the protagonist confronting a supernatural presence. Bottom low-contrast strip for native Korean subtitles. One continuous scene, no collage, no UI, no readable writing, no watermark."
+    }
+  ],
+  "sequence": [
+    {
+      "image": 1,
+      "duration": 6.5
+    },
+    {
+      "image": 2,
+      "duration": 7
+    },
+    {
+      "image": 3,
+      "duration": 7.5
+    },
+    {
+      "image": 0,
+      "duration": 9
+    }
+  ],
+  "notes": "Native title/menu/subtitle text is rendered separately. Art has slow UV camera motion and independent lightweight mist/particles. No generated voice, audio or skeletal character animation. Game build and runtime verification are user-owned."
+}
