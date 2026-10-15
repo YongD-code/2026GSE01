@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "type": "world_snapshot",
+  "game_id": "sample-game",
+  "game_name": "연동 예제 (샘플)",
+  "source_id": "developer-pc-1",
+  "session": "replace-at-process-start",
+  "sequence": 1,
+  "timestamp_ms": 0,
+  "mode": "playing",
+  "scope": "loaded_entities",
+  "player": {"position": {"x": 0, "y": 0}, "health": 100},
+  "quest": {"id": "sample-quest", "title": "샘플 목표", "objective": "연동 확인"},
+  "counts": {
+    "npc_registered": 1,
+    "npc_active": 1,
+    "npc_autonomous": 1,
+    "npc_working": 0,
+    "npc_hunting": 1,
+    "npc_recovering": 0,
+    "npc_gold": 32,
+    "npc_kills": 1,
+    "monsters_alive": 0,
+    "monsters_combat": 0,
+    "monsters_weakened": 0
+  },
+  "regions": [{
+    "id": "sample-village", "name": "샘플 마을", "kind": "village",
+    "status": "no_observed_threat", "npc_active": 1, "monsters_alive": 0,
+    "monsters_combat": 0, "coverage": "loaded_only", "npc_coverage": "complete"
+  }],
+  "npcs": [{
+    "id": "sample-npc", "name": "샘플 NPC", "status": "hunting", "active": true,
+    "kind": "autonomous", "role": "hunter", "role_name": "주령 사냥꾼",
+    "home_region": "sample-village", "health": 92, "maximum": 100, "stamina": 68,
+    "gold": 32, "earned": 12, "kills": 1, "goods": 1,
+    "destination": {"x": 320, "y": 100}, "quest_target": false, "interactable": false,
+    "position": {"x": 10, "y": 20}, "region": "sample-village"
+  }],
+  "monsters": []
+}
