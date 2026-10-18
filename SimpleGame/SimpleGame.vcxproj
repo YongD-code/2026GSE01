@@ -235,10 +235,6 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <ItemGroup>
-    <SpriteAssets Include="Assets\**\*.png" />
-    <ModelAssets Include="Assets\**\*.meshbin" />
-    <ShaderAssets Include="Shaders\**\*.vs;Shaders\**\*.fs" />
-    <GameData Include="Data\**\*.tsv;Data\**\*.ini" />
     <None Include="Data\Chapter1.tsv" />
     <None Include="Data\Capture.ini" />
     <None Include="Data\Combat.ini" />
@@ -248,6 +244,13 @@
     <None Include="Assets\Characters\keeper.png" />
   </ItemGroup>
   <Target Name="CopySpriteAssets" AfterTargets="Build">
+    <!-- Collect deployment-only files during the build, outside IDE project items. -->
+    <ItemGroup>
+      <SpriteAssets Include="Assets\**\*.png" />
+      <ModelAssets Include="Assets\**\*.meshbin" />
+      <ShaderAssets Include="Shaders\**\*.vs;Shaders\**\*.fs" />
+      <GameData Include="Data\**\*.tsv;Data\**\*.ini" />
+    </ItemGroup>
     <Copy SourceFiles="@(GameData)"
           DestinationFiles="@(GameData->'$(OutDir)Data\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
