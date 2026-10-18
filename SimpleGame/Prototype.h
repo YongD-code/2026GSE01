@@ -588,6 +588,21 @@ class Prototype
             if (!populationWalkSheets[i].Load(residentWalkFiles[i], walkLayout))
                 std::cerr << "생활 NPC 걷기 원화 로드 실패: " << i << std::endl;
         }
+        SpriteLayout gathererLayout;
+        gathererLayout.columns = 33;
+        gathererLayout.rows = 8;
+        // The Blender camera's right axis is (-X,+Y), opposite Screen's (+X,-Y).
+        gathererLayout.directionRows = {{0, 7, 6, 5, 4, 3, 2, 1}};
+        gathererLayout.firstWalkFrame = 1;
+        gathererLayout.walkFrames = 32;
+        gathererLayout.fixedCanvas = true;
+        gathererLayout.canvasAnchorY = .8394f;
+        gathererLayout.canvasCharacterHeight = .6120f;
+        gathererLayout.blendWalkFrames = false;
+        if (!gathererSheet.Load(L"Assets/Characters/Townsfolk/Gatherer/walk.png", gathererLayout))
+        {
+            std::cerr << "채집꾼 입체 보행 원화 로드 실패: 기존 외형을 사용합니다." << std::endl;
+        }
         for (int i = 0; i < StoryLayout::NpcCount; ++i)
         {
             SpriteLayout characterLayout = storyLayout;
@@ -990,6 +1005,8 @@ class Prototype
             screenShake = !screenShake;
         if (key == 'm')
             ToggleProtagonistModel();
+        if (key == 'n')
+            ToggleGathererStudy();
         const std::string skillKeys = "qwer";
         const auto skillSlot = skillKeys.find(char(key));
         if (skillSlot != std::string::npos)

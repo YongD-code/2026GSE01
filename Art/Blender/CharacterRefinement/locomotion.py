@@ -2,12 +2,12 @@
 import math
 
 
-def apply_locomotion(rig, kind, t):
+def apply_locomotion(rig, kind, t, walk_stride=.34):
     if kind not in ('walk', 'run'):
         return
     running = kind == 'run'
     phase = t * math.tau
-    stride = .46 if running else .34
+    stride = .46 if running else walk_stride
     stance = .44 if running else .60
     hip_height = (-.165 if running else -.105) - (.035 if running else .023) * math.cos(phase * 2)
     rig.pose.bones['hips'].location.y = hip_height

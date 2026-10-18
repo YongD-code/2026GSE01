@@ -1,0 +1,41 @@
+{
+  "source": "Art/Blender/TownsfolkStudy/gatherer.blend",
+  "output": "SimpleGame/Assets/Characters/Townsfolk/Gatherer/walk.png",
+  "dimensions": [
+    4224,
+    1024
+  ],
+  "cellSize": 128,
+  "rows": 8,
+  "columns": 33,
+  "firstWalkFrame": 1,
+  "walkFrames": 32,
+  "directionRows": [
+    0,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1
+  ],
+  "idleFrame": 0,
+  "fixedCanvas": true,
+  "canvasAnchorY": 0.8394111543893814,
+  "canvasCharacterHeight": 0.6120525151491165,
+  "directionYaws": [
+    2.356194490192345,
+    2.824536900380646,
+    3.9269908169872414,
+    -1.2537405735857496,
+    -0.7853981633974483,
+    -0.31705575320914714,
+    0.7853981633974478,
+    1.8878520800040435
+  ],
+  "worldStride": 44,
+  "gameHeight": 67,
+  "runtimeMesh": false,
+  "originalAssetsModified": false
+}

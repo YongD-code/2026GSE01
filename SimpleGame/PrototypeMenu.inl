@@ -34,18 +34,20 @@ PauseBounds MenuBounds() const
 
 const PauseColumn* PauseColumns() const
 {
-    static const PauseEntry character[] = {{"능력치", 4}, {"기본 화면", 13}};
+    static const PauseEntry character[] = {
+        {"능력치", 4}, {"기본 화면", 13}, {"주인공 외형 전환 · M", 16}};
     static const PauseEntry inventory[] = {{"인벤토리", 1}, {"주령석 강화", 9}};
     static const PauseEntry combat[] = {{"기본 공격 안내", 10}, {"주령 조종·스킬 전환", 12}};
     static const PauseEntry adventure[] = {{"이벤트 · 퀘스트", 3}};
     static const PauseEntry records[] = {{"주령 도감", 2}, {"저장", 5}, {"불러오기", 6}};
-    static const PauseEntry other[] = {{"조작 안내", 7}, {"게임 종료", 8}};
-    static const PauseColumn columns[] = {{"캐릭터", character, 2},
+    static const PauseEntry other[] = {
+        {"조작 안내", 7}, {"채집꾼 외형 전환 · N", 17}, {"게임 종료", 8}};
+    static const PauseColumn columns[] = {{"캐릭터", character, 3},
                                           {"소지품", inventory, 2},
                                           {"전투", combat, 2},
                                           {"모험", adventure, 1},
                                           {"기록", records, 3},
-                                          {"기타", other, 2}};
+                                          {"기타", other, 3}};
     return columns;
 }
 
@@ -202,6 +204,12 @@ void ActivateMenu(int item)
     case 13:
         hudVisible = !hudVisible;
         break;
+    case 16:
+        ToggleProtagonistModel();
+        break;
+    case 17:
+        ToggleGathererStudy();
+        break;
     default:
         break;
     }
@@ -238,7 +246,17 @@ void DrawPauseMenu()
             for (int row = 0; row < PauseColumns()[c].count; ++row)
             {
                 const auto& entry = PauseColumns()[c].entries[row];
-                UIButton(MenuEntryRect(c, row), entry.label, pauseSelection == entry.action);
+                const std::string label =
+                    entry.action == 16
+                        ? std::string("주인공 외형 · ") +
+                              (useProtagonistModel && protagonistModel.Ready() ? "입체 모델"
+                                                                               : "기존 외형")
+                    : entry.action == 17
+                        ? std::string("채집꾼 외형 · ") + (useGathererStudy && gathererSheet.Ready()
+                                                               ? "1차 보행 후보"
+                                                               : "기존 외형")
+                        : entry.label;
+                UIButton(MenuEntryRect(c, row), label, pauseSelection == entry.action);
             }
         }
         UIButton(MenuFooter(0), "이전 [");

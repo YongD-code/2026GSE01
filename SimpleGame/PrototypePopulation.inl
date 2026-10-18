@@ -1,7 +1,24 @@
 Population population;
 SpriteSheet populationSheets[4];
 SpriteSheet populationWalkSheets[4];
+SpriteSheet gathererSheet;
+bool useGathererStudy = false;
 int talkingResident = -1;
+
+void ToggleGathererStudy()
+{
+    if (!gathererSheet.Ready())
+    {
+        Say("채집꾼 외형", "1차 보행 후보를 읽지 못했습니다. 기존 외형을 사용합니다.");
+        return;
+    }
+    useGathererStudy = !useGathererStudy;
+    FrameProfiler::Event("gatherer_render_mode", useGathererStudy ? "volume_atlas" : "original", 0);
+    Say("채집꾼 외형",
+        useGathererStudy
+            ? "1차 보행 후보로 전환했습니다. 정교화 후보는 아직 게임에 적용하지 않았습니다."
+            : "기존 채집꾼 외형으로 전환했습니다. 게임 중 N으로 비교할 수 있습니다.");
+}
 
 bool ResidentQuestTarget(int id) const
 {
@@ -159,16 +176,20 @@ void DrawResident(const Population::Person& person)
         return;
     const float shade = .88f + (person.id % 4) * .04f;
     r.Ellipse(p.x, p.y, 13, 5, Color(0, 0, 0, .22f));
-    auto& sheet = person.animation.moving && populationWalkSheets[person.role].Ready()
+    const bool study =
+        useGathererStudy && gathererSheet.Ready() && person.role == Population::Farmer;
+    auto& sheet = study ? gathererSheet
+                  : person.animation.moving && populationWalkSheets[person.role].Ready()
                       ? populationWalkSheets[person.role]
                       : populationSheets[person.role];
-    sheet.Draw(r,
-               p,
-               67,
-               person.animation,
-               Color(shade, 1.f, .94f + (person.id % 3) * .02f),
-               width,
-               height);
+    SpriteAnimation animation = person.animation;
+    if (study)
+    {
+        // Population's distance-driven cycle has eight phases; this atlas has 32 poses.
+        animation.phase *= float(gathererSheet.WalkFrameCount()) / 8.f;
+    }
+    sheet.Draw(
+        r, p, 67, animation, Color(shade, 1.f, .94f + (person.id % 3) * .02f), width, height);
     if (person.action == Population::Fighting && person.attackWait > .85f)
     {
         const float glow = (person.attackWait - .85f) / .25f;

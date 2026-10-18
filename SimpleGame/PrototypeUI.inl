@@ -87,6 +87,12 @@ std::vector<std::string> JournalEntries()
         add("수집 · 자동 흡수 범위 " + std::to_string(int(levelOne.MagnetRange())) + " / 처치 " +
             std::to_string(levelOne.kills));
         add("기본 공격 · 좌클릭 / 커서 방향 연사");
+        add(std::string("주인공 외형 · ") +
+            (useProtagonistModel && protagonistModel.Ready() ? "입체 모델" : "기존 외형") +
+            " / M 전환");
+        add(std::string("채집꾼 외형 · ") +
+            (useGathererStudy && gathererSheet.Ready() ? "1차 보행 후보" : "기존 외형") +
+            " / 게임 중 N 전환");
         for (int i = 0; i < 4; ++i)
         {
             add(std::string("QWER").substr(i, 1) + " · " + SkillName(SkillSet(), i) + " / 대기 " +
@@ -151,6 +157,8 @@ std::vector<std::string> JournalEntries()
         add("주령 · B 조종과 QWER 전환 / 봉인사 강화 / 도감 N 동행 변경");
         add("기록 · Tab 기록창 / J 주령 / 1~5 탭 / [ ] 페이지");
         add("화면 · U HUD / K 피격 흔들림 / P 후처리 / O 블룸");
+        add("주인공 외형 · M 입체 모델과 기존 외형 비교 / ESC 캐릭터 메뉴에서도 전환");
+        add("채집꾼 외형 · 게임 중 N 기존 외형과 1차 보행 후보 비교 / 도감의 N은 동행 변경");
         add("저장 · F5 저장 / F9 불러오기 / 안전할 때 자동 저장");
         add("저장 슬롯 · 최대 3개 / 현재 슬롯 " + std::to_string(activeSlot));
         add("메뉴 · ESC 열기·돌아가기 / 항목 마우스 클릭");
