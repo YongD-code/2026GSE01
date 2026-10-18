@@ -1,0 +1,75 @@
+{
+  "selected": "A",
+  "status": "selected_A_atlas_packed",
+  "cellSize": 128,
+  "columns": 32,
+  "rows": 8,
+  "clips": {
+    "idle": {
+      "first": 0,
+      "frames": 12
+    },
+    "glide": {
+      "first": 12,
+      "frames": 12
+    },
+    "cast": {
+      "first": 24,
+      "frames": 8
+    }
+  },
+  "loopSeconds": 1.3333333333333333,
+  "directionRows": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "directionYaws": [
+    -0.0,
+    -0.42424096855172794,
+    -1.5707963267948966,
+    -2.7173516850380652,
+    -3.141592653589793,
+    2.7173516850380652,
+    1.570796326794897,
+    0.4242409685517281
+  ],
+  "worldOriginAnchorY": 0.8568742410215808,
+  "protectedBefore": {
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "Art\\Blender\\SpiritStudy\\Variants\\round_lantern\\candidate.blend": "683d57eaa161c4526b023ec14835d3d73fb459d75acdee3513d4d14e51122ce7",
+    "Art\\Blender\\SpiritStudy\\Variants\\split_mask\\candidate.blend": "4748c44e433c8d47729d48a651f78645a583eeb9e63d0a33a6c09999e0cab09e"
+  },
+  "protectedAfter": {
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "Art\\Blender\\SpiritStudy\\Variants\\round_lantern\\candidate.blend": "683d57eaa161c4526b023ec14835d3d73fb459d75acdee3513d4d14e51122ce7",
+    "Art\\Blender\\SpiritStudy\\Variants\\split_mask\\candidate.blend": "4748c44e433c8d47729d48a651f78645a583eeb9e63d0a33a6c09999e0cab09e"
+  },
+  "gameBuildRunTested": false,
+  "atlas": "SimpleGame\\Assets\\Spirits\\Forgotten\\lantern_a.png",
+  "dimensions": [
+    4096,
+    1024
+  ],
+  "alphaBounds": [
+    29,
+    15,
+    99,
+    114
+  ],
+  "canvasAnchorY": 0.90625,
+  "canvasCharacterHeight": 0.7734375,
+  "rgbaBytes": 16777216,
+  "atlasSha256": "1485721bd7e2b1f26ccec51a3a0c28da9f07bc16d06d77caf5070cbf19fcf981",
+  "emptyCells": 0,
+  "clippedCells": 0,
+  "selectionAccepted": true,
+  "runtimeAssetReady": true
+}

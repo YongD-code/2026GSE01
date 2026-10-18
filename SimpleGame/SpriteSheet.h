@@ -456,10 +456,18 @@ class SpriteSheet
               float emission = 0.f,
               int spiritMotion = -1,
               float motionTime = 0.f,
-              float casting = 0.f)
+              float casting = 0.f,
+              int clipFirst = -1,
+              int clipFrames = 0)
     {
         if (!Ready())
             return;
+        const int firstWalkFrame = clipFirst >= 0 ? clipFirst : layout.firstWalkFrame;
+        const int walkFrames = clipFrames > 0 ? clipFrames : layout.walkFrames;
+        if (clipFirst >= 0 && (walkFrames <= 0 || firstWalkFrame + walkFrames > layout.columns))
+        {
+            return;
+        }
         int row = layout.directionRows[static_cast<int>(animation.facing)];
         int column = layout.idleFrame;
         const int directionColumn = layout.directionIdleColumns[static_cast<int>(animation.facing)];
@@ -470,38 +478,38 @@ class SpriteSheet
         if (animation.moving)
         {
             int step = 0;
-            if (layout.pingPongWalk && layout.walkFrames > 1)
+            if (layout.pingPongWalk && walkFrames > 1)
             {
-                const int period = 2 * (layout.walkFrames - 1);
+                const int period = 2 * (walkFrames - 1);
                 step = static_cast<int>(animation.phase) % period;
-                if (step >= layout.walkFrames)
+                if (step >= walkFrames)
                     step = period - step;
             }
             else
-                step = static_cast<int>(animation.phase) % layout.walkFrames;
-            column = layout.firstWalkFrame + step;
+                step = static_cast<int>(animation.phase) % walkFrames;
+            column = firstWalkFrame + step;
             // Single-pose directional atlases still need their direction-specific column.
-            if (layout.walkFrames == 1 && directionColumn >= 0)
+            if (walkFrames == 1 && directionColumn >= 0)
                 column = directionColumn;
         }
         // Smooth only locomotion, not discrete cast poses. Fractional phase survives between
         // frames.
         if (layout.blendWalkFrames && animation.moving && casting <= 0 && emission < 1.f &&
-            layout.walkFrames > 1)
+            walkFrames > 1)
         {
             const float fraction = animation.phase - std::floor(animation.phase);
             int next = static_cast<int>(animation.phase) + 1;
             if (layout.pingPongWalk)
             {
-                const int period = 2 * (layout.walkFrames - 1);
+                const int period = 2 * (walkFrames - 1);
                 next %= period;
-                if (next >= layout.walkFrames)
+                if (next >= walkFrames)
                     next = period - next;
             }
             else
-                next %= layout.walkFrames;
+                next %= walkFrames;
             const Frame& from = frames[row * layout.columns + column];
-            const Frame& to = frames[row * layout.columns + layout.firstWalkFrame + next];
+            const Frame& to = frames[row * layout.columns + firstWalkFrame + next];
             const float mix = fraction * fraction * (3 - 2 * fraction);
             auto pose = [&](const Frame& f, float alpha)
             {
