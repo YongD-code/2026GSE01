@@ -2,6 +2,7 @@
 #include "Renderer.h"
 #include "World.h"
 #include "SpriteSheet.h"
+#include "CharacterModel.h"
 #include "LevelOne.h"
 #include "SaveGame.h"
 #include "SceneGraph.h"
@@ -54,6 +55,10 @@ class Prototype
         ghostVariants[3], spiritSpellArt[3], spiritRealms[4];
     SpriteSheet storyNpcSheets[StoryLayout::NpcCount];
     SpriteAnimation protagonistAnimation;
+    CharacterModel protagonistModel;
+    bool useProtagonistModel = false;
+    float protagonistYaw = 2.35619449f, protagonistGait = 0;
+    float protagonistModelTime = 0, protagonistCastAge = 1;
     WorldPoint movementVelocity = {0, 0};
     bool movementWasControlling = false;
     float protagonistStopTime = .08f;
@@ -541,6 +546,8 @@ class Prototype
         {
             std::cerr << "주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다." << std::endl;
         }
+        if (!protagonistModel.Load(L"Assets/Characters/Runtime/protagonist.meshbin"))
+            std::cerr << "주인공 입체 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
         SpriteLayout storyLayout;
         storyLayout.columns = 2;
         storyLayout.rows = 2;
@@ -981,6 +988,8 @@ class Prototype
             Interact();
         if (key == 'k')
             screenShake = !screenShake;
+        if (key == 'm')
+            ToggleProtagonistModel();
         const std::string skillKeys = "qwer";
         const auto skillSlot = skillKeys.find(char(key));
         if (skillSlot != std::string::npos)

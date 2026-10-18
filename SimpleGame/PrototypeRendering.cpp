@@ -299,7 +299,14 @@ void Prototype::DrawPlayer(WorldPoint pos)
     const float spriteHeight = 78.f;
     if (p.x < -80 || p.x > width + 80 || p.y < -20 || p.y > height + 100)
         return;
-    r.Ellipse(p.x, p.y + 1, 14.f, 5, Color(0, 0, 0, .35f));
+    const bool model = useProtagonistModel && protagonistModel.Ready();
+    if (model)
+    {
+        r.Ellipse(p.x + 4, p.y + 3, 20.f, 7, Color(0, 0, 0, .12f));
+        r.Ellipse(p.x, p.y + 1, 11.f, 4, Color(0, 0, 0, .32f));
+    }
+    else
+        r.Ellipse(p.x, p.y + 1, 14.f, 5, Color(0, 0, 0, .35f));
     if (!controlling)
         r.Ellipse(p.x, p.y, 18, 7, Color(.75f, .69f, .45f, .20f));
     SpriteAnimation animation = protagonistAnimation;
@@ -308,6 +315,8 @@ void Prototype::DrawPlayer(WorldPoint pos)
     Color tint = levelOne.dodgeTime > 0  ? Color(.5f, 1.5f, 2.f)
                  : levelOne.hurtTime > 0 ? Color(1.5f, .55f, .55f)
                                          : Color(1, 1, 1);
+    if (model && protagonistModel.Draw(r, p, tint))
+        return;
     if (levelOne.castTime > 0 && !protagonistAnimation.moving && attackSheet.Ready())
     {
         sheet = &attackSheet;

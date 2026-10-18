@@ -156,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="CharacterModel.h" />
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
     <ClInclude Include="StoryLayout.h" />
@@ -194,6 +195,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="CharacterModel.cpp" />
     <ClCompile Include="PrototypeScene.cpp" />
     <ClCompile Include="PrototypeFront.cpp" />
     <ClCompile Include="PrototypeRendering.cpp" />
@@ -213,6 +215,10 @@
     <None Include="Shaders\Batch.vs" />
     <None Include="Shaders\Batch.fs" />
     <None Include="Shaders\Geometry.fs" />
+    <None Include="Shaders\CharacterMesh.vs" />
+    <None Include="Shaders\CharacterMesh.fs" />
+    <None Include="Shaders\CharacterComposite.vs" />
+    <None Include="Shaders\CharacterComposite.fs" />
     <None Include="Shaders\Sprite.vs" />
     <None Include="Shaders\Sprite.fs" />
     <None Include="Shaders\Fullscreen.vs" />
@@ -229,6 +235,7 @@
   </ImportGroup>
   <ItemGroup>
     <SpriteAssets Include="Assets\**\*.png" />
+    <ModelAssets Include="Assets\**\*.meshbin" />
     <ShaderAssets Include="Shaders\**\*.vs;Shaders\**\*.fs" />
     <GameData Include="Data\**\*.tsv;Data\**\*.ini" />
     <None Include="Data\Chapter1.tsv" />
@@ -245,6 +252,9 @@
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(SpriteAssets)"
           DestinationFiles="@(SpriteAssets->'$(OutDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ModelAssets)"
+          DestinationFiles="@(ModelAssets->'$(OutDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ShaderAssets)"
           DestinationFiles="@(ShaderAssets->'$(OutDir)Shaders\%(RecursiveDir)%(Filename)%(Extension)')"

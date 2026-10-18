@@ -231,6 +231,7 @@ void ResetControls(bool restoring = false)
     skillEffects.clear();
     levelOne.hitFeedback.clear();
     levelOne.hitStop = levelOne.hitStopGuard = 0;
+    ResetCharacterPresentation();
     for (auto& set : skillTimers)
     {
         for (float& timer : set)
@@ -238,6 +239,71 @@ void ResetControls(bool restoring = false)
             timer = restoring ? levelOne.skillCooldown : 0;
         }
     }
+}
+
+float CharacterFacing(Facing facing) const
+{
+    const float angle = static_cast<int>(facing) * .785398163f;
+    const double sx = -std::sin(angle), sy = std::cos(angle);
+    return static_cast<float>(std::atan2((-sx / .85 + sy / .43) * .5, (sx / .85 + sy / .43) * .5) +
+                              1.570796327);
+}
+
+void ResetCharacterPresentation()
+{
+    protagonistYaw = CharacterFacing(protagonistAnimation.facing);
+    protagonistGait = protagonistModelTime = 0;
+    protagonistCastAge = 1;
+    protagonistModel.Reset(protagonistYaw);
+}
+
+void ToggleProtagonistModel()
+{
+    if (!protagonistModel.Ready())
+    {
+        Say("주인공 외형", "입체 모델을 읽지 못했습니다. 기존 외형을 사용합니다.");
+        return;
+    }
+    useProtagonistModel = !useProtagonistModel;
+    FrameProfiler::Event("character_render_mode", useProtagonistModel ? "mesh" : "sprite", 0);
+    Say("주인공 외형",
+        useProtagonistModel ? "입체 모델로 전환했습니다. M으로 비교할 수 있습니다."
+                            : "기존 외형으로 전환했습니다. M으로 비교할 수 있습니다.");
+}
+
+void UpdateCharacterPresentation(float dt, double dx, double dy, double screenDistance)
+{
+    if (pauseMenu || journal || !serviceNpc.empty())
+        return;
+    protagonistModelTime = std::fmod(protagonistModelTime + dt, 16.f);
+    if (chapter.choicePending || dialoguePending)
+    {
+        protagonistModel.Animate(
+            dt, CharacterModel::Motion::Idle, protagonistModelTime * .25f, protagonistYaw);
+        return;
+    }
+    protagonistCastAge += dt;
+    const bool casting =
+        !controlling && (PreparingSkill() || (levelOne.castTime > 0 && screenDistance < .001));
+    if (screenDistance > .001 && !casting)
+        protagonistYaw = static_cast<float>(std::atan2(dy, dx) + 1.570796327);
+    protagonistGait = std::fmod(protagonistGait + static_cast<float>(screenDistance) /
+                                                      (protagonistSprinting ? 68.f : 48.f),
+                                1.f);
+    CharacterModel::Motion motion = CharacterModel::Motion::Idle;
+    float phase = protagonistModelTime * .25f;
+    if (casting)
+    {
+        motion = CharacterModel::Motion::Cast;
+        phase = PreparingSkill() ? (std::min)(.55f, protagonistCastAge / .32f)
+                                 : (std::min)(1.f, protagonistCastAge / .32f);
+    }
+    else if (protagonistAnimation.moving)
+    {
+        motion = protagonistSprinting ? CharacterModel::Motion::Run : CharacterModel::Motion::Walk;
+        phase = protagonistGait;
+    }
+    protagonistModel.Animate(dt, motion, phase, protagonistYaw);
 }
 
 bool ControlsActive() const
@@ -313,6 +379,8 @@ void FaceCast(WorldPoint origin, WorldPoint target)
     }
     else
     {
+        protagonistCastAge = 0;
+        protagonistYaw = static_cast<float>(std::atan2(dy, dx) + 1.570796327);
         levelOne.castFacing = aim.facing;
         levelOne.castTime = .18f;
     }

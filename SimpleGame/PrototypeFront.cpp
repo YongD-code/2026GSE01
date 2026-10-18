@@ -274,6 +274,7 @@ void Prototype::NewGame()
     captured = controlling = dialoguePending = false;
     selectedCompanion = capturedSpirit = collectionPage = eventPage = 0;
     protagonistAnimation = SpriteAnimation();
+    ResetCharacterPresentation();
     movementVelocity = {0, 0};
     movementWasControlling = false;
     protagonistStopTime = .08f;

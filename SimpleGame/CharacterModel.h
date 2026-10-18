@@ -29,16 +29,19 @@ class CharacterModel
   private:
     using Matrix = std::array<float, 16>;
     using Pose = std::array<float, 10>;
+
     struct Joint
     {
         int parent = -1;
         Matrix inverseBind;
     };
+
     struct Clip
     {
         unsigned frames = 0;
         std::vector<Pose> poses;
     };
+
     std::vector<Joint> joints;
     std::array<Clip, 4> clips;
     std::vector<Pose> pose, transitionFrom;

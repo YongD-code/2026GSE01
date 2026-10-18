@@ -11,8 +11,7 @@ void main()
         n = -n;
     vec3 light = normalize(vec3(-.45, -.65, 1.1));
     float diffuse = dot(n, light);
-    float bands = .48 + .22 * smoothstep(-.08, .06, diffuse) +
-                  .28 * smoothstep(.48, .60, diffuse);
+    float bands = .48 + .22 * smoothstep(-.08, .06, diffuse) + .28 * smoothstep(.48, .60, diffuse);
     float sky = .04 * max(n.z, 0.0);
     float contact = mix(.86, 1.0, smoothstep(0.0, 25.0, worldPosition.z));
     vec3 view = normalize(vec3(.603, .603, .519));

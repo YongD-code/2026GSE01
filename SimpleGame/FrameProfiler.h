@@ -28,6 +28,7 @@ class FrameProfiler
         WorldDraw,
         InterfaceDraw,
         Monitoring,
+        CharacterDraw,
         Count
     };
 
@@ -102,7 +103,7 @@ class FrameProfiler
                 s.events << s.startup.str();
                 s.startup.str("");
                 std::ofstream metadata((stem + L"-session.txt").c_str());
-                metadata << "schema=1\npatch=1.0.68v\nbatching="
+                metadata << "schema=1\npatch=1.0.70v\nbatching="
                          << RenderStorage::Enabled(L"GSE_RENDER_BATCH")
                          << "\ndisk_cache=" << RenderStorage::Enabled(L"GSE_MESH_DISK_CACHE")
                          << "\nGL_VENDOR=" << glGetString(GL_VENDOR)
@@ -242,7 +243,8 @@ class FrameProfiler
                                       "scene_sync",
                                       "world_draw",
                                       "interface_draw",
-                                      "monitoring"};
+                                      "monitoring",
+                                      "character_3d"};
         for (size_t i = 0; i < s.sections.size(); ++i)
         {
             auto& section = s.sections[i];

@@ -244,6 +244,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     movementWasControlling = false;
     protagonistStopTime = .08f;
     protagonistAnimation.facing = static_cast<Facing>(state.facing);
+    ResetCharacterPresentation();
     companionAnimation = SpriteAnimation();
     moving = false;
     protagonistSprinting = false;

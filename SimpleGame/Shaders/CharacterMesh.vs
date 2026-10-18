@@ -22,9 +22,10 @@ void main()
     n.xy = rotation * n.xy;
     // Match Prototype::Screen's isometric basis. The model is 90 world units tall.
     worldPosition = p * 90.0;
-    vec2 screen = vec2(128, 280) +
-                  vec2(.85 * (worldPosition.x - worldPosition.y),
-                       .43 * (worldPosition.x + worldPosition.y) - worldPosition.z) * 2.0;
+    vec2 screen =
+        vec2(128, 280) + vec2(.85 * (worldPosition.x - worldPosition.y),
+                              .43 * (worldPosition.x + worldPosition.y) - worldPosition.z) *
+                             2.0;
     float depth = -dot(worldPosition, vec3(.603, .603, .519)) / 180.0;
     gl_Position = vec4(screen.x / 128.0 - 1, 1 - screen.y / 160.0, depth, 1);
     surfaceNormal = n;

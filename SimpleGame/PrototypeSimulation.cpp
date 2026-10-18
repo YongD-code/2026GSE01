@@ -280,6 +280,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             protagonistStopTime = 0;
         }
     }
+    UpdateCharacterPresentation(dt, actualX, actualY, screenDistance);
     const double spiritDX = spirit.x - previousSpirit.x, spiritDY = spirit.y - previousSpirit.y;
     double screenDX = (spiritDX - spiritDY) * .85, screenDY = (spiritDX + spiritDY) * .43;
     // Ignore the tiny convergence tail of the following interpolation.
