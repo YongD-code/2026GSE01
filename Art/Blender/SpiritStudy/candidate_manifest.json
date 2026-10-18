@@ -1,0 +1,76 @@
+{
+  "status": "candidate_not_applied",
+  "name": "남겨진 자",
+  "reference": "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png",
+  "source": "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend",
+  "cellSize": 192,
+  "rows": 8,
+  "columns": 9,
+  "firstWalkFrame": 1,
+  "walkFrames": 8,
+  "directionRows": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "directionYaws": [
+    -0.0,
+    -0.42424096855172794,
+    -1.5707963267948966,
+    -2.7173516850380652,
+    -3.141592653589793,
+    2.7173516850380652,
+    1.570796326794897,
+    0.4242409685517281
+  ],
+  "fixedCanvas": true,
+  "canvasAnchorY": 0.8568742410215808,
+  "loopSeconds": 1.3333333333333333,
+  "bones": 16,
+  "camera": {
+    "orthoScale": 4.8,
+    "tilt": 0.4686350988177705
+  },
+  "renderer": "BLENDER_EEVEE",
+  "gameAssetsModified": false,
+  "gameBuildRunTested": false,
+  "fire": "closed 3D volumes / density-noise / radiance core / looped turbulence and bend keys",
+  "protectedBefore": {
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "SimpleGame\\SpiritCatalog.h": "27998d8419819d8abc6c9070c4d1b399ff9bd479d3ab6b67578ad84ba7089dea",
+    "SimpleGame\\PrototypeRendering.cpp": "5212b6ad3eecc43a1fdd54da0b81618deb1fc9201614a84dcc03956c704fbbc5"
+  },
+  "protectedAfter": {
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "SimpleGame\\SpiritCatalog.h": "27998d8419819d8abc6c9070c4d1b399ff9bd479d3ab6b67578ad84ba7089dea",
+    "SimpleGame\\PrototypeRendering.cpp": "5212b6ad3eecc43a1fdd54da0b81618deb1fc9201614a84dcc03956c704fbbc5"
+  },
+  "atlas": "Art\\Blender\\SpiritStudy\\candidate_glide_8dir.png",
+  "dimensions": [
+    1728,
+    1536
+  ],
+  "alphaBounds": [
+    43,
+    23,
+    149,
+    171
+  ],
+  "canvasCharacterHeight": 0.7708333333333334,
+  "emptyCells": 0,
+  "clippedCells": 0,
+  "runtimeIntegrated": false,
+  "reviewFiles": [
+    "comparison.png",
+    "turnaround.png",
+    "direction_review.png",
+    "glide_preview.gif",
+    "fire_review.png",
+    "fire_preview.gif"
+  ]
+}
