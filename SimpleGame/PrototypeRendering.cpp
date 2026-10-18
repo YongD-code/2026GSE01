@@ -531,6 +531,44 @@ void Prototype::DrawWorldLabel(WorldPoint position,
     r.Text(box.x + 6, box.y + 17, text, color);
 }
 
+bool Prototype::DrawSpiritModel(int species,
+                                Point feet,
+                                float size,
+                                SpriteAnimation animation,
+                                Color tint,
+                                float motionClock,
+                                float castProgress)
+{
+    if (!UsingSpiritModel(species))
+    {
+        return false;
+    }
+    const bool casting = castProgress >= 0;
+    const int first = casting            ? SpiritAppearance::CastFirst
+                      : animation.moving ? SpiritAppearance::GlideFirst
+                                         : SpiritAppearance::IdleFirst;
+    const int count = casting            ? SpiritAppearance::CastFrames
+                      : animation.moving ? SpiritAppearance::GlideFrames
+                                         : SpiritAppearance::IdleFrames;
+    if (casting)
+    {
+        animation.phase = (std::max)(0.f, (std::min)(1.f, castProgress)) * (count - 1);
+    }
+    else
+    {
+        // Four old walk phases represent one quadruped stride. Preserve distance-based gait.
+        const float phase = species == SpiritCatalog::Hands && animation.moving
+                                ? animation.phase * .25f
+                                : motionClock / SpiritAppearance::Get(species).loopSeconds;
+        animation.phase = (phase - std::floor(phase)) * count;
+    }
+    animation.moving = true;
+    // Float, cloth response and fire are baked in. Do not shear or bob the entire model again.
+    spiritModelSheets[species].Draw(
+        r, feet, size, animation, tint, width, height, 0, -1, 0, casting ? 1.f : 0.f, first, count);
+    return true;
+}
+
 void Prototype::Wisp(int type, WorldPoint position)
 {
     Point p = Screen(position.x, position.y);
@@ -548,7 +586,17 @@ void Prototype::Wisp(int type, WorldPoint position)
             animation.phase = (1.f - (std::min)(1.f, spiritCastPose / .8f)) * 4.f;
         }
     }
-    const float cycle = animation.moving ? animation.phase * 1.5707963f : time * 2;
+    float castProgress = -1.f;
+    if (captured && capturedSpirit == type && spiritCastPose > 0)
+    {
+        castProgress =
+            controlling && PreparingSkill() ? .45f : 1.f - (std::min)(1.f, spiritCastPose / .55f);
+    }
+    if (DrawSpiritModel(
+            type, p, SpiritCatalog::Get(type).size, animation, Color(1, 1, 1), time, castProgress))
+    {
+        return;
+    }
     const int motion = SpiritCatalog::Get(type).motion;
     const float bob = motion == 0   ? std::sin(time * 2.f) * 1.5f - 3.f
                       : motion == 1 ? std::sin(time * 1.8f) * .6f
@@ -593,6 +641,13 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
         const float fade = enemy.remnantTime < 0 ? 1.f : (std::min)(1.f, enemy.remnantTime / 10.f);
         const float bob = std::sin(time * 3) * 4;
         r.Ellipse(p.x, p.y, 20, 7, Color(.3f, .8f, .75f, .18f * fade));
+        SpriteAnimation remnant = enemy.animation;
+        remnant.moving = false;
+        if (DrawSpiritModel(
+                enemy.type, {p.x, p.y - 8}, 55, remnant, Color(.65f, 1, .9f, .6f * fade), time))
+        {
+            return;
+        }
         spiritSheets[enemy.type].Draw(r,
                                       {p.x, p.y - 8 + bob},
                                       55,
@@ -613,6 +668,16 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
                 r, p, size, enemy.animation, Color(1, 1, 1), width, height);
         else
             r.Text(p.x - 45, p.y - 32, "전용 외형 로드 실패", Color(1, .6f, .5f));
+    }
+    else if (DrawSpiritModel(enemy.type,
+                             p,
+                             size,
+                             enemy.animation,
+                             Color(1, 1, 1),
+                             time + float(enemy.position.x * .01),
+                             enemy.castPose > 0 ? .25f + .5f * enemy.castPose : -1.f))
+    {
+        // Health bars and alerts below still belong to the existing enemy Actor.
     }
     else if (spiritSheets[enemy.type].Ready())
     {

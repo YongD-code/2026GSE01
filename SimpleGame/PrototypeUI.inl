@@ -93,6 +93,8 @@ std::vector<std::string> JournalEntries()
         add(std::string("채집꾼 외형 · ") +
             (useGathererStudy && gathererSheet.Ready() ? "1차 보행 후보" : "기존 외형") +
             " / 게임 중 N 전환");
+        add(std::string("주령 외형 · ") + (UsingSpiritModels() ? "2.5D 모델" : "기존 원화") +
+            " / ESC 전투 메뉴에서 전환");
         for (int i = 0; i < 4; ++i)
         {
             add(std::string("QWER").substr(i, 1) + " · " + SkillName(SkillSet(), i) + " / 대기 " +
@@ -258,8 +260,11 @@ void DrawJournalSlot(int index, int local)
     if (spirits)
     {
         const auto& entry = levelOne.collection[index];
-        spiritSheets[entry.species].Draw(
-            r, {box.x + 41, box.y + 81}, 62, pose, Color(1, 1, 1), width, height);
+        if (!DrawSpiritModel(entry.species, {box.x + 41, box.y + 81}, 62, pose, Color(1, 1, 1), 0))
+        {
+            spiritSheets[entry.species].Draw(
+                r, {box.x + 41, box.y + 81}, 62, pose, Color(1, 1, 1), width, height);
+        }
         name = SpiritName(entry.species);
         for (int star = 0; star < entry.rarity; ++star)
         {

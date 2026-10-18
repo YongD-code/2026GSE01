@@ -271,6 +271,25 @@ void ToggleProtagonistModel()
                             : "기존 외형으로 전환했습니다. M으로 비교할 수 있습니다.");
 }
 
+void ToggleSpiritModels()
+{
+    bool ready = false;
+    for (int species = 0; species < SpiritCatalog::Count; ++species)
+    {
+        ready = ready || spiritModelSheets[species].Ready();
+    }
+    if (!ready)
+    {
+        Say("주령 외형", "입체 외형을 읽지 못했습니다. 기존 원화를 사용합니다.");
+        return;
+    }
+    useSpiritModels = !useSpiritModels;
+    FrameProfiler::Event("spirit_render_mode", useSpiritModels ? "models" : "original", 0);
+    Say("주령 외형",
+        useSpiritModels ? "주령들의 입체 외형으로 전환했습니다."
+                        : "기존 원화로 전환했습니다. ESC 전투 메뉴에서 다시 바꿀 수 있습니다.");
+}
+
 void UpdateCharacterPresentation(float dt, double dx, double dy, double screenDistance)
 {
     if (pauseMenu || journal || !serviceNpc.empty())

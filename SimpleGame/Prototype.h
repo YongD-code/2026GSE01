@@ -3,6 +3,7 @@
 #include "World.h"
 #include "SpriteSheet.h"
 #include "CharacterModel.h"
+#include "SpiritAppearance.h"
 #include "LevelOne.h"
 #include "SaveGame.h"
 #include "SceneGraph.h"
@@ -65,6 +66,8 @@ class Prototype
     SpriteSheet attackSheet, protagonistRunSheet;
     bool blenderProtagonist = false, protagonistSprinting = false;
     SpriteSheet spiritSheets[SpiritCatalog::Count];
+    SpriteSheet spiritModelSheets[SpiritCatalog::Count];
+    bool useSpiritModels = true;
     SpriteSheet storyEnemySheets[StoryEncounter::SpriteCount];
     SpriteSheet lootSheets[5];
     SpriteAnimation companionAnimation;
@@ -80,6 +83,24 @@ class Prototype
     const char* SpiritStory(int type) const
     {
         return SpiritCatalog::Get(type).story;
+    }
+
+    bool UsingSpiritModel(int species) const
+    {
+        return useSpiritModels && species >= 0 && species < SpiritCatalog::Count &&
+               spiritModelSheets[species].Ready();
+    }
+
+    bool UsingSpiritModels() const
+    {
+        for (int species = 0; species < SpiritCatalog::Count; ++species)
+        {
+            if (UsingSpiritModel(species))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     int width = 1280, height = 800;
@@ -446,6 +467,13 @@ class Prototype
     bool StoryPersonVisible(const StoryLayout::Site& site, WorldPoint position) const;
     void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
     void Wisp(int type, WorldPoint position);
+    bool DrawSpiritModel(int species,
+                         Point feet,
+                         float size,
+                         SpriteAnimation animation,
+                         Color tint,
+                         float motionClock,
+                         float castProgress = -1.f);
 
     struct EnemyVisual
     {
@@ -653,6 +681,25 @@ class Prototype
             }
             if (!spiritSheets[i].Load(SpiritCatalog::Get(i).sprite, speciesLayout))
                 std::cerr << "주령 이미지 로드 실패: " << SpiritName(i) << std::endl;
+        }
+        for (int species = 0; species < SpiritCatalog::Count; ++species)
+        {
+            const auto& appearance = SpiritAppearance::Get(species);
+            SpriteLayout modelLayout;
+            modelLayout.columns = SpiritAppearance::Columns;
+            modelLayout.rows = SpiritAppearance::Rows;
+            modelLayout.directionRows = {{0, 1, 2, 3, 4, 5, 6, 7}};
+            modelLayout.firstWalkFrame = 0;
+            modelLayout.walkFrames = SpiritAppearance::Columns;
+            modelLayout.fixedCanvas = true;
+            modelLayout.blendWalkFrames = false;
+            modelLayout.canvasAnchorY = appearance.anchorY;
+            modelLayout.canvasCharacterHeight = appearance.characterHeight;
+            if (!spiritModelSheets[species].Load(appearance.sprite, modelLayout))
+            {
+                std::cerr << "주령 입체 외형 로드 실패, 기존 원화 사용: " << SpiritName(species)
+                          << std::endl;
+            }
         }
         SpriteLayout encounterLayout;
         encounterLayout.directionRows = {{0, 2, 2, 2, 3, 1, 1, 1}};

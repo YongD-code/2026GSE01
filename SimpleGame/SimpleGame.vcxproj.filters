@@ -45,6 +45,8 @@
     <ClInclude Include="ShaderFiles.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="SpriteSheet.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="CharacterModel.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ForgottenAppearance.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="SpiritAppearance.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="EnvironmentGeometry.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>헤더 파일</Filter>
