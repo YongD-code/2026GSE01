@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="CharacterModel.h" />
+    <ClInclude Include="EnvironmentGeometry.h" />
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
     <ClInclude Include="StoryLayout.h" />

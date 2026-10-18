@@ -436,8 +436,8 @@ class Prototype
     }
 
     void House(const Object& o);
-    void Tree(const Object& o);
-    void Stone(const Object& o);
+    void Tree(const Object& o, int variant);
+    void Stone(const Object& o, int variant);
     void DrawPlayer(WorldPoint pos);
     void StoryProp(const StoryLayout::Site& site, WorldPoint at);
     void StoryFacade(const Object& building);

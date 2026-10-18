@@ -112,26 +112,32 @@ void Prototype::DrawObject(const Object& o)
         bounds.y - radiusY - o.h - 75 > height)
         return;
     Object visual = o;
+    const int variant = o.kind == 0
+                            ? 0
+                            : static_cast<int>(World::Hash(static_cast<World::Coordinate>(o.x),
+                                                           static_cast<World::Coordinate>(o.y),
+                                                           774) %
+                                               3);
     float scale = 1.f;
     if (o.kind == 1)
     {
         visual.w = 18;
         visual.d = 18;
-        visual.h = static_cast<int>(o.h) % 3 == 0 ? 90 : 91;
+        visual.h = 90;
         scale = static_cast<float>(o.h / visual.h);
     }
-    const std::string meshKey = "object:shared-v4:" + std::to_string(visual.kind) + ":" +
+    const std::string meshKey = "object:shared-v5:" + std::to_string(visual.kind) + ":" +
                                 std::to_string(visual.w) + ":" + std::to_string(visual.d) + ":" +
-                                std::to_string(visual.h);
+                                std::to_string(visual.h) + ":" + std::to_string(variant);
     const Point origin = Screen(o.x, o.y);
     if (r.BeginCachedMesh(meshKey, origin))
     {
         if (o.kind == 0)
             House(o);
         else if (o.kind == 1)
-            Tree(visual);
+            Tree(visual, variant);
         else
-            Stone(o);
+            Stone(o, variant);
         r.EndCachedMesh();
     }
     const Point drawOrigin = o.kind == 1 ? Screen(o.x + (o.w - visual.w * scale) * .5,

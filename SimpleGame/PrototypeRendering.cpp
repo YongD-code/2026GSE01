@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Prototype.h"
+#include "EnvironmentGeometry.h"
 #include "PrototypeStoryProps.inl"
 
 void Prototype::House(const Object& o)
@@ -178,7 +179,7 @@ void Prototype::House(const Object& o)
            Color(.37f, .38f, .35f));
 }
 
-void Prototype::Stone(const Object& o)
+void Prototype::Stone(const Object& o, int variant)
 {
     // Tall existing markers become lanterns; broad obstacles remain natural stone.
     // Both use their existing collision footprint and SceneGraph actor.
@@ -206,7 +207,18 @@ void Prototype::Stone(const Object& o)
                top);
     };
 
-    if (o.h > (std::max)(o.w, o.d) * 1.65)
+    const Point ground = Screen(o.x + o.w * .5, o.y + o.d * .5);
+    r.Ellipse(ground.x + 3,
+              ground.y + 2,
+              float((o.w + o.d) * .46),
+              float((o.w + o.d) * .17),
+              Color(.035f, .045f, .035f, .22f));
+    r.Ellipse(ground.x,
+              ground.y,
+              float((o.w + o.d) * .32),
+              float((o.w + o.d) * .12),
+              Color(.025f, .035f, .025f, .42f));
+    if (o.w <= 26 && o.d <= 26 && o.h > (std::max)(o.w, o.d) * 1.65)
     {
         tier(0, 0, .10, Color(.39f, .42f, .38f));
         tier(.10, .10, .18, Color(.32f, .36f, .33f));
@@ -228,68 +240,126 @@ void Prototype::Stone(const Object& o)
         return;
     }
 
-    const Point a = point(.06, .28, .15);
-    const Point b = point(.28, .06, .35);
-    const Point c = point(.80, .12, .26);
-    const Point d = point(.98, .65, .08);
-    const Point e = point(.64, .98, .04);
-    const Point f = point(.08, .82, .07);
-    const Point peak = point(.43, .42, 1);
-    const Point shoulder = point(.77, .56, .72);
-    r.Triangle(a, b, peak, Color(.34f, .38f, .37f));
-    r.Triangle(b, c, peak, Color(.43f, .46f, .42f));
-    r.Triangle(c, shoulder, peak, Color(.36f, .40f, .38f));
-    r.Triangle(c, d, shoulder, Color(.22f, .27f, .28f));
-    r.Triangle(d, e, shoulder, Color(.17f, .22f, .24f));
-    r.Triangle(e, f, peak, Color(.29f, .34f, .32f));
-    r.Triangle(e, peak, shoulder, Color(.25f, .30f, .29f));
-    r.Triangle(f, a, peak, Color(.32f, .37f, .34f));
-    // Moss follows the rock facets rather than floating above the silhouette.
-    r.Triangle(a, b, point(.36, .35, .79), Color(.22f, .32f, .20f));
-    r.Triangle(f, point(.20, .65, .37), point(.34, .87, .20), Color(.19f, .28f, .18f));
-    r.Line(peak, point(.52, .68, .46), 1, Color(.16f, .21f, .21f));
-    r.Line(point(.52, .68, .46), e, 1, Color(.19f, .24f, .23f));
+    EnvironmentGeometry::Solid solid;
+    using Vertex = EnvironmentGeometry::Vertex;
+    constexpr int sides = 10;
+    auto vertex = [&](int ring, int i)
+    {
+        const double a = i * 6.283185307179586 / sides + variant * .31;
+        const double radius[] = {.45, .48, .30};
+        const double heights[] = {.015, .42, .86};
+        const double chip = 1 + .07 * std::sin(i * 2.7 + ring + variant);
+        return Vertex{o.x + o.w * (.5 + std::cos(a) * radius[ring] * chip - ring * .025),
+                      o.y + o.d * (.5 + std::sin(a) * radius[ring] * chip),
+                      o.h * (heights[ring] + (ring ? .045 * std::sin(i * 1.9 + variant) : 0))};
+    };
+    for (int ring = 0; ring < 2; ++ring)
+        for (int i = 0; i < sides; ++i)
+        {
+            const auto a = vertex(ring, i), b = vertex(ring, i + 1);
+            const auto c = vertex(ring + 1, i + 1), d = vertex(ring + 1, i);
+            const bool moss = ring == 1 && (i + variant * 2) % 5 <= 1;
+            const Color stone =
+                moss ? Color(.22f, .30f, .17f) : Color(.37f + variant * .025f, .40f, .37f);
+            solid.Quad(a, b, c, d, stone);
+            // Inset veins and chips sit on the facet instead of floating above its plane.
+            const Vertex p = EnvironmentGeometry::Scale(EnvironmentGeometry::Add(a, d), .5);
+            const Vertex q = EnvironmentGeometry::Scale(EnvironmentGeometry::Add(b, c), .5);
+            if ((i + ring + variant) % 3 == 0)
+            {
+                const Vertex toward = EnvironmentGeometry::Scale(
+                    EnvironmentGeometry::Add(c, EnvironmentGeometry::Scale(a, -1)), .012);
+                solid.Triangle(p, q, EnvironmentGeometry::Add(q, toward), Color(.19f, .23f, .20f));
+            }
+        }
+    const Vertex top = {o.x + o.w * .43, o.y + o.d * .47, o.h * .94};
+    for (int i = 0; i < sides; ++i)
+        solid.Triangle(top,
+                       vertex(2, i),
+                       vertex(2, i + 1),
+                       (i + variant) % 4 == 0 ? Color(.26f, .34f, .19f) : Color(.44f, .46f, .40f));
+    solid.Draw(r,
+               [this](Vertex v)
+               {
+                   return Screen(v.x, v.y, v.z);
+               });
+    // Small fragments overlap the contact shadow and lock the silhouette to the ground.
+    for (int i = 0; i < 4; ++i)
+    {
+        const double a = i * 1.8 + variant;
+        const Point p =
+            Screen(o.x + o.w * (.5 + .54 * std::cos(a)), o.y + o.d * (.5 + .54 * std::sin(a)), 1);
+        r.Triangle({p.x - 3, p.y}, {p.x, p.y - 3}, {p.x + 4, p.y + 1}, Color(.28f, .32f, .27f));
+    }
 }
 
-void Prototype::Tree(const Object& o)
+void Prototype::Tree(const Object& o, int variant)
 {
     const double cx = o.x + o.w * .5;
     const double cy = o.y + o.d * .5;
     const Point base = Screen(cx, cy);
-    const bool cedar = static_cast<int>(o.h) % 3 == 0;
-    const Color bark(.22f, .19f, .15f);
-    r.Ellipse(base.x, base.y, 22, 9, Color(.035f, .065f, .055f, .45f));
-    const Point bend = Screen(cx - 4, cy + 2, o.h * .53);
-    const Point crown = Screen(cx + 3, cy, o.h * .90);
-    r.Line(base, bend, 7, bark);
-    r.Line(bend, crown, 4, Color(.29f, .25f, .19f));
-    r.Line(Screen(cx + 2, cy, 3), Screen(cx - 2, cy + 2, o.h * .50), 1, Color(.42f, .36f, .25f));
-    for (int root = 0; root < 3; ++root)
+    const Color bark(.29f, .225f, .145f);
+    r.Ellipse(base.x + 11, base.y + 5, 30, 10, Color(.02f, .04f, .03f, .15f));
+    r.Ellipse(base.x, base.y + 1, 17, 6, Color(.10f, .12f, .075f, .70f));
+    r.Ellipse(base.x, base.y, 11, 4, Color(.02f, .035f, .02f, .42f));
+    EnvironmentGeometry::Solid solid;
+    using Vertex = EnvironmentGeometry::Vertex;
+    const Vertex foot = {cx, cy, 0};
+    const Vertex bend = {cx - 2 + variant, cy + 1, o.h * .46};
+    const Vertex crown = {cx + 2, cy - 1, o.h * .94};
+    solid.Taper(foot, bend, 5.5, 3.3, bark, 12);
+    solid.Taper(bend, crown, 3.3, .7, bark, 10);
+    for (int i = 0; i < 6; ++i)
     {
-        r.Line(base, Screen(o.x + o.w * root * .5, o.y + o.d, 0), 3, bark);
+        const double a = i * 1.0471975512 + variant * .3;
+        solid.Taper({cx + std::cos(a) * 12, cy + std::sin(a) * 12, .6},
+                    {cx + std::cos(a) * 2, cy + std::sin(a) * 2, 9},
+                    .7,
+                    2.5,
+                    bark,
+                    6);
     }
-
-    // Layered cedar crowns and asymmetric pine boughs share the same tree actor.
-    for (int layer = 0; layer < 4; ++layer)
+    for (int i = 0; i < 5; ++i)
     {
-        const double height = o.h * (.40 + layer * .16);
-        const double side = layer % 2 == 0 ? -1 : 1;
-        const double spread = cedar ? 30 - layer * 5 : 27 - layer * 3;
-        const Point center = Screen(cx + (cedar ? 0 : side * 10), cy, height);
-        const Point trunk = Screen(cx, cy, height - 8);
-        r.Line(trunk, {center.x + float(side * spread * .6), center.y}, 3, bark);
-        const Point left = {center.x - float(spread), center.y + 3};
-        const Point right = {center.x + float(spread), center.y + 3};
-        const Point top = {center.x + float(side * 4), center.y - float(cedar ? 27 : 13)};
-        r.Triangle(left, right, top, Color(.085f, .17f, .14f));
-        r.Triangle(left, {center.x, center.y + 8}, right, Color(.055f, .12f, .105f));
-        r.Triangle(
-            {left.x + 5, left.y - 1}, {right.x - 9, right.y - 3}, top, Color(.15f, .24f, .18f));
-        for (int needle = 0; needle < 5; ++needle)
+        const double a = .16 + i * .29;
+        solid.Taper({cx + 5.3 * std::cos(a), cy + 5.3 * std::sin(a), 3},
+                    {cx - 1 + 3.3 * std::cos(a), cy + 1 + 3.3 * std::sin(a), o.h * .39},
+                    .18,
+                    .12,
+                    Color(.16f, .12f, .08f),
+                    4);
+    }
+    const bool cedar = variant == 0;
+    const int tiers = cedar ? 6 : 4;
+    for (int layer = 0; layer < tiers; ++layer)
+    {
+        const double t = double(layer) / (tiers - 1);
+        const double z = o.h * (.43 + t * .48);
+        const double spread = cedar ? 25 - t * 18 : 27 - t * 9;
+        const double a = layer * 2.39996 + variant;
+        const double offset = cedar ? 2 : 12;
+        const Vertex tip = {cx + std::cos(a) * offset, cy + std::sin(a) * offset, z};
+        solid.Taper({cx - 1, cy, z - 12}, tip, 1.6, .55, bark, 7);
+        const Color needles = variant == 2 ? Color(.18f, .28f, .135f) : Color(.12f, .235f, .18f);
+        solid.Foliage(tip, spread, spread * .78, cedar ? 13 : 9, layer + variant * 13, needles);
+        if (!cedar)
         {
-            const float nx = center.x - float(spread * .7) + float(needle * spread * .32);
-            r.Line({nx, center.y}, {nx - 3, center.y - 5}, 1, Color(.25f, .32f, .22f));
+            const Vertex side = {
+                tip.x + std::cos(a + 1.6) * 11, tip.y + std::sin(a + 1.6) * 11, z - 3};
+            solid.Foliage(side, spread * .65, spread * .52, 6, layer + 9, needles);
         }
+    }
+    solid.Draw(r,
+               [this](Vertex v)
+               {
+                   return Screen(v.x, v.y, v.z);
+               });
+    for (int i = 0; i < 6; ++i)
+    {
+        const double a = i * 1.7 + variant;
+        const Point p = Screen(cx + std::cos(a) * 14, cy + std::sin(a) * 12);
+        r.Line({p.x - 2, p.y + 1}, {p.x + 3, p.y - 1}, 1, Color(.28f, .25f, .15f));
+        r.Triangle({p.x - 2, p.y}, {p.x, p.y - 4}, {p.x + 1, p.y + 1}, Color(.18f, .27f, .13f));
     }
 }
 
