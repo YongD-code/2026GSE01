@@ -1,0 +1,43 @@
+{
+  "label": "B · 기다리는 등불",
+  "style": "round_lantern",
+  "status": "candidate_not_applied",
+  "source": "Art\\Blender\\SpiritStudy\\Variants\\round_lantern\\candidate.blend",
+  "bones": 16,
+  "camera": {
+    "resolution": [
+      560,
+      700
+    ],
+    "orthoScale": 4.8,
+    "azimuth": 0.42
+  },
+  "meshParts": 159,
+  "materials": "cel bands / fine fabric and metal grain / procedural volume flame",
+  "wholeModelRebuilt": true,
+  "reviewDirections": 8,
+  "motionFrames": 16,
+  "gameBuildRunTested": false,
+  "gameAssetsModified": false,
+  "runtimeIntegrated": false,
+  "protectedBefore": {
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "Art\\Blender\\SpiritStudy\\candidate_perspective.png": "bbe7d94972ecebcb4268875095be095be68a7b28297fab09bbe34e751373d2b6",
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "SimpleGame\\SpiritCatalog.h": "27998d8419819d8abc6c9070c4d1b399ff9bd479d3ab6b67578ad84ba7089dea",
+    "SimpleGame\\PrototypeRendering.cpp": "5212b6ad3eecc43a1fdd54da0b81618deb1fc9201614a84dcc03956c704fbbc5"
+  },
+  "protectedAfter": {
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "Art\\Blender\\SpiritStudy\\candidate_perspective.png": "bbe7d94972ecebcb4268875095be095be68a7b28297fab09bbe34e751373d2b6",
+    "SimpleGame\\Assets\\Spirits\\ash_lantern_4dir.png": "abcb8d98c5d1d153f16c2da945b7be5d7d4fc17a1ee3ffd204066765f1ef6464",
+    "SimpleGame\\SpiritCatalog.h": "27998d8419819d8abc6c9070c4d1b399ff9bd479d3ab6b67578ad84ba7089dea",
+    "SimpleGame\\PrototypeRendering.cpp": "5212b6ad3eecc43a1fdd54da0b81618deb1fc9201614a84dcc03956c704fbbc5"
+  },
+  "reviewFiles": [
+    "turnaround.png",
+    "direction_study.png"
+  ],
+  "emptyDirectionCells": 0,
+  "clippedDirectionCells": 0
+}

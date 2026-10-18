@@ -103,7 +103,7 @@ class FrameProfiler
                 s.events << s.startup.str();
                 s.startup.str("");
                 std::ofstream metadata((stem + L"-session.txt").c_str());
-                metadata << "schema=1\npatch=1.0.77v\nbatching="
+                metadata << "schema=1\npatch=1.0.78v\nbatching="
                          << RenderStorage::Enabled(L"GSE_RENDER_BATCH")
                          << "\ndisk_cache=" << RenderStorage::Enabled(L"GSE_MESH_DISK_CACHE")
                          << "\nGL_VENDOR=" << glGetString(GL_VENDOR)
