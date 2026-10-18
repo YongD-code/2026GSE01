@@ -28,7 +28,20 @@ bool ResidentQuestTarget(int id) const
 
 bool ResidentNameVisible(const Population::Person& person) const
 {
-    return ResidentQuestTarget(person.id) || (dialoguePending && talkingResident == person.id);
+    return ResidentVisible(person) &&
+           (ResidentQuestTarget(person.id) || (dialoguePending && talkingResident == person.id));
+}
+
+bool ResidentVisible(const Population::Person& person) const
+{
+    if (person.health <= 0 || person.role < 0 || person.role >= 4 ||
+        !CharacterInView(person.position, 67))
+    {
+        return false;
+    }
+    return (useGathererStudy && person.role == Population::Farmer && gathererSheet.Ready()) ||
+           (person.animation.moving && populationWalkSheets[person.role].Ready()) ||
+           populationSheets[person.role].Ready();
 }
 
 const Population::Person* NearbyResident() const
@@ -171,9 +184,11 @@ void SyncPopulationHealth()
 
 void DrawResident(const Population::Person& person)
 {
-    Point p = Screen(person.position.x, person.position.y);
-    if (p.x < -100 || p.x > width + 100 || p.y < -30 || p.y > height + 130)
+    if (!ResidentVisible(person))
+    {
         return;
+    }
+    Point p = Screen(person.position.x, person.position.y);
     const float shade = .88f + (person.id % 4) * .04f;
     r.Ellipse(p.x, p.y, 13, 5, Color(0, 0, 0, .22f));
     const bool study =

@@ -208,18 +208,17 @@ class Population
             p.animation.moving = true;
             const double stride = p.role == Hunter ? 50. : p.role == Merchant ? 48. : 44.;
             p.animation.phase = std::fmod(p.animation.phase + float(distance * 8 / stride), 8.f);
-            if (std::hypot(p.visualVelocity.x, p.visualVelocity.y) > 1)
+            const double quarter = .7853981633974483;
+            // Face the displacement actually taken this step. A filtered velocity can
+            // still point backwards just after a turn or when leaving a blocked route.
+            const double angle = std::atan2(-(dx - dy) * .85, (dx + dy) * .43);
+            const double difference =
+                std::remainder(angle - int(p.animation.facing) * quarter, 6.283185307179586);
+            // Small steering/separation corrections must not flip the portrait every step.
+            if (first || std::abs(difference) > quarter * .5 + .12)
             {
-                const double quarter = .7853981633974483;
-                const double angle = std::atan2(-p.visualVelocity.x, p.visualVelocity.y);
-                const double difference =
-                    std::remainder(angle - int(p.animation.facing) * quarter, 6.283185307179586);
-                // Small steering/separation corrections must not flip the portrait every step.
-                if (first || std::abs(difference) > quarter * .5 + .12)
-                {
-                    const int direction = (int(std::floor(angle / quarter + .5)) + 8) % 8;
-                    p.animation.facing = static_cast<Facing>(direction);
-                }
+                const int direction = (int(std::floor(angle / quarter + .5)) + 8) % 8;
+                p.animation.facing = static_cast<Facing>(direction);
             }
         }
         else

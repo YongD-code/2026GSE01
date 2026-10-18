@@ -90,6 +90,11 @@ inline bool Visible(const Site& site, const Chapter& chapter)
            (site.until.empty() || chapter.step < chapter.Index(site.until));
 }
 
+inline float PersonHeight(const Site& site)
+{
+    return site.kind == Kind::Child ? 55.f : 78.f;
+}
+
 inline const std::vector<WorldObject>& Buildings()
 {
     static const std::vector<WorldObject> buildings = {{0, 140, -220, 115, 100, 85},

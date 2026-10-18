@@ -347,7 +347,12 @@ void Prototype::SynchronizeScene()
                      }
                  });
         }
-        bind("story/" + site.id,
+        const std::string bodyId = "story/" + site.id;
+        if (site.kind != StoryLayout::Kind::Evidence && !StoryPersonVisible(site, site.position))
+        {
+            continue;
+        }
+        bind(bodyId,
              "story",
              site.position,
              site.kind == StoryLayout::Kind::Evidence ? ActorLayer::World : ActorLayer::Character,
@@ -355,12 +360,6 @@ void Prototype::SynchronizeScene()
              {
                  const auto pos = node.WorldPosition();
                  const WorldPoint at = {pos.x, pos.y};
-                 const Point screen = Screen(pos.x, pos.y);
-                 if (screen.x < -90 || screen.x > width + 90 || screen.y < -40 ||
-                     screen.y > height + 120)
-                 {
-                     return;
-                 }
                  if (site.kind != StoryLayout::Kind::Evidence)
                  {
                      StoryPerson(site, at);
@@ -370,36 +369,31 @@ void Prototype::SynchronizeScene()
                      StoryProp(site, at);
                  }
              });
-        bind("story-label/" + site.id,
-             "story",
-             site.position,
-             ActorLayer::WorldLabel,
-             [this, site](const Actor& node)
-             {
-                 const auto pos = node.WorldPosition();
-                 const WorldPoint at = {pos.x, pos.y};
-                 const bool missing =
-                     site.kind != StoryLayout::Kind::Evidence &&
-                     (site.spriteIndex < 0 || !storyNpcSheets[site.spriteIndex].Ready());
-                 if (missing)
-                 {
-                     DrawWorldLabel(at, 60, "외형 로드 실패", Color(1.f, .5f, .5f));
-                 }
-                 if (site.kind != StoryLayout::Kind::Evidence || Distance(player, at) < 130)
-                 {
-                     DrawWorldLabel(at,
-                                    site.kind == StoryLayout::Kind::Evidence ? 40.f : 85.f,
-                                    site.name,
-                                    Color(.95f, .9f, .72f));
-                 }
-             });
+        bind(
+            "story-label/" + site.id,
+            bodyId,
+            site.position,
+            ActorLayer::WorldLabel,
+            [this, site](const Actor& node)
+            {
+                const auto pos = node.WorldPosition();
+                const WorldPoint at = {pos.x, pos.y};
+                const bool evidence = site.kind == StoryLayout::Kind::Evidence;
+                if ((!evidence && StoryPersonVisible(site, at)) ||
+                    (evidence && StoryLayout::Visible(site, chapter) && Distance(player, at) < 130))
+                {
+                    DrawWorldLabel(at,
+                                   evidence ? 40.f : StoryLayout::PersonHeight(site) + 12.f,
+                                   site.name,
+                                   Color(.95f, .9f, .72f));
+                }
+            });
     }
     scene.Ensure("residents", "world");
     for (size_t i = 0; i < population.people.size(); ++i)
     {
         const auto& person = population.people[i];
-        const Point p = Screen(person.position.x, person.position.y);
-        if (p.x < -140 || p.x > width + 140 || p.y < -80 || p.y > height + 160)
+        if (!ResidentVisible(person))
             continue;
         const std::string id = "residents/" + std::to_string(person.id);
         bind(id,
@@ -412,15 +406,18 @@ void Prototype::SynchronizeScene()
              });
         if (ResidentNameVisible(person))
             bind(id + "/label",
-                 "residents",
+                 id,
                  person.position,
                  ActorLayer::WorldLabel,
-                 [this, i](const Actor&)
+                 [this, i](const Actor& node)
                  {
                      const auto& npc = population.people[i];
                      if (ResidentNameVisible(npc))
+                     {
+                         const auto at = node.WorldPosition();
                          DrawWorldLabel(
-                             npc.position, 88, Population::Name(npc.id), Color(.75f, .94f, .83f));
+                             {at.x, at.y}, 79, Population::Name(npc.id), Color(.75f, .94f, .83f));
+                     }
                  });
     }
     if (captured)

@@ -442,6 +442,8 @@ class Prototype
     void StoryProp(const StoryLayout::Site& site, WorldPoint at);
     void StoryFacade(const Object& building);
     void StoryPerson(const StoryLayout::Site& site, WorldPoint position);
+    bool CharacterInView(WorldPoint position, float bodyHeight) const;
+    bool StoryPersonVisible(const StoryLayout::Site& site, WorldPoint position) const;
     void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
     void Wisp(int type, WorldPoint position);
 
