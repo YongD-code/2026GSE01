@@ -1,5 +1,6 @@
 #pragma once
 #include "LevelOne.h"
+#include "Population.h"
 #include <iomanip>
 #include <locale>
 #include <limits>
@@ -17,12 +18,15 @@ class SaveGame
         std::uint64_t seed = 0, story = 0;
         WorldPoint player = {0, 0}, spirit = {0, 0}, keeper = {0, 0};
         LevelOne level;
+        std::vector<Population::Person> residents;
         Chapter chapter;
         int companion = 0, facing = 0;
         bool controlling = false, dialogue = false;
         bool hud = true, shake = true, post = true, bloom = true;
         std::string speaker, message;
         float messageTime = 0;
+        bool spiritEquipped = true;
+        float skillTimers[5][4] = {};
     };
 
     enum class Result
@@ -142,7 +146,7 @@ class SaveGame
         }
     };
 
-    static bool Transfer(Archive& a, State& s)
+    static bool Transfer(Archive& a, State& s, int version = 6)
     {
         auto& l = s.level;
         auto& c = s.chapter;
@@ -179,6 +183,10 @@ class SaveGame
                  l.selectedTicket,
                  l.saintRemains,
                  l.skillsUsed);
+        if (version >= 5)
+        {
+            a.Fields(l.gold, l.potions, l.weaponStones, l.spoils);
+        }
         for (int& ticket : l.tickets)
         {
             a.Field(ticket);
@@ -226,9 +234,13 @@ class SaveGame
         for (auto& spirit : l.collection)
         {
             a.Fields(spirit.species, spirit.rarity, spirit.memory);
+            if (version >= 3)
+            {
+                a.Fields(spirit.health);
+            }
         }
         count = l.resolvedBosses.size();
-        if (!a.Count(count, 4))
+        if (!a.Count(count, 12))
         {
             return false;
         }
@@ -238,7 +250,7 @@ class SaveGame
             {
                 int id = 0;
                 a.Field(id);
-                if (id < 1 || id > 4 || !l.resolvedBosses.insert(id).second)
+                if (id < 1 || id > 12 || !l.resolvedBosses.insert(id).second)
                 {
                     return false;
                 }
@@ -286,7 +298,7 @@ class SaveGame
             }
         }
         count = l.enemies.size();
-        if (!a.Count(count, 128))
+        if (!a.Count(count, 512))
         {
             return false;
         }
@@ -307,9 +319,17 @@ class SaveGame
                      e.weakened,
                      e.boss,
                      e.slowed);
+            if (version >= 4)
+            {
+                a.Fields(e.remnantTime, e.remnantRarity);
+            }
             // Snapshots are accepted only outside combat. Resume idle actors without attack phases.
             if (a.reading)
             {
+                if (e.boss == 4)
+                {
+                    e.type = SpiritCatalog::Saint;
+                }
                 e.trail.push_back(e.home);
                 if (LevelOne::Distance(e.home, e.position) > .001)
                 {
@@ -337,6 +357,57 @@ class SaveGame
             }
             item.kind = static_cast<LevelOne::LootKind>(kind);
         }
+        if (version >= 2)
+        {
+            a.Field(s.spiritEquipped);
+            for (auto& set : s.skillTimers)
+            {
+                for (float& timer : set)
+                {
+                    a.Field(timer);
+                }
+            }
+        }
+        else
+        {
+            for (auto& set : s.skillTimers)
+            {
+                for (float& timer : set)
+                {
+                    timer = s.level.skillCooldown;
+                }
+            }
+        }
+        if (version >= 6)
+        {
+            size_t residents = s.residents.size();
+            if (!a.Count(residents, 40))
+                return false;
+            if (a.reading)
+                s.residents.resize(residents);
+            for (auto& person : s.residents)
+            {
+                a.Fields(person.id,
+                         person.role,
+                         person.district,
+                         person.gold,
+                         person.earned,
+                         person.kills,
+                         person.goods,
+                         person.health,
+                         person.stamina,
+                         person.cycle);
+                a.Point(person.position);
+                a.Point(person.home);
+                a.Point(person.workplace);
+                if (a.reading)
+                {
+                    person.destination = person.position;
+                    person.action = Population::Resting;
+                    person.timer = 1 + person.id % 6;
+                }
+            }
+        }
         return bool(a.stream);
     }
 
@@ -358,6 +429,29 @@ class SaveGame
 
     static bool Validate(const State& s, const Chapter& authored)
     {
+        if (!s.residents.empty() && s.residents.size() != 40)
+            return false;
+        for (size_t i = 0; i < s.residents.size(); ++i)
+        {
+            const auto& person = s.residents[i];
+            if (person.id != int(i) || !Number(person.role, 0, 3) ||
+                !Number(person.district, 0, 4) || !Number(person.gold, 0, 1000000000) ||
+                !Number(person.earned, 0, 1000000000) || !Number(person.kills, 0, 1000000000) ||
+                !Number(person.goods, 0, 1000000) || !Number(person.health, 0, 100) ||
+                !Number(person.stamina, 0, 100) || !Point(person.position) || !Point(person.home) ||
+                !Point(person.workplace))
+                return false;
+        }
+        for (const auto& set : s.skillTimers)
+        {
+            for (float timer : set)
+            {
+                if (!Number(timer, 0, 1000))
+                {
+                    return false;
+                }
+            }
+        }
         const auto& l = s.level;
         const auto& c = s.chapter;
         if (authored.quests.empty() || s.story != StoryHash(authored) || !Point(s.player) ||
@@ -365,12 +459,17 @@ class SaveGame
             !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
             !Number(l.experience, 0, l.RequiredExperience() - 1) ||
             !Number(l.health, .001, l.MaximumHealth()) || !Number(l.weapon, 0, 20) ||
+            !Number(l.gold, 0, 100000000) || !Number(l.potions, 0, 1000000) ||
+            !Number(l.weaponStones, 0, 1000000) || !Number(l.spoils, 0, 1000000) ||
             !Number(l.spiritRank, 0, 10) || !Number(l.failedUpgrades, 0, 3) ||
-            !Number(l.selectedTicket, 0, 2) || !Number(c.step, 0, authored.quests.size()) ||
-            !Number(c.baselineKills, 0, l.kills) ||
-            !Number(c.baselineCaptures, 0, l.collection.size()) ||
-            !Number(s.companion, 0, l.collection.empty() ? 0 : l.collection.size() - 1) ||
-            (s.controlling && l.collection.empty()) || (c.choicePending && c.step != 0))
+            !Number(l.selectedTicket, 0, 2) || c.step < 0 ||
+            static_cast<size_t>(c.step) > authored.quests.size() ||
+            !Number(c.baselineKills, 0, l.kills) || c.baselineCaptures < 0 ||
+            static_cast<size_t>(c.baselineCaptures) > l.collection.size() || s.companion < 0 ||
+            (l.collection.empty() ? s.companion != 0
+                                  : static_cast<size_t>(s.companion) >= l.collection.size()) ||
+            (s.controlling && l.collection.empty()) ||
+            (c.choicePending && c.step != authored.Index("P001_WITNESS")))
         {
             return false;
         }
@@ -398,7 +497,8 @@ class SaveGame
         }
         for (const auto& spirit : l.collection)
         {
-            if (!Number(spirit.species, 0, 3) || !Number(spirit.rarity, 1, 4))
+            if (!Number(spirit.species, 0, SpiritCatalog::Count - 1) ||
+                !Number(spirit.rarity, 1, 4) || !Number(spirit.health, 0, 100))
             {
                 return false;
             }
@@ -423,15 +523,18 @@ class SaveGame
         std::set<int> bosses;
         for (const auto& e : l.enemies)
         {
-            if (!Point(e.position) || !Point(e.home) || !Key(e.camp) || !Number(e.type, 0, 2) ||
-                !Number(e.slot, 0, 3) || !Number(e.boss, 0, 4) || !Number(e.maximum, 1, 1000000) ||
-                !Number(e.health, .001, e.maximum) || !Number(e.slowed, 0, 1000))
+            if (!Point(e.position) || !Point(e.home) || !Key(e.camp) ||
+                !Number(e.type, 0, SpiritCatalog::Count - 1) || !Number(e.slot, 0, 3) ||
+                !Number(e.boss, 0, 12) || !Number(e.maximum, 1, 1000000) ||
+                !Number(e.health, .001, e.maximum) || !Number(e.slowed, 0, 1000) ||
+                !Number(e.remnantTime, -2, 60) || !Number(e.remnantRarity, 1, 4))
             {
                 return false;
             }
             if (e.boss)
             {
-                if (l.resolvedBosses.count(e.boss) || !bosses.insert(e.boss).second)
+                if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
+                    !bosses.insert(e.boss).second)
                 {
                     return false;
                 }
@@ -439,7 +542,8 @@ class SaveGame
             else
             {
                 auto camp = l.camps.find(e.camp);
-                if (camp == l.camps.end() || (camp->second.defeated & (1u << e.slot)) ||
+                if (camp == l.camps.end() ||
+                    (!e.weakened && (camp->second.defeated & (1u << e.slot))) ||
                     !actors.insert({e.camp, e.slot}).second)
                 {
                     return false;
@@ -483,7 +587,9 @@ class SaveGame
         std::string magic;
         int version = 0;
         std::uint64_t checksum = 0;
-        if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" || version != 1)
+        if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" ||
+            (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 &&
+             version != 6))
         {
             return false;
         }
@@ -500,7 +606,7 @@ class SaveGame
         Archive archive(true);
         archive.stream.str(payload);
         State candidate;
-        if (!Transfer(archive, candidate))
+        if (!Transfer(archive, candidate, version))
         {
             return false;
         }
@@ -558,7 +664,7 @@ class SaveGame
             return false;
         }
         const std::string payload = archive.stream.str();
-        const std::string bytes = "GSE_SAVE 1 " + std::to_string(Hash(payload)) + "\n" + payload;
+        const std::string bytes = "GSE_SAVE 6 " + std::to_string(Hash(payload)) + "\n" + payload;
         if (bytes.size() > MaximumBytes)
         {
             return false;

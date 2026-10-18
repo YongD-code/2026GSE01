@@ -11,4 +11,7 @@
 *.lastbuildstate 
 *.suo 
 *.db 
+/Monitoring/snapshots/
+__pycache__/
+*.pyc
 

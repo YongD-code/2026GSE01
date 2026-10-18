@@ -6,6 +6,8 @@
 #include <vector>
 #include <utility>
 #include <random>
+#include <array>
+#include <algorithm>
 
 struct WorldPoint
 {
@@ -35,6 +37,10 @@ class World
 
     std::map<Key, Chunk> chunks;
     std::uint64_t seed = std::random_device{}();
+    std::vector<Key> streamAnchors;
+    std::array<Coordinate, 4> streamBounds = {{0, 0, 0, 0}};
+    std::uint64_t streamSeed = 0;
+    unsigned streamPass = 0;
 
     static Coordinate Index(double value)
     {
@@ -66,6 +72,21 @@ class World
         return std::abs(x) < 512 && std::abs(y) < 512;
     }
 
+    static const std::array<WorldPoint, 5>& Settlements()
+    {
+        static const std::array<WorldPoint, 5> hubs = {
+            {{0, 0}, {-1280, 0}, {0, 1280}, {0, -1280}, {2560, 768}}};
+        return hubs;
+    }
+
+    static bool Settlement(double x, double y)
+    {
+        for (const auto& hub : Settlements())
+            if (std::abs(x - hub.x) < 280 && std::abs(y - hub.y) < 300)
+                return true;
+        return false;
+    }
+
     Chunk& Ensure(Coordinate x, Coordinate y)
     {
         Key key = {x, y};
@@ -88,7 +109,8 @@ class World
                 // at least 30 units between cells and never enter the boundary road network.
                 double px = double(x) * ChunkSize + 85 + col * 112 + double((h >> 8) % 12);
                 double py = double(y) * ChunkSize + 85 + row * 112 + double((h >> 16) % 12);
-                if (Village(px, py))
+                if (Village(px, py) || Settlement(px, py) ||
+                    (px >= 500 && px <= 3500 && py >= -450 && py <= 400))
                     continue;
                 int kind = c.biome == 2 ? 2 : 1;
                 double w = kind == 1 ? 18 : 30, d = w,
@@ -106,20 +128,43 @@ class World
         return chunks.emplace(key, std::move(c)).first->second;
     }
 
-    void Stream(WorldPoint camera, WorldPoint actor, int width, int height)
+    void Stream(WorldPoint camera,
+                WorldPoint actor,
+                int width,
+                int height,
+                const std::vector<WorldPoint>& residents = {})
     {
         // Inverse projection of screen bounds plus roof-height and movement margins.
         double reach = width / 3.4 + height / 1.72 + 260;
         Coordinate minX = Index(camera.x - reach), maxX = Index(camera.x + reach);
         Coordinate minY = Index(camera.y - reach), maxY = Index(camera.y + reach);
+        const std::array<Coordinate, 4> bounds = {{minX, maxX, minY, maxY}};
+        std::vector<Key> anchors;
+        anchors.reserve(residents.size() + 1);
+        anchors.push_back({Index(actor.x), Index(actor.y)});
+        for (const auto& resident : residents)
+            anchors.push_back({Index(resident.x), Index(resident.y)});
+        std::sort(anchors.begin(), anchors.end());
+        anchors.erase(std::unique(anchors.begin(), anchors.end()), anchors.end());
+        // Movement within the same chunks does not change residency. Periodically trim chunks
+        // created by collision probes even when the anchors have not changed.
+        if (!chunks.empty() && streamSeed == seed && streamBounds == bounds &&
+            streamAnchors == anchors && ++streamPass < 30)
+            return;
+        streamAnchors = anchors;
+        streamBounds = bounds;
+        streamSeed = seed;
+        streamPass = 0;
         std::set<Key> needed;
         for (Coordinate y = minY; y <= maxY; ++y)
             for (Coordinate x = minX; x <= maxX; ++x)
                 needed.insert({x, y});
-        Coordinate ax = Index(actor.x), ay = Index(actor.y);
-        for (int y = -1; y <= 1; ++y)
-            for (int x = -1; x <= 1; ++x)
-                needed.insert({ax + x, ay + y});
+        for (const auto& anchor : anchors)
+        {
+            for (int y = -1; y <= 1; ++y)
+                for (int x = -1; x <= 1; ++x)
+                    needed.insert({anchor.first + x, anchor.second + y});
+        }
         for (const Key& key : needed)
             Ensure(key.first, key.second);
         for (auto it = chunks.begin(); it != chunks.end();)
@@ -134,13 +179,11 @@ class World
     bool Blocked(WorldPoint p)
     {
         Coordinate cx = Index(p.x), cy = Index(p.y);
-        // Include neighbors so object footprints remain solid at chunk boundaries.
-        for (int y = -1; y <= 1; ++y)
-            for (int x = -1; x <= 1; ++x)
-                for (const WorldObject& o : Ensure(cx + x, cy + y).objects)
-                    if (p.x > o.x - 12 && p.x < o.x + o.w + 12 && p.y > o.y - 12 &&
-                        p.y < o.y + o.d + 12)
-                        return true;
+        // Ensure() places every procedural footprint, including its 12-unit collision margin,
+        // strictly inside its own chunk. Authored buildings are checked separately by the host.
+        for (const WorldObject& o : Ensure(cx, cy).objects)
+            if (p.x > o.x - 12 && p.x < o.x + o.w + 12 && p.y > o.y - 12 && p.y < o.y + o.d + 12)
+                return true;
         return false;
     }
 

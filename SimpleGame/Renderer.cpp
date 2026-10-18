@@ -76,10 +76,10 @@ void Renderer::Resize(int width, int height)
         m_Post->Resize(m_Width, m_Height);
 }
 
-void Renderer::Begin(Color c)
+void Renderer::Begin(Color c, bool scenePostProcessing)
 {
     ++m_Frame;
-    m_InHDRScene = m_Post && m_Post->Begin(postProcess.enabled);
+    m_InHDRScene = m_Post && m_Post->Begin(postProcess.enabled && scenePostProcessing);
     if (m_InHDRScene)
     {
         c.r = std::pow(c.r, 2.2f);
@@ -267,8 +267,8 @@ void Renderer::Submit(const std::string& key, Instance instance, GLuint texture)
     const int count = static_cast<int>(mesh.vertices.size());
     // Bound padding overhead: large terrain meshes cannot inflate tiny sprite batches.
     if (!m_Instances.empty() &&
-        (m_Instances.size() >= 2048 || count > (std::max)(72, m_BatchVertices) * 4 ||
-         m_BatchVertices > (std::max)(72, count) * 4))
+        (m_Instances.size() >= 2048 || count > (std::max)(72, m_BatchVertices) * 2 ||
+         m_BatchVertices > (std::max)(72, count) * 2))
     {
         FrameProfiler::Event("batch_flush", "capacity_or_vertex_ratio", m_Instances.size());
         Flush();
@@ -299,10 +299,14 @@ void Renderer::Submit(const std::string& key, Instance instance, GLuint texture)
         Flush();
 }
 
-void Renderer::DrawCachedMesh(const std::string& key, Point origin)
+void Renderer::DrawCachedMesh(const std::string& key, Point origin, float scale)
 {
     Submit(key,
-           {{1, 0, 0, 1}, {origin.x, origin.y, 0, 0}, {1, 1, 1, 1}, {0, 0, 1, 1}, {-1, 0, 0, 0}});
+           {{scale, 0, 0, scale},
+            {origin.x, origin.y, 0, 0},
+            {1, 1, 1, 1},
+            {0, 0, 1, 1},
+            {-1, 0, 0, 0}});
 }
 
 void Renderer::Triangle(Point a, Point b, Point c, Color col)
@@ -388,19 +392,70 @@ void Renderer::Sprite(GLuint texture,
                       float u1,
                       float v1,
                       Color c,
-                      float emission)
+                      float emission,
+                      float shear,
+                      float effectPhase,
+                      bool animatedEffect,
+                      float rotation,
+                      int effectMode)
 {
-    Submit(
-        "unit:quad",
-        {{w, 0, 0, h}, {x, y, 0, 0}, {c.r, c.g, c.b, c.a}, {u0, v0, u1, v1}, {0, emission, 0, 0}},
-        texture);
+    const float cs = std::cos(rotation), sn = std::sin(rotation);
+    const float ax = w * cs, ay = w * sn;
+    const float bx = shear * cs - h * sn, by = shear * sn + h * cs;
+    Submit("unit:quad",
+           {{ax, ay, bx, by},
+            {x + (w + shear - ax - bx) * .5f, y + (h - ay - by) * .5f, 0, 0},
+            {c.r, c.g, c.b, c.a},
+            {u0, v0, u1, v1},
+            {0,
+             emission,
+             effectPhase,
+             effectMode > 0   ? float(effectMode)
+             : animatedEffect ? 3.f
+                              : 0.f}},
+           texture);
 }
 
-void Renderer::Text(float x, float y, const std::string& text, Color c, bool large)
+// Procedural translucent quad, submitted through the existing instance batch.
+void Renderer::EnergyParticle(Point center,
+                              float radiusX,
+                              float radiusY,
+                              float angle,
+                              Color color,
+                              float phase,
+                              bool turbulent)
+{
+    if (color.a <= .002f || radiusX <= 0 || radiusY <= 0 || center.x + radiusX + radiusY < 0 ||
+        center.x - radiusX - radiusY > m_Width || center.y + radiusX + radiusY < 0 ||
+        center.y - radiusX - radiusY > m_Height)
+    {
+        return;
+    }
+    const float c = std::cos(angle), s = std::sin(angle);
+    const float ax = c * radiusX * 2, ay = s * radiusX * 2;
+    const float bx = -s * radiusY * 2, by = c * radiusY * 2;
+    Submit("unit:quad",
+           {{ax, ay, bx, by},
+            {center.x - (ax + bx) * .5f, center.y - (ay + by) * .5f, 0, 0},
+            {color.r, color.g, color.b, color.a},
+            {0, 0, 1, 1},
+            {-1, .7f, phase, turbulent ? 2.f : 1.f}});
+}
+
+void Renderer::Text(float x,
+                    float y,
+                    const std::string& text,
+                    Color c,
+                    bool large,
+                    int pixelHeight,
+                    bool calligraphy)
 {
     if (text.empty())
         return;
-    const std::string key = (large ? "large:" : "normal:") + text;
+    const int fontSize =
+        pixelHeight > 0 ? (std::max)(12, (std::min)(160, pixelHeight)) : (large ? 20 : 15);
+    const std::string key = std::to_string(fontSize) + (calligraphy ? ":brush:" : ":sans:") +
+                            (large ? "bold:" : "normal:") + text;
     auto found = m_TextCache.find(key);
     if (found == m_TextCache.end())
     {
@@ -419,7 +474,7 @@ void Renderer::Text(float x, float y, const std::string& text, Color c, bool lar
         HDC dc = CreateCompatibleDC(nullptr);
         if (!dc)
             return;
-        HFONT font = CreateFontW(large ? -20 : -15,
+        HFONT font = CreateFontW(-fontSize,
                                  0,
                                  0,
                                  0,
@@ -432,7 +487,7 @@ void Renderer::Text(float x, float y, const std::string& text, Color c, bool lar
                                  CLIP_DEFAULT_PRECIS,
                                  ANTIALIASED_QUALITY,
                                  DEFAULT_PITCH,
-                                 L"Malgun Gothic");
+                                 calligraphy ? L"Gungsuh" : L"Malgun Gothic");
         if (!font)
         {
             DeleteDC(dc);

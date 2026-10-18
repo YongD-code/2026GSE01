@@ -1,15 +1,18 @@
 // Included inside Prototype. Disk state is separate from rendering and input state.
 bool CanSaveProgress() const
 {
-    if (titleScreen || levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
-        levelOne.invulnerability > 0 || !levelOne.projectiles.empty())
+    if (titleScreen || openingPlaying || levelOne.Dead() || chapter.quests.empty() ||
+        levelOne.dodgeTime > 0 || levelOne.invulnerability > 0 || !skillEffects.empty())
     {
         return false;
     }
+    for (const auto& shot : levelOne.projectiles)
+        if (!shot.residentBattle || Distance(player, shot.position) < 700)
+            return false;
     for (const auto& enemy : levelOne.enemies)
     {
         if (enemy.health > 0 && (enemy.alerted || enemy.returning || enemy.phase != 0) &&
-            !enemy.weakened)
+            !enemy.weakened && (enemy.boss != 0 || Distance(player, enemy.position) < 700))
         {
             return false;
         }
@@ -48,6 +51,18 @@ bool SaveProgress(bool manual, int slot = 0)
     state.spirit = spirit;
     state.keeper = keeper;
     state.level = levelOne;
+    state.residents = population.people;
+    for (const auto& result : levelOne.residentCombatants)
+        if (result.id >= 0 && result.id < int(state.residents.size()))
+            state.residents[result.id].health = result.health;
+    state.spiritEquipped = controlling;
+    for (int set = 0; set < 5; ++set)
+    {
+        for (int slot = 0; slot < 4; ++slot)
+        {
+            state.skillTimers[set][slot] = skillTimers[set][slot];
+        }
+    }
     state.chapter = chapter;
     state.companion = selectedCompanion;
     state.facing = static_cast<int>(protagonistAnimation.facing);
@@ -70,7 +85,7 @@ bool SaveProgress(bool manual, int slot = 0)
                   enemies.end());
     for (const auto& enemy : enemies)
     {
-        if (enemy.boss == 0)
+        if (enemy.boss == 0 && !enemy.weakened)
         {
             state.level.camps[enemy.camp].health[enemy.slot] = enemy.health;
         }
@@ -107,8 +122,8 @@ bool LoadProgress(bool startup = false, int slot = 0)
     if (result == SaveGame::Result::Invalid)
     {
         automaticSaveAllowed = false;
-        ProgressNotice(
-            "저장을 읽지 못했습니다. 자동 저장 중지 · F5는 현재 진행으로 새로 저장합니다.");
+        ProgressNotice("퀘스트 구성이 다르거나 손상된 기록입니다. 기존 슬롯을 보존하고 빈 슬롯에서 "
+                       "새 여정을 시작하세요.");
         return false;
     }
     // Validate collision using a temporary world before modifying the live session.
@@ -141,7 +156,21 @@ bool LoadProgress(bool startup = false, int slot = 0)
     state.level.LoadCombat();
     world = std::move(restoredWorld);
     levelOne = std::move(state.level);
+    population.people = std::move(state.residents);
+    population.seed = world.seed;
+    population.planningCursor = 0;
+    for (auto& person : population.people)
+    {
+        if (Blocked(person.position))
+            person.position = Population::OpenPoint(person.home,
+                                                    [this](WorldPoint p)
+                                                    {
+                                                        return Blocked(p);
+                                                    });
+        person.destination = person.position;
+    }
     chapter = std::move(state.chapter);
+    storyTrialTime = 0;
     player = state.player;
     spirit = state.spirit;
     keeper = state.keeper;
@@ -165,6 +194,17 @@ bool LoadProgress(bool startup = false, int slot = 0)
     collectionPage = 0;
     eventPage = 0;
     protagonistAnimation = SpriteAnimation();
+    ResetControls(true);
+    for (int set = 0; set < 5; ++set)
+    {
+        for (int slotIndex = 0; slotIndex < 4; ++slotIndex)
+        {
+            skillTimers[set][slotIndex] = state.skillTimers[set][slotIndex];
+        }
+    }
+    movementVelocity = {0, 0};
+    movementWasControlling = false;
+    protagonistStopTime = .08f;
     protagonistAnimation.facing = static_cast<Facing>(state.facing);
     companionAnimation = SpriteAnimation();
     moving = false;
@@ -177,6 +217,10 @@ bool LoadProgress(bool startup = false, int slot = 0)
     automaticSaveAllowed = true;
     activeSlot = slot;
     titleScreen = false;
+    openingPlaying = openingSkipping = false;
+    openingPending = false;
+    openingTime = openingExitTime = 0;
+    openingFade = .7f;
     ProgressNotice(result == SaveGame::Result::Backup ? "이전 백업에서 진행을 복구했습니다."
                                                       : "저장된 여정을 이어갑니다.");
     return true;

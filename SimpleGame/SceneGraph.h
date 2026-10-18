@@ -21,6 +21,7 @@ class SceneGraph
     T& Ensure(const std::string& id, const std::string& parentId = "")
     {
         CheckMutation();
+        orderDirty = true;
         Actor* parent = parentId.empty() ? nullptr : Find(parentId);
         if (!parentId.empty() && !parent)
             throw std::logic_error("SceneGraph parent does not exist");
@@ -61,6 +62,7 @@ class SceneGraph
         const ActorPosition position = actor->WorldPosition();
         actor->parent = parent;
         actor->SetWorldPosition(position);
+        orderDirty = true;
         return true;
     }
 
@@ -84,12 +86,14 @@ class SceneGraph
         }
         for (const auto& key : removed)
             actors.erase(key);
+        orderDirty = true;
     }
 
     void BeginSync()
     {
         CheckMutation();
         ++generation;
+        orderDirty = true;
     }
 
     void EndSync()
@@ -98,16 +102,25 @@ class SceneGraph
         std::vector<std::string> stale;
         for (const auto& entry : actors)
         {
-            if (entry.second->generation != generation)
-                stale.push_back(entry.first);
+            // Determine the entire removal set before erasing any parent pointers.
+            for (const Actor* node = entry.second.get(); node; node = node->parent)
+            {
+                if (node->generation != generation)
+                {
+                    stale.push_back(entry.first);
+                    break;
+                }
+            }
         }
         for (const auto& id : stale)
-            Remove(id);
+            actors.erase(id);
+        orderDirty = true;
     }
 
     void Update(float dt)
     {
         Traversal guard(*this);
+        orderDirty = true;
         auto ordered = Ordered();
         // Ancestors update before descendants regardless of drawing layer.
         std::stable_sort(ordered.begin(),
@@ -121,14 +134,20 @@ class SceneGraph
             if (actor->IsEnabled())
                 actor->Update(dt);
         }
+        // Callbacks may change publicly accessible transforms, layers or depth offsets.
+        orderDirty = true;
     }
 
     void Draw(bool interfacePass)
     {
         Traversal guard(*this);
+        // Rebuild on the first pass; the following label/UI pass shares exactly this ordering.
+        if (!interfacePass)
+            orderDirty = true;
         for (Actor* actor : Ordered())
         {
-            if ((actor->layer == ActorLayer::Interface) == interfacePass && actor->IsVisible())
+            // Labels render after scene post-processing, before menus and HUD.
+            if ((actor->layer >= ActorLayer::WorldLabel) == interfacePass && actor->IsVisible())
                 actor->Draw();
         }
     }
@@ -136,7 +155,9 @@ class SceneGraph
     bool PointerDown(int x, int y)
     {
         Traversal guard(*this);
+        orderDirty = true;
         const auto ordered = Ordered();
+        orderDirty = true;
         for (auto it = ordered.rbegin(); it != ordered.rend(); ++it)
         {
             if ((*it)->IsVisible() && (*it)->PointerDown(x, y))
@@ -149,6 +170,8 @@ class SceneGraph
     std::map<std::string, std::unique_ptr<Actor>> actors;
     unsigned long long generation = 0, nextSequence = 0;
     bool traversing = false;
+    bool orderDirty = true;
+    std::vector<Actor*> drawOrder;
 
     struct Traversal
     {
@@ -180,22 +203,39 @@ class SceneGraph
         return depth;
     }
 
-    std::vector<Actor*> Ordered() const
+    const std::vector<Actor*>& Ordered()
     {
-        std::vector<Actor*> result;
+        if (!orderDirty)
+            return drawOrder;
+
+        struct Entry
+        {
+            Actor* actor;
+            double depth;
+        };
+
+        std::vector<Entry> entries;
+        entries.reserve(actors.size());
         for (const auto& entry : actors)
-            result.push_back(entry.second.get());
-        std::sort(result.begin(),
-                  result.end(),
-                  [](Actor* a, Actor* b)
+        {
+            Actor* actor = entry.second.get();
+            const auto p = actor->WorldPosition();
+            entries.push_back({actor, p.x + p.y + actor->depthOffset});
+        }
+        std::sort(entries.begin(),
+                  entries.end(),
+                  [](const Entry& a, const Entry& b)
                   {
-                      if (a->layer != b->layer)
-                          return a->layer < b->layer;
-                      const auto ap = a->WorldPosition(), bp = b->WorldPosition();
-                      const double ad = ap.x + ap.y + a->depthOffset;
-                      const double bd = bp.x + bp.y + b->depthOffset;
-                      return ad == bd ? a->sequence < b->sequence : ad < bd;
+                      if (a.actor->layer != b.actor->layer)
+                          return a.actor->layer < b.actor->layer;
+                      return a.depth == b.depth ? a.actor->sequence < b.actor->sequence
+                                                : a.depth < b.depth;
                   });
-        return result;
+        drawOrder.clear();
+        drawOrder.reserve(entries.size());
+        for (const auto& entry : entries)
+            drawOrder.push_back(entry.actor);
+        orderDirty = false;
+        return drawOrder;
     }
 };

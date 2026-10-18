@@ -11,10 +11,13 @@ struct ActorPosition
 enum class ActorLayer
 {
     Terrain,
+    SkillBackdrop,
     Warning,
     World,
+    Character,
     Projectile,
     Atmosphere,
+    WorldLabel,
     Interface
 };
 

@@ -36,12 +36,12 @@ class Renderer
     }
 
     void Resize(int width, int height);
-    void Begin(Color background);
+    void Begin(Color background, bool scenePostProcessing = true);
     void Flush();
     void FinishScene();
     bool BeginCachedMesh(const std::string& key, Point origin);
     void EndCachedMesh();
-    void DrawCachedMesh(const std::string& key, Point origin);
+    void DrawCachedMesh(const std::string& key, Point origin, float scale = 1.f);
 
     bool IsHDRScene() const
     {
@@ -54,7 +54,20 @@ class Renderer
     void Rect(float x, float y, float width, float height, Color color);
     void Ellipse(float x, float y, float rx, float ry, Color color);
     void Line(Point a, Point b, float width, Color color);
-    void Text(float x, float y, const std::string& text, Color color, bool large = false);
+    void EnergyParticle(Point center,
+                        float radiusX,
+                        float radiusY,
+                        float angle,
+                        Color color,
+                        float phase,
+                        bool turbulent = false);
+    void Text(float x,
+              float y,
+              const std::string& text,
+              Color color,
+              bool large = false,
+              int pixelHeight = 0,
+              bool calligraphy = false);
     void Sprite(GLuint texture,
                 float x,
                 float y,
@@ -65,7 +78,12 @@ class Renderer
                 float u1,
                 float v1,
                 Color tint,
-                float emission = 0);
+                float emission = 0,
+                float shear = 0,
+                float effectPhase = 0,
+                bool animatedEffect = false,
+                float rotation = 0,
+                int effectMode = 0);
     void DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a);
 
   private:

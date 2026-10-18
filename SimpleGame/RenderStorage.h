@@ -42,7 +42,7 @@ inline std::uint64_t Hash(const void* bytes, size_t size)
 
 inline std::wstring MeshPath(const std::string& key)
 {
-    const auto folder = Folder(L"MeshCache-v3");
+    const auto folder = Folder(L"MeshCache-v4");
     if (folder.empty())
         return {};
     wchar_t name[64] = {};
@@ -90,7 +90,7 @@ template <class Vertex> bool Write(const std::string& key, const std::vector<Ver
     if (path.empty())
         return false;
     // Stop adding derived files at the budget; existing game saves are unrelated.
-    const auto folder = Folder(L"MeshCache-v3");
+    const auto folder = Folder(L"MeshCache-v4");
     WIN32_FIND_DATAW entry = {};
     HANDLE find = FindFirstFileW((folder + L"/*.mesh").c_str(), &entry);
     unsigned long long bytes = 0;

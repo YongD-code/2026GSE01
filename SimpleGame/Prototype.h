@@ -6,6 +6,10 @@
 #include "SaveGame.h"
 #include "SceneGraph.h"
 #include "UILayout.h"
+#include "StoryLayout.h"
+#include "ClickNavigation.h"
+#include "Monitoring.h"
+#include "Population.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -32,6 +36,9 @@ class Prototype
         Load
     };
     bool titleScreen = true, overwriteConfirm = false, exitAfterSave = false;
+    bool openingPlaying = false, openingSkipping = false, openingPending = false;
+    float frontTime = 0, openingTime = 0, openingExitTime = 0, openingFade = 0;
+    SpriteSheet presentationSheets[4];
     SlotMode slotMode = SlotMode::Closed;
     int activeSlot = 0, frontSelection = 0;
     std::string slotLabels[3];
@@ -42,45 +49,42 @@ class Prototype
     std::string saveStatus = "자동 저장 대기";
     std::vector<Object> villageObjects;
     Renderer& r;
-    SpriteSheet protagonistSheet, childSheet, keeperSheet;
-    bool blenderChild = false, blenderKeeper = false;
+    SpriteSheet protagonistSheet, domainPortrait, spiritPortraits[4], ghostFace, ghostScreamPoses,
+        ghostVariants[3], spiritSpellArt[3], spiritRealms[4];
+    SpriteSheet storyNpcSheets[StoryLayout::NpcCount];
     SpriteAnimation protagonistAnimation;
+    WorldPoint movementVelocity = {0, 0};
+    bool movementWasControlling = false;
+    float protagonistStopTime = .08f;
     SpriteSheet attackSheet, protagonistRunSheet;
     bool blenderProtagonist = false, protagonistSprinting = false;
-    SpriteSheet spiritSheets[3];
+    SpriteSheet spiritSheets[SpiritCatalog::Count];
     SpriteSheet lootSheets[5];
     SpriteAnimation companionAnimation;
-    const WorldPoint wildSpirits[3] = {{300, 160}, {-220, 250}, {220, 360}};
+    std::string serviceNpc;
+    std::vector<UIRect> occupiedLabels;
     int capturedSpirit = 0;
 
     const char* SpiritName(int type) const
     {
-        static const char* names[] = {
-            "남겨진 자", "목 없는 순례자", "기도하는 손", "기도하지 않는 성자"};
-        return names[(std::max)(0, (std::min)(type, 3))];
+        return SpiritCatalog::Get(type).name;
     }
 
     const char* SpiritStory(int type) const
     {
-        static const char* stories[] = {"눈 오는 공동묘지에서 돌아오지 않는 부모를 기다리던 아이.",
-                                        "목적지를 잃은 채 수도원으로 향하는 순례자의 기억.",
-                                        "응답 없는 기도가 모여 누군가를 지키려는 손이 되었다.",
-                                        "기도를 멈춘 성자. 검게 변한 성유물의 문장을 기억한다."};
-        return stories[(std::max)(0, (std::min)(type, 3))];
+        return SpiritCatalog::Get(type).story;
     }
 
     int width = 1280, height = 800;
     bool keys[256] = {};
-    bool arrows[4] = {};
     SceneGraph scene;
     bool sceneReady = false, requestedSprint = false;
     unsigned long long nextSceneId = 1;
     WorldPoint player = {70, 160}, spirit = {300, 160}, camera = {70, 160};
     const WorldPoint child = {-100, 90}, fire = {0, 0};
     WorldPoint keeper = {150, -100};
-    float time = 0, walk = 0, messageTime = 0;
-    bool moving = false, captured = false, controlling = false, journal = false, toySword = false;
-    int childTalk = 0;
+    float time = 0, messageTime = 0;
+    bool moving = false, captured = false, controlling = false, journal = false;
     std::string speaker, message;
 
     static double Distance(WorldPoint a, WorldPoint b)
@@ -95,6 +99,16 @@ class Prototype
         if (screenShake && levelOne.hurtTime > 0)
             x += std::sin(time * 110) * levelOne.hurtTime * 18;
         y -= camera.y;
+        if (screenShake && domainShake > 0)
+        {
+            x += std::sin(time * 63) * domainShake * 13;
+            y += std::cos(time * 79) * domainShake * 8;
+        }
+        if (screenShake && purpleShake > 0)
+        {
+            x += std::sin(time * 91) * purpleShake * 20;
+            y += std::cos(time * 77) * purpleShake * 10;
+        }
         return {static_cast<float>(width * .5 + (x - y) * .85),
                 static_cast<float>(height * .51 + (x + y) * .43 - z)};
     }
@@ -116,8 +130,14 @@ class Prototype
     void Say(const std::string& name, const std::string& text)
     {
         speaker = name;
-        message = text;
+        message = ControlText(text);
         messageTime = 8;
+    }
+
+    double SimulationRadius() const
+    {
+        // Include the projected viewport, sprite height and camera-follow margin on wide displays.
+        return (std::max)(1400., std::hypot(width / 1.7, height / .86) * .70710678 + 350);
     }
 
     bool Blocked(WorldPoint p)
@@ -132,58 +152,102 @@ class Prototype
         return false;
     }
 
-    int Nearby() const
+    float storyTrialTime = 0;
+
+    const StoryLayout::Site* NearbyStory() const
     {
         if (controlling)
-            return -1;
-        if (Distance(player, child) < 85)
-            return 0;
-        if (Distance(player, keeper) < 85)
-            return 1;
-        if (Distance(player, fire) < 85)
-            return 3;
-        return -1;
+        {
+            return nullptr;
+        }
+        const auto* quest = chapter.Current();
+        const StoryLayout::Site* closest = nullptr;
+        double nearest = 62;
+        for (const auto& site : StoryLayout::Sites())
+        {
+            if (!StoryLayout::Visible(site, chapter))
+            {
+                continue;
+            }
+            const double distance = Distance(player, site.position);
+            if (distance < 62 && quest &&
+                quest->trigger.substr(quest->trigger.find(':') + 1) == site.id)
+            {
+                return &site;
+            }
+            if (distance < nearest)
+            {
+                nearest = distance;
+                closest = &site;
+            }
+        }
+        return closest;
+    }
+
+    int Nearby() const
+    {
+        return !controlling && Distance(player, fire) < 65 ? 3 : -1;
     }
 
     void Interact()
     {
+        if (controlling)
+        {
+            return;
+        }
         if (levelOne.Capturable(player) >= 0)
         {
             levelOne.Capture(player, false);
             return;
         }
         const auto* quest = chapter.Current();
-        const int target = Nearby();
-        if (target == 0)
+        const auto* site = NearbyStory();
+        if (site)
         {
-            if (quest && quest->trigger == "villager")
+            const std::string suffix = ":" + site->id;
+            if (quest &&
+                (quest->trigger == "talk" + suffix || quest->trigger == "inspect" + suffix ||
+                 quest->trigger == "choice" + suffix))
             {
-                if (chapter.step == 0)
+                Say(site->name, quest->dialogue);
+                if (quest->trigger == "choice:child")
                 {
                     chapter.choicePending = true;
-                    Say("벨른 마을의 아이",
-                        "공동묘지 근처에서 봤다는 사람이 있어. 요즘 밤에는 거기로 가지 마….");
+                    return;
                 }
-                else
+                if (quest->id == "C100")
                 {
-                    Say("벨른 마을의 아이", "동생? 너한테 동생이 있었다고? 라엔에게 물어봐.");
-                    chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+                    levelOne.tickets[1] += 3;
                 }
-            }
-            else
-                Say("벨른 마을의 아이", "죽은 사람이 돌아왔다는 소문이 있어. 조심해.");
-        }
-        else if (target == 1)
-        {
-            if (quest && quest->trigger == "guide")
-            {
-                Say("라엔", quest->dialogue);
+                if (quest->id == "C100_SMITH")
+                {
+                    levelOne.weapon = (std::min)(20, levelOne.weapon + 1);
+                    levelOne.health = levelOne.MaximumHealth();
+                }
+                if (quest->id == "P004")
+                {
+                    levelOne.health = levelOne.MaximumHealth();
+                }
+                dialoguePending = true;
                 chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+                autoSaveTime = 30;
             }
             else
-                Say("라엔", "주령은 장소에 남은 감정이야. 힘만으로는 그 사연을 알 수 없어.");
+            {
+                if (site->id == "smith" || site->id == "merchant" || site->id == "sealer")
+                {
+                    serviceNpc = site->id;
+                    ClearInput();
+                    return;
+                }
+                Say(site->name,
+                    site->kind == StoryLayout::Kind::Evidence
+                        ? "이곳의 흔적을 기록해 두었다. 현재 조사는 Tab에서 확인하자."
+                        : "지금 해야 할 일은 기록창에서 확인할 수 있다.");
+            }
+            return;
         }
-        else if (target == 3)
+        if (Nearby() == 3)
         {
             levelOne.health = levelOne.MaximumHealth();
             Say("벨른의 불씨", "잠시 쉬어 체력을 회복했습니다.");
@@ -192,9 +256,12 @@ class Prototype
 
     void UpdateChapter()
     {
-        if (levelOne.Dead())
-            return;
         const auto* quest = chapter.Current();
+        levelOne.storyTrial = quest && quest->trigger == "survive";
+        if (levelOne.Dead())
+        {
+            return;
+        }
         if (!quest)
         {
             if (chapter.rewardPending && !chapter.quests.empty())
@@ -206,49 +273,65 @@ class Prototype
                 ++levelOne.tickets[3];
                 ++levelOne.stones;
                 Say("1장 완료 · 저주를 보는 자",
-                    "검게 변한 성유물을 얻었다. 일곱 번째 종이 울리는 날, 문이 열린다. 다음 장의 "
-                    "이야기는 아직 준비 중입니다.");
+                    "성유물을 확보했다. 수도원 밖을 성흔회가 포위한다. 여기까지가 이번 여정이다. "
+                    "자유 탐험과 저장을 계속할 수 있다.");
+                dialoguePending = true;
             }
             return;
         }
         if (chapter.rewardPending)
         {
             chapter.rewardPending = false;
-            Say(quest->title, quest->dialogue);
+            const bool battle = quest->trigger == "fight" || quest->trigger == "first_capture" ||
+                                quest->trigger == "survive" || quest->trigger == "skill";
+            Say(quest->title, battle ? quest->dialogue : quest->objective);
             dialoguePending = true;
-            if (quest->trigger == "guide")
-                keeper = quest->destination;
             if (quest->id == "P005")
             {
                 levelOne.captureUnlocked = true;
                 ++levelOne.tickets[0];
+                levelOne.selectedTicket = 0;
             }
-            if (quest->id == "C102")
-                levelOne.tickets[1] += 3;
+            storyTrialTime = 0;
+            if (quest->trigger == "skill")
+            {
+                levelOne.skillsUsed = 0;
+            }
+            return;
         }
-        int boss =
-            quest->trigger == "boss"
-                ? 1
-                : (quest->trigger == "elite"
-                       ? 2
-                       : (quest->trigger == "monk" ? 3 : (quest->trigger == "saint" ? 4 : 0)));
-        if (boss && Distance(player, quest->destination) < 700)
-            levelOne.EnsureBoss(boss,
+        const bool encounter = quest->trigger == "fight" || quest->trigger == "first_capture" ||
+                               quest->trigger == "survive";
+        if (encounter && Distance(player, quest->destination) < 300)
+        {
+            levelOne.EnsureBoss(quest->amount,
                                 quest->destination,
+                                player,
                                 [this](WorldPoint p)
                                 {
                                     return Blocked(p);
                                 });
-        bool done = quest->trigger == "reach" && Distance(player, quest->destination) < 80;
-        done = done || (quest->trigger == "kills" &&
-                        levelOne.kills - chapter.baselineKills >= quest->amount);
-        done = done || (quest->trigger == "capture" &&
-                        static_cast<int>(levelOne.collection.size()) - chapter.baselineCaptures >=
-                            quest->amount);
-        done = done || (quest->trigger == "skill" && levelOne.skillsUsed > 0);
-        done = done || (boss && levelOne.resolvedBosses.count(boss));
+        }
+        bool done = encounter && levelOne.resolvedBosses.count(quest->amount) != 0;
+        if (quest->trigger == "survive" && storyTrialTime >= 5)
+        {
+            for (auto& enemy : levelOne.enemies)
+            {
+                if (enemy.boss == 12 && enemy.health > 0)
+                {
+                    levelOne.Resolve(enemy, false);
+                }
+            }
+            levelOne.projectiles.clear();
+            done = true;
+        }
+        if (quest->trigger == "skill")
+        {
+            done = levelOne.skillsUsed > 0;
+        }
         if (done)
+        {
             chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+        }
         if (!levelOne.collection.empty() && !captured)
         {
             captured = true;
@@ -260,16 +343,34 @@ class Prototype
     void House(const Object& o);
     void Tree(const Object& o);
     void Stone(const Object& o);
-    void Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize = false);
+    void DrawPlayer(WorldPoint pos);
+    void StoryProp(const StoryLayout::Site& site, WorldPoint at);
+    void StoryFacade(const Object& building);
+    void StoryPerson(const StoryLayout::Site& site, WorldPoint position);
+    void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
     void Wisp(int type, WorldPoint position);
-    void DrawEnemy(const LevelOne::Enemy& enemy);
+
+    struct EnemyVisual
+    {
+        WorldPoint position;
+        SpriteAnimation animation;
+        float health = 0, maximum = 1, flash = 0;
+        WorldPoint hitDirection = {0, 0};
+        float hitStrength = 0;
+        float castPose = 0;
+        float remnantTime = -2;
+        int type = 0, boss = 0;
+        bool alerted = false, weakened = false;
+    };
+
+    void DrawEnemy(const EnemyVisual& enemy);
     void DrawCombatWarnings();
     void Hearth(WorldPoint position);
 
     void Panel(float x, float y, float w, float h)
     {
         r.Rect(x + 4, y + 5, w, h, Color(0, 0, 0, .32f));
-        r.Rect(x, y, w, h, Color(.035f, .052f, .068f, .94f));
+        r.Rect(x, y, w, h, Color(.07f, .12f, .24f, .96f));
         r.Rect(x, y, 1, h, Color(.32f, .38f, .39f, .8f));
         r.Rect(x + w - 1, y, 1, h, Color(.32f, .38f, .39f, .8f));
         r.Rect(x, y, w, 1, Color(.48f, .43f, .30f, .65f));
@@ -282,12 +383,16 @@ class Prototype
                box.y,
                box.w,
                box.h,
-               selected ? Color(.18f, .30f, .32f, .98f) : Color(.075f, .115f, .14f, .98f));
+               selected ? Color(.36f, .30f, .67f, .98f) : Color(.19f, .36f, .57f, .98f));
         r.Rect(box.x,
                box.y,
                selected ? 3.f : 1.f,
                box.h,
                selected ? Color(.85f, .7f, .43f) : Color(.28f, .36f, .38f));
+        const bool hover = box.Contains(cursorX, cursorY);
+        r.Rect(box.x + 1, box.y + 1, box.w - 2, 2, Color(.65f, .8f, 1, hover ? .85f : .4f));
+        if (hover)
+            r.Rect(box.x + 2, box.y + 3, box.w - 4, box.h - 5, Color(.6f, .8f, 1, .12f));
         WrappedText(box.x + 12,
                     box.y + box.h * .5f + 6,
                     box.w - 24,
@@ -296,9 +401,13 @@ class Prototype
                     1);
     }
 
+#include "PrototypePopulation.inl"
+#include "PrototypeControls.inl"
 #include "PrototypeSave.inl"
 #include "PrototypeMenu.inl"
 #include "PrototypeUI.inl"
+#include "PrototypeServices.inl"
+#include "PrototypeMonitoring.inl"
 
   public:
     explicit Prototype(Renderer& renderer) : r(renderer)
@@ -311,6 +420,10 @@ class Prototype
                           {2, 390, 270, 30, 35, 52},
                           {2, 280, 280, 25, 25, 24}};
         // Temporary authored landmarks; keep the y=0 quest route clear.
+        for (const auto& building : StoryLayout::Buildings())
+        {
+            villageObjects.push_back(building);
+        }
         for (int i = 0; i < 6; ++i)
             villageObjects.push_back({2, 1080. + i * 45, -90, 18, 16, 38});
         villageObjects.push_back({0, 2930, -250, 210, 110, 140});
@@ -326,6 +439,7 @@ class Prototype
         blenderLayout.columns = 9;
         blenderLayout.firstWalkFrame = 1;
         blenderLayout.walkFrames = 8;
+        blenderLayout.detectLocomotionColumns = true;
         blenderLayout.fixedCanvas = true;
         blenderProtagonist =
             protagonistSheet.Load(L"Assets/Characters/Blender/walk.png", blenderLayout);
@@ -337,16 +451,41 @@ class Prototype
         {
             std::cerr << "주인공 스프라이트를 불러오지 못해 임시 도형을 사용합니다." << std::endl;
         }
-        SpriteLayout npcIdleLayout = blenderLayout;
-        npcIdleLayout.columns = 8;
-        npcIdleLayout.firstWalkFrame = 0;
-        npcIdleLayout.walkFrames = 8;
-        blenderChild = childSheet.Load(L"Assets/Characters/Blender/npc1/idle.png", npcIdleLayout);
-        blenderKeeper = keeperSheet.Load(L"Assets/Characters/Blender/npc2/idle.png", npcIdleLayout);
-        if (!blenderChild && !childSheet.Load(L"Assets/Characters/mira.png", eightDirections))
-            std::cerr << "NPC1 스프라이트 로드 실패: 임시 외형을 사용합니다." << std::endl;
-        if (!blenderKeeper && !keeperSheet.Load(L"Assets/Characters/keeper.png", eightDirections))
-            std::cerr << "NPC2 스프라이트 로드 실패: 임시 외형을 사용합니다." << std::endl;
+        SpriteLayout storyLayout;
+        storyLayout.columns = 2;
+        storyLayout.rows = 2;
+        storyLayout.directionRows = {{0, 0, 0, 0, 1, 1, 1, 1}};
+        storyLayout.directionIdleColumns = {{0, 1, 1, 1, 1, 0, 0, 0}};
+        storyLayout.firstWalkFrame = 0;
+        storyLayout.walkFrames = 1;
+        storyLayout.anchorAtFeet = true;
+        const auto& npcSprites = StoryLayout::NpcSprites();
+        const auto outposts = Population::Buildings();
+        villageObjects.insert(villageObjects.end(), outposts.begin(), outposts.end());
+        for (int i = 0; i < 4; ++i)
+        {
+            SpriteLayout residentLayout = storyLayout;
+            residentLayout.columns = residentLayout.rows = 4;
+            residentLayout.directionRows.fill(i);
+            residentLayout.directionIdleColumns = {{0, 2, 2, 2, 3, 1, 1, 1}};
+            if (!populationSheets[i].Load(L"Assets/Characters/Townsfolk/residents.png",
+                                          residentLayout))
+                std::cerr << "생활 NPC 외형 로드 실패: " << i << std::endl;
+        }
+        for (int i = 0; i < StoryLayout::NpcCount; ++i)
+        {
+            SpriteLayout characterLayout = storyLayout;
+            if (npcSprites[i].reversedSides)
+            {
+                // The smith sheet places the right-facing view in its upper-right cell.
+                characterLayout.directionRows = {{0, 1, 1, 1, 1, 0, 0, 0}};
+                characterLayout.directionIdleColumns = {{0, 0, 0, 0, 1, 1, 1, 1}};
+            }
+            if (!storyNpcSheets[i].Load(npcSprites[i].path, characterLayout))
+            {
+                std::cerr << "이야기 NPC 전용 스프라이트 로드 실패: " << i << std::endl;
+            }
+        }
         SpriteLayout attackLayout;
         attackLayout.firstWalkFrame = 0;
         attackLayout.walkFrames = 4;
@@ -367,18 +506,60 @@ class Prototype
         spiritLayout.directionRows = {{0, 1, 1, 1, 3, 2, 2, 2}};
         spiritLayout.firstWalkFrame = 1;
         spiritLayout.walkFrames = 3;
-        const wchar_t* spiritFiles[] = {L"Assets/Spirits/ash_lantern_4dir.png",
-                                        L"Assets/Spirits/mourning_bell_4dir.png",
-                                        L"Assets/Spirits/briar_fox_4dir.png"};
-        for (int i = 0; i < 3; ++i)
-            if (!spiritSheets[i].Load(spiritFiles[i], spiritLayout))
+        spiritLayout.pingPongWalk = true;
+        spiritLayout.anchorAtTorso = true;
+        for (int i = 0; i < SpiritCatalog::Count; ++i)
+        {
+            SpriteLayout speciesLayout = spiritLayout;
+            if (i == SpiritCatalog::Saint)
+            {
+                // The saint glides. Alternate illustration poses are not aligned walk frames.
+                speciesLayout.firstWalkFrame = 0;
+                speciesLayout.walkFrames = 1;
+                speciesLayout.pingPongWalk = false;
+            }
+            if (!spiritSheets[i].Load(SpiritCatalog::Get(i).sprite, speciesLayout))
                 std::cerr << "주령 이미지 로드 실패: " << SpiritName(i) << std::endl;
+        }
         chapter.Load();
         SpriteLayout lootLayout;
         lootLayout.columns = lootLayout.rows = 1;
         lootLayout.directionRows.fill(0);
         lootLayout.firstWalkFrame = 0;
         lootLayout.walkFrames = 1;
+        LoadPresentation(lootLayout);
+        if (!domainPortrait.Load(L"Assets/Effects/domain_portrait.png", lootLayout))
+        {
+            std::cerr << "영역 컷인 이미지 로드 실패" << std::endl;
+        }
+        const wchar_t* portraits[] = {L"Assets/Effects/forgotten_ultimate.png",
+                                      L"Assets/Effects/pilgrim_ultimate.png",
+                                      L"Assets/Effects/hands_ultimate.png",
+                                      L"Assets/Effects/saint_ultimate.png"};
+        for (int i = 0; i < 4; ++i)
+            spiritPortraits[i].Load(portraits[i], lootLayout);
+        ghostFace.Load(L"Assets/Effects/ghost_scream.png", lootLayout);
+        ghostScreamPoses.Load(L"Assets/Effects/ghost_scream_poses.png", lootLayout);
+        const wchar_t* realmFiles[] = {L"Assets/Effects/Realms/snow_graveyard.png",
+                                       L"Assets/Effects/Realms/endless_pilgrimage.png",
+                                       L"Assets/Effects/Realms/praying_sanctuary.png",
+                                       L"Assets/Effects/Realms/inverted_belfry.png"};
+        for (int i = 0; i < 4; ++i)
+            if (!spiritRealms[i].Load(realmFiles[i], lootLayout))
+                std::cerr << "주령 영역 이미지 로드 실패: " << i << std::endl;
+        const wchar_t* ghostFiles[] = {L"Assets/Effects/ghost_binding.png",
+                                       L"Assets/Effects/ghost_drift.png",
+                                       L"Assets/Effects/ghost_choir.png"};
+        for (int i = 0; i < 3; ++i)
+            ghostVariants[i].Load(ghostFiles[i], lootLayout);
+        const wchar_t* spellArt[] = {L"Assets/Effects/pilgrim_skills.png",
+                                     L"Assets/Effects/hands_skills.png",
+                                     L"Assets/Effects/saint_skills.png"};
+        for (int i = 0; i < 3; ++i)
+        {
+            if (!spiritSpellArt[i].Load(spellArt[i], lootLayout))
+                std::cerr << "주령 스킬 이미지 로드 실패: " << i << std::endl;
+        }
         lootLayout.anchorAtFeet = true;
         const wchar_t* lootFiles[] = {L"Assets/Items/experience.png",
                                       L"Assets/Items/weapon_stone.png",
@@ -398,7 +579,7 @@ class Prototype
 
     void ProgressKey(bool load)
     {
-        if (slotMode != SlotMode::Closed || exitConfirm)
+        if (openingPlaying || slotMode != SlotMode::Closed || exitConfirm)
             return;
         if (!titleScreen || load)
             OpenSlots(load ? SlotMode::Load : SlotMode::Save);
@@ -420,7 +601,72 @@ class Prototype
 
     void PointerDown(int x, int y)
     {
-        scene.PointerDown(x, y);
+        MouseButton(0, true, x, y);
+    }
+
+    void PointerMove(int x, int y)
+    {
+        cursorX = x;
+        cursorY = y;
+        if (titleScreen && !openingPlaying && slotMode == SlotMode::Closed)
+        {
+            for (int i = 0; i < 3; ++i)
+                if (FrontButton(i).Contains(x, y))
+                    frontSelection = i;
+        }
+    }
+
+    void MouseButton(int button, bool down, int x, int y)
+    {
+        PointerMove(x, y);
+        if (button == 0 && !down)
+        {
+            attackHeld = false;
+            return;
+        }
+        if (!down)
+        {
+            return;
+        }
+        if (openingPlaying)
+        {
+            if (button == 0 && OpeningSkipBounds().Contains(x, y))
+                SkipOpening();
+            return;
+        }
+        if (button == 0 && scene.PointerDown(x, y))
+        {
+            return;
+        }
+        if (!ControlsActive())
+        {
+            return;
+        }
+        if (MinimapBounds().Contains(x, y) || SkillBarBounds().Contains(x, y) ||
+            (hudVisible && QuestTrackerBounds().Contains(x, y)))
+        {
+            return;
+        }
+        if (button == 2)
+        {
+            attackHeld = false;
+            if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0)
+            {
+                BufferCommand(5);
+            }
+            else
+            {
+                bufferedCommand.action = -1;
+                MoveTo(CursorWorld());
+            }
+        }
+        if (button == 0)
+        {
+            moveRoute.clear();
+            movementVelocity = {0, 0};
+            attackHeld = true;
+            BasicAttack(true);
+        }
     }
 
     void MenuClick(int x, int y)
@@ -454,9 +700,25 @@ class Prototype
         keys[key] = down;
         if (!fresh)
             return;
+        if (openingPlaying)
+        {
+            if (key == 27 || key == 13 || key == ' ')
+                SkipOpening();
+            keys[key] = true;
+            return;
+        }
         if (titleScreen || slotMode != SlotMode::Closed)
         {
             FrontKey(key);
+            keys[key] = true;
+            return;
+        }
+        if (!serviceNpc.empty())
+        {
+            if (key == 27)
+                serviceNpc.clear();
+            else if (key >= '1' && key <= '6')
+                ServiceAction(key - '1');
             return;
         }
         if (key == 27)
@@ -497,20 +759,24 @@ class Prototype
         }
         if (chapter.choicePending && !journal)
         {
-            if (key >= '1' && key <= '3')
+            if (key == '1' || key == '2')
             {
-                if (key == '1')
-                    ++chapter.empathy;
-                if (key == '2')
-                    ++chapter.indifference;
-                if (key == '3')
-                    ++chapter.greed;
                 chapter.choicePending = false;
-                chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+                if (key == '1')
+                {
+                    dialoguePending = true;
+                    chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+                    autoSaveTime = 30;
+                }
+                else
+                {
+                    dialoguePending = false;
+                    messageTime = 0;
+                }
             }
             return;
         }
-        if (!journal && dialoguePending && (key == 'e' || key == 13))
+        if (!journal && dialoguePending && (key == 'f' || key == 13))
         {
             dialoguePending = false;
             messageTime = 0;
@@ -532,7 +798,7 @@ class Prototype
             }
             return;
         }
-        if (key == 'h')
+        if (key == 'u')
         {
             hudVisible = !hudVisible;
             return;
@@ -561,7 +827,7 @@ class Prototype
             r.postProcess.enabled = !r.postProcess.enabled;
             Say("화면 효과", r.postProcess.enabled ? "후처리를 켰습니다." : "후처리를 껐습니다.");
         }
-        if (key == 'b')
+        if (key == 'o')
         {
             r.postProcess.bloomEnabled = !r.postProcess.bloomEnabled;
             Say("빛 번짐",
@@ -571,7 +837,9 @@ class Prototype
 
         if (key == 'r' && levelOne.Dead())
         {
+            population.people.clear();
             levelOne = LevelOne();
+            ResetControls();
             levelOne.captureRules.Load();
             levelOne.LoadCombat();
             chapter = Chapter();
@@ -592,28 +860,47 @@ class Prototype
         }
         if (levelOne.Dead())
             return;
-        if (key == 'f')
-            levelOne.automatic = !levelOne.automatic;
         if (key == 't')
             levelOne.selectedTicket = (levelOne.selectedTicket + 1) % 3;
         if (key == 'x')
             levelOne.Capture(player, true);
-        if (key == 'v')
-            levelOne.UseSkill(player);
-        if (key == 'g')
-            levelOne.Upgrade(captured);
-        if (key == 'e')
+        if (key == 'h')
+            levelOne.UsePotion();
+        if (key == 'f')
             Interact();
         if (key == 'k')
             screenShake = !screenShake;
-        if (key == 'q')
+        const std::string skillKeys = "qwer";
+        const auto skillSlot = skillKeys.find(char(key));
+        if (skillSlot != std::string::npos)
         {
+            CastSkill(static_cast<int>(skillSlot));
+        }
+        if (key == 's')
+        {
+            bufferedCommand.action = -1;
+            moveRoute.clear();
+            movementVelocity = {0, 0};
+            attackHeld = false;
+        }
+        if (key == 'b')
+        {
+            if (PreparingSkill())
+                return;
             if (captured)
             {
+                if (!controlling && levelOne.collection[selectedCompanion].health < 25.f)
+                {
+                    Say("조종 전환", "주령 체력이 25 이상 회복되면 조종할 수 있습니다.");
+                    return;
+                }
                 controlling = !controlling;
+                ClearInput();
+                movementWasControlling = controlling;
                 Say("조종 전환",
-                    controlling ? "주령을 조종합니다. WASD로 이동하고 Q로 본체에 돌아갑니다."
-                                : "방랑자의 몸으로 돌아왔습니다.");
+                    controlling ? "주령을 조종합니다. 우클릭으로 이동하고 주령 QWER을 사용합니다. "
+                                  "B로 본체에 돌아갑니다."
+                                : "방랑자의 몸으로 돌아와 기본 QWER을 사용합니다.");
             }
             else
                 Say("조종 전환", "라엔에게 봉인을 배운 뒤 약화된 주령에게 봉인권을 사용하세요.");
@@ -622,6 +909,8 @@ class Prototype
 
     void Arrow(int key, bool down)
     {
+        if (openingPlaying)
+            return;
         if (titleScreen || slotMode != SlotMode::Closed)
         {
             if (down && !overwriteConfirm && (key == 1 || key == 3))
@@ -636,22 +925,31 @@ class Prototype
             }
             return;
         }
-        if (key >= 0 && key < 4)
-            arrows[key] = down;
     }
 
     void ClearInput()
     {
         for (bool& k : keys)
             k = false;
-        for (bool& k : arrows)
-            k = false;
+        bufferedCommand.action = -1;
+        moveRoute.clear();
+        movementVelocity = {0, 0};
+        attackHeld = false;
     }
 
     void Update(float dt, bool sprint = false);
     void Draw();
 
   private:
+    void LoadPresentation(const SpriteLayout& layout);
+    void StartOpening();
+    void UpdatePresentation(float dt);
+    void SkipOpening();
+    UIRect PresentationBounds() const;
+    UIRect OpeningSkipBounds() const;
+    void DrawPresentationBackground();
+    void DrawOpening();
+    void DrawPresentationImage(int image, const UIRect& bounds, float progress);
     UIRect FrontBounds() const;
     UIRect FrontButton(int index) const;
     bool GameUIClick(int x, int y);

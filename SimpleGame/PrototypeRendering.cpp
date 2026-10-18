@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Prototype.h"
+#include "PrototypeStoryProps.inl"
 
 void Prototype::House(const Object& o)
 {
@@ -187,21 +188,21 @@ void Prototype::Stone(const Object& o)
     };
     auto tier = [&](double inset, double low, double high, Color top)
     {
-        const double far = 1 - inset;
-        r.Quad(point(inset, far, low),
-               point(far, far, low),
-               point(far, far, high),
-               point(inset, far, high),
+        const double outerEdge = 1 - inset;
+        r.Quad(point(inset, outerEdge, low),
+               point(outerEdge, outerEdge, low),
+               point(outerEdge, outerEdge, high),
+               point(inset, outerEdge, high),
                Color(.24f, .28f, .27f));
-        r.Quad(point(far, inset, low),
-               point(far, far, low),
-               point(far, far, high),
-               point(far, inset, high),
+        r.Quad(point(outerEdge, inset, low),
+               point(outerEdge, outerEdge, low),
+               point(outerEdge, outerEdge, high),
+               point(outerEdge, inset, high),
                Color(.16f, .20f, .21f));
         r.Quad(point(inset, inset, high),
-               point(far, inset, high),
-               point(far, far, high),
-               point(inset, far, high),
+               point(outerEdge, inset, high),
+               point(outerEdge, outerEdge, high),
+               point(inset, outerEdge, high),
                top);
     };
 
@@ -292,51 +293,27 @@ void Prototype::Tree(const Object& o)
     }
 }
 
-void Prototype::Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize)
+void Prototype::DrawPlayer(WorldPoint pos)
 {
     Point p = Screen(pos.x, pos.y);
-    const float spriteHeight = childSize ? 55.f : 78.f;
+    const float spriteHeight = 78.f;
     if (p.x < -80 || p.x > width + 80 || p.y < -20 || p.y > height + 100)
         return;
-    r.Ellipse(p.x, p.y + 1, childSize ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
-    if (isPlayer && !controlling)
+    r.Ellipse(p.x, p.y + 1, 14.f, 5, Color(0, 0, 0, .35f));
+    if (!controlling)
         r.Ellipse(p.x, p.y, 18, 7, Color(.75f, .69f, .45f, .20f));
     SpriteAnimation animation = protagonistAnimation;
-    SpriteSheet* sheet = isPlayer && protagonistSprinting && protagonistRunSheet.Ready()
-                             ? &protagonistRunSheet
-                             : &protagonistSheet;
-    Color tint = isPlayer && levelOne.dodgeTime > 0  ? Color(.5f, 1.5f, 2.f)
-                 : isPlayer && levelOne.hurtTime > 0 ? Color(1.5f, .55f, .55f)
-                                                     : Color(1, 1, 1);
-    if (isPlayer && levelOne.castTime > 0 && !protagonistAnimation.moving && attackSheet.Ready())
+    SpriteSheet* sheet = protagonistSprinting && protagonistRunSheet.Ready() ? &protagonistRunSheet
+                                                                             : &protagonistSheet;
+    Color tint = levelOne.dodgeTime > 0  ? Color(.5f, 1.5f, 2.f)
+                 : levelOne.hurtTime > 0 ? Color(1.5f, .55f, .55f)
+                                         : Color(1, 1, 1);
+    if (levelOne.castTime > 0 && !protagonistAnimation.moving && attackSheet.Ready())
     {
         sheet = &attackSheet;
         animation.facing = levelOne.castFacing;
         animation.moving = true;
         animation.phase = (std::min)(3.f, std::floor((.18f - levelOne.castTime) / .045f));
-    }
-    if (!isPlayer)
-    {
-        sheet = childSize ? &childSheet : &keeperSheet;
-        // Until a dedicated image is supplied, share the protagonist texture as a placeholder.
-        if (!sheet->Ready())
-        {
-            sheet = &protagonistSheet;
-            tint = childSize ? Color(1.f, .78f, .66f) : Color(.72f, .9f, .78f);
-        }
-        animation = SpriteAnimation();
-        if (Distance(pos, player) < 160)
-        {
-            double dx = player.x - pos.x, dy = player.y - pos.y;
-            animation.Update((dx - dy) * .85, (dx + dy) * .43, 0, false);
-            animation.moving = false;
-        }
-        if (childSize ? blenderChild : blenderKeeper)
-        {
-            // Idle sheets contain a full breathing loop for each facing.
-            animation.moving = true;
-            animation.phase = std::fmod(time * 4.f + (childSize ? 0.f : 3.f), 8.f);
-        }
     }
     if (sheet->Ready())
         sheet->Draw(r,
@@ -346,13 +323,86 @@ void Prototype::Person(WorldPoint pos, Color coat, bool isPlayer, bool childSize
                     tint,
                     width,
                     height,
-                    isPlayer && levelOne.castTime > 0 && !protagonistAnimation.moving ? 1.4f : 0.f);
+                    levelOne.castTime > 0 && !protagonistAnimation.moving ? 1.4f : 0.f);
     else
     {
         // Keep the actor visible if an asset is missing or PNG decoding fails.
-        r.Triangle({p.x, p.y - 43}, {p.x - 14, p.y - 6}, {p.x + 14, p.y - 6}, coat);
+        r.Triangle(
+            {p.x, p.y - 43}, {p.x - 14, p.y - 6}, {p.x + 14, p.y - 6}, Color(.44f, .49f, .52f));
         r.Ellipse(p.x, p.y - 44, 8, 10, Color(.61f, .53f, .43f));
     }
+}
+
+void Prototype::StoryPerson(const StoryLayout::Site& site, WorldPoint position)
+{
+    const int index = site.spriteIndex;
+
+    const Point p = Screen(position.x, position.y);
+    if (index < 0 || !storyNpcSheets[index].Ready())
+    {
+        return;
+    }
+
+    SpriteAnimation animation;
+    if (Distance(position, player) < 160)
+    {
+        const double dx = player.x - position.x, dy = player.y - position.y;
+        animation.Update((dx - dy) * .85, (dx + dy) * .43, 0, false);
+        animation.moving = false;
+    }
+
+    const bool childPortrait = site.kind == StoryLayout::Kind::Child;
+    r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
+    storyNpcSheets[index].Draw(
+        r, p, childPortrait ? 55.f : 78.f, animation, Color(1, 1, 1), width, height);
+}
+
+void Prototype::DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color)
+{
+    const Point p = Screen(position.x, position.y, elevation);
+    if (p.x < -90 || p.x > width + 90 || p.y < -20 || p.y > height + 20)
+    {
+        return;
+    }
+    float textWidth = 0;
+    for (unsigned char c : text)
+    {
+        if ((c & 0xc0) != 0x80)
+        {
+            textWidth += c < 128 ? 8.f : 16.f;
+        }
+    }
+    const float labelWidth = (std::min)(textWidth + 12, float(width) - 16);
+    UIRect box = {(std::max)(8.f, (std::min)(float(width) - labelWidth - 8, p.x - labelWidth * .5f)),
+                  (std::max)(12.f, (std::min)(float(height) - 100, p.y - 17)), labelWidth, 24};
+    auto overlaps = [](const UIRect& a, const UIRect& b)
+    {
+        return a.x < b.x + b.w + 4 && a.x + a.w + 4 > b.x &&
+               a.y < b.y + b.h + 4 && a.y + a.h + 4 > b.y;
+    };
+    // Search nearby rows first; names remain on the overlay and never overlap each other.
+    const float preferred = box.y;
+    for (int row = 0; row < height / 28 + 2; ++row)
+    {
+        box.y = std::fmod(preferred + row * 28, (std::max)(28.f, float(height) - 110));
+        box.y = (std::max)(12.f, box.y);
+        bool blocked = false;
+        for (const auto& other : occupiedLabels) blocked = blocked || overlaps(box, other);
+        if (hudVisible)
+        {
+            blocked = blocked || overlaps(box, {20, 20, 330, 200}) || overlaps(box, MinimapBounds());
+        }
+        for (const auto& site : StoryLayout::Sites())
+        {
+            if (site.kind == StoryLayout::Kind::Evidence || !StoryLayout::Visible(site, chapter)) continue;
+            const Point body = Screen(site.position.x, site.position.y);
+            blocked = blocked || overlaps(box, {body.x - 24, body.y - 65, 48, 70});
+        }
+        if (!blocked) break;
+    }
+    occupiedLabels.push_back(box);
+    r.Rect(box.x, box.y, box.w, box.h, Color(.015f, .025f, .035f, .92f));
+    r.Text(box.x + 6, box.y + 17, text, color);
 }
 
 void Prototype::Wisp(int type, WorldPoint position)
@@ -363,41 +413,109 @@ void Prototype::Wisp(int type, WorldPoint position)
     r.Ellipse(p.x, p.y, 18, 6, Color(0, 0, 0, .3f));
     SpriteAnimation animation;
     if (captured && capturedSpirit == type)
+    {
         animation = companionAnimation;
-    float bob = type % 3 == 2 ? 0.f : std::sin(time * 2 + type) * 3.f;
-    if (spiritSheets[type % 3].Ready())
-        spiritSheets[type % 3].Draw(r,
-                                    {p.x, p.y - 4 + bob},
-                                    type == 2 ? 67.f : 72.f,
-                                    animation,
-                                    Color(1, 1, 1),
-                                    width,
-                                    height,
-                                    type == 0 ? 2.f : (type == 1 ? 1.f : .15f));
+        if (spiritCastPose > 0)
+        {
+            animation.facing = spiritCastFacing;
+            animation.moving = true;
+            animation.phase = (1.f - (std::min)(1.f, spiritCastPose / .8f)) * 4.f;
+        }
+    }
+    const float cycle = animation.moving ? animation.phase * 1.5707963f : time * 2;
+    const int motion = SpiritCatalog::Get(type).motion;
+    const float bob = motion == 0   ? std::sin(time * 2.f) * 1.5f - 3.f
+                      : motion == 1 ? std::sin(time * 1.8f) * .6f
+                                    : std::sin(time * 2.f) * .5f;
+    const float casting = (captured && capturedSpirit == type)
+                              ? std::sin((std::min)(1.f, spiritCastPose / .8f) * 3.14159265f)
+                              : 0.f;
+    if (spiritSheets[type].Ready())
+        spiritSheets[type].Draw(r,
+                                {p.x, p.y - 4 + bob},
+                                SpiritCatalog::Get(type).size,
+                                animation,
+                                Color(1, 1, 1),
+                                width,
+                                height,
+                                type == 0 ? 2.f : (type == 1 ? 1.f : .15f),
+                                motion,
+                                time,
+                                casting);
     else
         r.Ellipse(p.x, p.y - 25, 12, 18, Color(.4f, .7f, .8f));
 }
 
-void Prototype::DrawEnemy(const LevelOne::Enemy& enemy)
+void Prototype::DrawEnemy(const EnemyVisual& enemy)
 {
-    const Point p = Screen(enemy.position.x, enemy.position.y);
-    r.Ellipse(p.x, p.y, 20, 7, Color(.65f, .08f, .1f, .6f));
+    Point p = Screen(enemy.position.x, enemy.position.y);
+    if (!enemy.weakened && enemy.flash > 0)
+    {
+        const float reaction = std::sin((1 - enemy.flash / .15f) * 3.14159265f) *
+                               enemy.hitStrength * (enemy.boss > 0 ? .4f : 1.f);
+        p.x += float(enemy.hitDirection.x - enemy.hitDirection.y) * .85f * reaction;
+        p.y += float(enemy.hitDirection.x + enemy.hitDirection.y) * .43f * reaction - reaction * .25f;
+    }
+    if (p.x < -140 || p.x > width + 140 || p.y < -30 || p.y > height + 160)
+    {
+        return;
+    }
+
+    if (enemy.weakened)
+    {
+        const float fade = enemy.remnantTime < 0 ? 1.f : (std::min)(1.f, enemy.remnantTime / 10.f);
+        const float bob = std::sin(time * 3) * 4;
+        r.Ellipse(p.x, p.y, 20, 7, Color(.3f, .8f, .75f, .18f * fade));
+        spiritSheets[enemy.type].Draw(r,
+                                      {p.x, p.y - 8 + bob},
+                                      55,
+                                      enemy.animation,
+                                      Color(.65f, 1, .9f, .6f * fade),
+                                      width,
+                                      height,
+                                      1.f);
+        return;
+    }
+    if (enemy.boss >= 6 && enemy.boss <= 8)
+    {
+        // Temporary silhouette until an authored dog sheet is available.
+        r.Ellipse(p.x, p.y, 20, 7, Color(0, 0, 0, .3f));
+        r.Ellipse(p.x, p.y - 17, 19, 10, Color(.27f, .24f, .20f));
+        r.Ellipse(p.x + 17, p.y - 25, 9, 8, Color(.32f, .28f, .22f));
+        r.Triangle({p.x + 12, p.y - 28},
+                   {p.x + 17, p.y - 40},
+                   {p.x + 21, p.y - 28},
+                   Color(.22f, .19f, .16f));
+        r.Line({p.x - 12, p.y - 13}, {p.x - 15, p.y - 2}, 4, Color(.22f, .19f, .16f));
+        r.Line({p.x + 10, p.y - 13}, {p.x + 13, p.y - 2}, 4, Color(.22f, .19f, .16f));
+        r.Rect(p.x - 20, p.y - 46, 40, 3, Color(.16f, .10f, .10f));
+        r.Rect(p.x - 20, p.y - 46, 40 * enemy.health / enemy.maximum, 3, Color(.65f, .25f, .20f));
+        return;
+    }
+    r.Ellipse(p.x, p.y, 20, 7, Color(0, 0, 0, .3f));
     if (spiritSheets[enemy.type].Ready())
     {
-        spiritSheets[enemy.type].Draw(
-            r,
-            p,
-            enemy.boss > 0 ? 100.f : 68.f,
-            enemy.animation,
-            enemy.flash > 0 ? Color(2, 2, 2)
-                            : (enemy.returning ? Color(.55f, .55f, .65f) : Color(1.25f, .6f, .65f)),
-            width,
-            height,
-            .4f);
+        SpriteAnimation animation = enemy.animation;
+        if (enemy.castPose > 0 && enemy.type != SpiritCatalog::Saint)
+        {
+            animation.moving = true;
+            animation.phase = enemy.castPose * 2.f;
+        }
+        spiritSheets[enemy.type].Draw(r,
+                                      p,
+                                      enemy.boss > 0 ? 100.f : SpiritCatalog::Get(enemy.type).size,
+                                      animation,
+                                      Color(1, 1, 1),
+                                      width,
+                                      height,
+                                      .4f,
+                                      SpiritCatalog::Get(enemy.type).motion,
+                                      time + float(enemy.position.x * .01),
+                                      enemy.castPose);
     }
     else
     {
-        r.Ellipse(p.x, p.y - 25, 16, 24, Color(.8f, .2f, .3f));
+        r.Ellipse(p.x, p.y - 25, 16, 24, Color(.4f, .7f, .8f));
     }
     if (!enemy.alerted && !enemy.weakened && enemy.flash <= 0 && enemy.boss == 0)
         return;
@@ -414,6 +532,44 @@ void Prototype::DrawCombatWarnings()
 {
     for (const auto& enemy : levelOne.enemies)
     {
+        // Include the full ranged telegraph/charge reach, but skip distant NPC battles.
+        const Point warningOrigin = Screen(enemy.position.x, enemy.position.y);
+        if (warningOrigin.x < -680 || warningOrigin.x > width + 680 ||
+            warningOrigin.y < -500 || warningOrigin.y > height + 600)
+        {
+            continue;
+        }
+        if (enemy.type == SpiritCatalog::Saint && enemy.alerted && !enemy.weakened &&
+            enemy.health > 0)
+        {
+            const bool preparing = enemy.phase == 1;
+            const float after = 1.25f - enemy.phaseTime;
+            if (preparing || (enemy.phase == 3 && after < .4f))
+            {
+                const int toll = preparing ? enemy.ritualCount : enemy.ritualCount - 1;
+                const bool radial = toll % 3 == 2;
+                const WorldPoint target = radial ? enemy.position : enemy.ritualTarget;
+                const Point center = Screen(target.x, target.y, 2);
+                const float alpha = preparing ? .35f : (1 - after / .4f) * .8f;
+                const double radius = radial ? 110 : 78;
+                for (int i = 0; i < 32; ++i)
+                {
+                    const double a = i * 6.2831853 / 32, b = (i + 1) * 6.2831853 / 32;
+                    r.Line(Screen(target.x + std::cos(a) * radius, target.y + std::sin(a) * radius),
+                           Screen(target.x + std::cos(b) * radius, target.y + std::sin(b) * radius),
+                           2,
+                           Color(.85f, .45f, 1.f, alpha));
+                }
+                spiritSpellArt[2].DrawSpellTile(r,
+                                                radial ? 3 : 0,
+                                                {center.x, center.y - (preparing ? 5 : 30)},
+                                                radial ? 130.f : 95.f,
+                                                radial ? 130.f : 95.f,
+                                                alpha,
+                                                time);
+            }
+            continue;
+        }
         if (!enemy.alerted || enemy.weakened || enemy.health <= 0 ||
             (enemy.phase != 1 && enemy.phase != 2))
             continue;

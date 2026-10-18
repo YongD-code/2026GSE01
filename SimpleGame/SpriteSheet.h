@@ -30,11 +30,13 @@ struct SpriteLayout
     int columns = 4, rows = 4;
     std::array<int, 8> directionRows = {{0, 1, 1, 1, 3, 2, 2, 2}};
     int idleFrame = 0, firstWalkFrame = 1, walkFrames = 3;
+    std::array<int, 8> directionIdleColumns = {{-1, -1, -1, -1, -1, -1, -1, -1}};
     bool anchorAtFeet = false;
     bool anchorAtTorso = false;
     bool pingPongWalk = false;
     // Authored Blender sheets share a camera and ground origin across every frame.
     bool fixedCanvas = false;
+    bool detectLocomotionColumns = false;
     float canvasAnchorY = .845f, canvasCharacterHeight = .78f;
 };
 
@@ -80,6 +82,7 @@ class SpriteSheet
     GLuint texture = 0;
     std::vector<Frame> frames;
     SpriteLayout layout;
+    float imageAspect = 1;
     int referenceHeight = 1;
 
   public:
@@ -98,6 +101,155 @@ class SpriteSheet
         return texture && !frames.empty();
     }
 
+    // Full image panel, independent of character-frame anchoring.
+    void DrawPanel(Renderer& renderer, float x, float y, float w, float h, float alpha)
+    {
+        if (Ready())
+        {
+            renderer.Sprite(texture, x, y, w, h, 0, 0, 1, 1, Color(1, 1, 1, alpha));
+        }
+    }
+
+    // Crop UVs rather than stretching or drawing outside the cinematic frame.
+    void DrawCinematic(Renderer& renderer,
+                       float x,
+                       float y,
+                       float w,
+                       float h,
+                       float zoom,
+                       float panX,
+                       float panY,
+                       float alpha = 1.f)
+    {
+        if (!Ready() || w <= 0 || h <= 0)
+            return;
+        const float aspect = w / h;
+        const float scale = (std::max)(1.f, zoom);
+        const float cropX = (aspect < imageAspect ? aspect / imageAspect : 1.f) / scale;
+        const float cropY = (aspect > imageAspect ? imageAspect / aspect : 1.f) / scale;
+        const float u = (std::max)(cropX * .5f, (std::min)(1 - cropX * .5f, .5f + panX));
+        const float v = (std::max)(cropY * .5f, (std::min)(1 - cropY * .5f, .5f + panY));
+        renderer.Sprite(texture,
+                        x,
+                        y,
+                        w,
+                        h,
+                        u - cropX * .5f,
+                        v - cropY * .5f,
+                        u + cropX * .5f,
+                        v + cropY * .5f,
+                        Color(1, 1, 1, alpha));
+    }
+
+    void DrawEffect(Renderer& renderer, Point center, float w, float h, float alpha, float phase)
+    {
+        if (Ready() && alpha > .001f)
+        {
+            renderer.Sprite(texture,
+                            center.x - w * .5f,
+                            center.y - h * .5f,
+                            w,
+                            h,
+                            0,
+                            0,
+                            1,
+                            1,
+                            Color(1, 1, 1, alpha),
+                            .5f,
+                            0,
+                            phase,
+                            true);
+        }
+    }
+
+    // Four padded spell illustrations in a 2x2 atlas; inset avoids neighboring-cell bleed.
+    void DrawSpellTile(Renderer& renderer,
+                       int tile,
+                       Point center,
+                       float w,
+                       float h,
+                       float alpha,
+                       float phase = 0,
+                       float rotation = 0)
+    {
+        if (!Ready() || tile < 0 || tile > 3 || alpha <= .001f)
+            return;
+        const float u = (tile % 2) * .5f, v = (tile / 2) * .5f;
+        renderer.Sprite(texture,
+                        center.x - w * .5f,
+                        center.y - h * .5f,
+                        w,
+                        h,
+                        u + .001f,
+                        v + .001f,
+                        u + .499f,
+                        v + .499f,
+                        Color(1, 1, 1, alpha),
+                        .7f,
+                        0,
+                        phase,
+                        true,
+                        rotation);
+    }
+
+    // Authored facial poses retain their anatomy instead of using UV noise distortion.
+    void DrawPoseTile(Renderer& renderer,
+                      int tile,
+                      Point center,
+                      float size,
+                      float alpha,
+                      float aspect = 1.f,
+                      float emission = .45f)
+    {
+        if (!Ready() || tile < 0 || tile > 3 || alpha <= .001f)
+        {
+            return;
+        }
+        const float u = (tile % 2) * .5f, v = (tile / 2) * .5f;
+        renderer.Sprite(texture,
+                        center.x - size * .5f,
+                        center.y - size / aspect * .5f,
+                        size,
+                        size / aspect,
+                        u + .001f,
+                        v + .001f,
+                        u + .499f,
+                        v + .499f,
+                        Color(1, 1, 1, alpha),
+                        emission);
+    }
+
+    // A single textured dome; the shader clips/refracts its edge and dissolves on collapse.
+    void DrawRealm(Renderer& renderer, Point center, float rx, float ry, float alpha, float phase)
+    {
+        if (!Ready() || rx < 1 || ry < 1 || alpha <= .001f)
+            return;
+        const float aspect = rx / ry;
+        const float cropX = aspect < imageAspect ? aspect / imageAspect : 1.f;
+        const float cropY = aspect > imageAspect ? imageAspect / aspect : 1.f;
+        renderer.Sprite(texture,
+                        center.x - rx,
+                        center.y - ry,
+                        rx * 2,
+                        ry * 2,
+                        .5f - cropX * .5f,
+                        .5f - cropY * .5f,
+                        .5f + cropX * .5f,
+                        .5f + cropY * .5f,
+                        Color(1, 1, 1, alpha),
+                        .12f,
+                        0,
+                        phase,
+                        false,
+                        0,
+                        4);
+    }
+
+    int WalkFrameCount() const
+    {
+        return layout.walkFrames;
+    }
+
     bool Load(const std::wstring& relativePath, const SpriteLayout& definition = SpriteLayout())
     {
         using Microsoft::WRL::ComPtr;
@@ -110,6 +262,13 @@ class SpriteSheet
         for (int row : layout.directionRows)
             if (row < 0 || row >= layout.rows)
                 return false;
+        for (int column : layout.directionIdleColumns)
+        {
+            if (column < -1 || column >= layout.columns)
+            {
+                return false;
+            }
+        }
         HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
         struct ComScope
@@ -165,6 +324,26 @@ class SpriteSheet
             return false;
         UINT width = 0, height = 0;
         converter->GetSize(&width, &height);
+        imageAspect = height > 0 ? float(width) / height : 1.f;
+        if (layout.detectLocomotionColumns)
+        {
+            if (height == 0 || height % layout.rows != 0)
+            {
+                return false;
+            }
+            const UINT cellSize = height / layout.rows;
+            if (width % cellSize != 0)
+            {
+                return false;
+            }
+            const UINT columns = width / cellSize;
+            if (columns != 9 && columns != 17)
+            {
+                return false;
+            }
+            layout.columns = static_cast<int>(columns);
+            layout.walkFrames = layout.columns - layout.firstWalkFrame;
+        }
         if (width < static_cast<UINT>(layout.columns) || height < static_cast<UINT>(layout.rows) ||
             width > 8192 || height > 8192)
             return false;
@@ -273,12 +452,20 @@ class SpriteSheet
               Color tint,
               int width,
               int height,
-              float emission = 0.f)
+              float emission = 0.f,
+              int spiritMotion = -1,
+              float motionTime = 0.f,
+              float casting = 0.f)
     {
         if (!Ready())
             return;
         int row = layout.directionRows[static_cast<int>(animation.facing)];
         int column = layout.idleFrame;
+        const int directionColumn = layout.directionIdleColumns[static_cast<int>(animation.facing)];
+        if (!animation.moving && directionColumn >= 0)
+        {
+            column = directionColumn;
+        }
         if (animation.moving)
         {
             int step = 0;
@@ -293,10 +480,84 @@ class SpriteSheet
                 step = static_cast<int>(animation.phase) % layout.walkFrames;
             column = layout.firstWalkFrame + step;
         }
+        // Smooth only locomotion, not discrete cast poses. Fractional phase survives between
+        // frames.
+        if (animation.moving && casting <= 0 && emission < 1.f && layout.walkFrames > 1)
+        {
+            const float fraction = animation.phase - std::floor(animation.phase);
+            int next = static_cast<int>(animation.phase) + 1;
+            if (layout.pingPongWalk)
+            {
+                const int period = 2 * (layout.walkFrames - 1);
+                next %= period;
+                if (next >= layout.walkFrames)
+                    next = period - next;
+            }
+            else
+                next %= layout.walkFrames;
+            const Frame& from = frames[row * layout.columns + column];
+            const Frame& to = frames[row * layout.columns + layout.firstWalkFrame + next];
+            const float scale = size / referenceHeight;
+            const float mix = fraction * fraction * (3 - 2 * fraction);
+            auto pose = [&](const Frame& f, float alpha)
+            {
+                if (alpha < .001f)
+                    return;
+                renderer.Sprite(texture,
+                                feet.x - f.anchorX * scale,
+                                feet.y - f.anchorY * scale,
+                                f.width * scale,
+                                f.height * scale,
+                                f.u0,
+                                f.v0,
+                                f.u1,
+                                f.v1,
+                                Color(tint.r, tint.g, tint.b, tint.a * alpha),
+                                emission);
+            };
+            pose(from, 1 - mix);
+            pose(to, mix);
+            return;
+        }
         const Frame& frame = frames[row * layout.columns + column];
         float scale = size / referenceHeight, w = frame.width * scale, h = frame.height * scale;
         if (feet.x + w < 0 || feet.x - w > width || feet.y < 0 || feet.y - h > height)
             return;
+        if (spiritMotion >= 0)
+        {
+            const float pace = animation.moving ? animation.phase * 1.5707963f : motionTime * 2;
+            const float pulse = std::sin(pace);
+            const float squash =
+                spiritMotion == 2 ? .045f * pulse - casting * .12f : .025f * pulse + casting * .06f;
+            h *= 1 + squash;
+            const float left = feet.x - frame.anchorX * scale;
+            const float top = feet.y - frame.anchorY * scale * (1 + squash);
+            auto offset = [&](float t)
+            {
+                const float wave = spiritMotion == 0   ? std::sin(pace - t * 4) * t * 4
+                                   : spiritMotion == 1 ? pulse * (1 - t) * 4
+                                                       : std::sin(pace + t * 2) * 2;
+                return wave + casting * (1 - t) * (spiritMotion == 2 ? 9 : -5);
+            };
+            // Contiguous sheared strips bend the sprite without changing source artwork.
+            for (int strip = 0; strip < 8; ++strip)
+            {
+                const float a = strip / 8.f, b = (strip + 1) / 8.f;
+                renderer.Sprite(texture,
+                                left + offset(a),
+                                top + h * a,
+                                w,
+                                h / 8,
+                                frame.u0,
+                                frame.v0 + (frame.v1 - frame.v0) * a,
+                                frame.u1,
+                                frame.v0 + (frame.v1 - frame.v0) * b,
+                                tint,
+                                emission,
+                                offset(b) - offset(a));
+            }
+            return;
+        }
         renderer.Sprite(texture,
                         feet.x - frame.anchorX * scale,
                         feet.y - frame.anchorY * scale,

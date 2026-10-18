@@ -36,13 +36,13 @@ const PauseColumn* PauseColumns() const
 {
     static const PauseEntry character[] = {{"능력치", 4}, {"기본 화면", 13}};
     static const PauseEntry inventory[] = {{"인벤토리", 1}, {"주령석 강화", 9}};
-    static const PauseEntry combat[] = {{"자동 발사", 10}, {"주령 능력", 11}, {"주령 조종", 12}};
+    static const PauseEntry combat[] = {{"기본 공격 안내", 10}, {"주령 조종·스킬 전환", 12}};
     static const PauseEntry adventure[] = {{"이벤트 · 퀘스트", 3}};
     static const PauseEntry records[] = {{"주령 도감", 2}, {"저장", 5}, {"불러오기", 6}};
     static const PauseEntry other[] = {{"조작 안내", 7}, {"게임 종료", 8}};
     static const PauseColumn columns[] = {{"캐릭터", character, 2},
                                           {"소지품", inventory, 2},
-                                          {"전투", combat, 3},
+                                          {"전투", combat, 2},
                                           {"모험", adventure, 1},
                                           {"기록", records, 3},
                                           {"기타", other, 2}};
@@ -177,17 +177,16 @@ void ActivateMenu(int item)
         levelOne.Upgrade(captured);
         break;
     case 10:
-        levelOne.automatic = !levelOne.automatic;
-        Say("자동 발사", levelOne.automatic ? "자동 발사를 켰습니다." : "자동 발사를 껐습니다.");
-        break;
-    case 11:
-        levelOne.UseSkill(player);
+        Say("기본 공격", "좌클릭으로 커서 방향을 공격합니다. 누르고 있으면 연속 공격합니다.");
         break;
     case 12:
         if (captured)
         {
             controlling = !controlling;
-            Say("조종 전환", controlling ? "주령을 조종합니다." : "방랑자의 몸으로 돌아왔습니다.");
+            movementWasControlling = controlling;
+            Say("조종 전환",
+                controlling ? "주령을 조종하고 주령 QWER을 사용합니다."
+                            : "방랑자의 몸으로 돌아와 기본 QWER을 사용합니다.");
         }
         else
         {

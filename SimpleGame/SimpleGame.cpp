@@ -59,7 +59,9 @@ void Timer(int)
     game->Update(dt, sprint);
     FrameProfiler::UpdateTime(FrameProfiler::Milliseconds(updateStart));
     glutPostRedisplay();
-    glutTimerFunc(16, Timer, 0);
+    // Include update work in the frame budget instead of adding a fixed wait after it.
+    const int elapsed = glutGet(GLUT_ELAPSED_TIME) - now;
+    glutTimerFunc((std::max)(1, 16 - elapsed), Timer, 0);
 }
 
 void Reshape(int w, int h)
@@ -76,9 +78,17 @@ void KeyDown(unsigned char key, int, int)
 
 void Mouse(int button, int state, int x, int y)
 {
-    if (game && button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+    if (game)
     {
-        game->PointerDown(x, y);
+        game->MouseButton(button, state == GLUT_DOWN, x, y);
+    }
+}
+
+void PointerMotion(int x, int y)
+{
+    if (game)
+    {
+        game->PointerMove(x, y);
     }
 }
 
@@ -153,7 +163,7 @@ int main(int argc, char** argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(1280, 800);
     glutCreateWindow("2026GSE01");
-    SetWindowTextW(WindowFromDC(wglGetCurrentDC()), L"마지막 불씨 | 2026GSE01 시제품");
+    SetWindowTextW(WindowFromDC(wglGetCurrentDC()), L"주흔 — 잊힌 이름 | 2026GSE01 시제품");
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
     glewExperimental = GL_TRUE;
     GLenum result = glewInit();
@@ -175,6 +185,8 @@ int main(int argc, char** argv)
     glutKeyboardFunc(KeyDown);
     glutKeyboardUpFunc(KeyUp);
     glutMouseFunc(Mouse);
+    glutMotionFunc(PointerMotion);
+    glutPassiveMotionFunc(PointerMotion);
     glutSpecialFunc(SpecialDown);
     glutSpecialUpFunc(SpecialUp);
     glutEntryFunc(Entry);

@@ -8,13 +8,17 @@ uniform samplerBuffer meshPool;
 uniform vec2 viewport;
 out vec4 tint;
 out vec2 uv;
+flat out vec4 imageBounds;
 flat out int textureSlot;
 flat out float emission;
+flat out vec2 energy;
 
 void main()
 {
     textureSlot = int(material.x);
     emission = material.y;
+    energy = material.zw;
+    imageBounds = uvRect;
     if (gl_VertexID >= int(placement.w))
     {
         gl_Position = vec4(2, 2, 0, 1);

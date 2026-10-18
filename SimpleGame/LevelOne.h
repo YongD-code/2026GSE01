@@ -2,6 +2,7 @@
 #include "World.h"
 #include "SpriteSheet.h"
 #include "CaptureRules.h"
+#include "SpiritCatalog.h"
 #include <algorithm>
 #include <random>
 #include <string>
@@ -16,6 +17,8 @@ class LevelOne
         WorldPoint position;
         int type;
         float health, maximum, flash = 0;
+        WorldPoint hitDirection = {0, 0};
+        float hitStrength = 0;
         SpriteAnimation animation;
         WorldPoint home = {0, 0};
         World::Key camp = {0, 0};
@@ -23,12 +26,23 @@ class LevelOne
         bool alerted = false, returning = false;
         std::vector<WorldPoint> trail;
         bool weakened = false;
+        float remnantTime = -2;
+        int remnantRarity = 1;
         int boss = 0;
         float slowed = 0;
         // 0: approach, 1: committed windup, 2: charge, 3: recovery.
         int phase = 0;
         float phaseTime = 0, stagger = 0, staggerGuard = 0;
         WorldPoint aim = {0, 0};
+        WorldPoint ritualTarget = {0, 0};
+        int npcTarget = -1;
+        int residentTargetIndex = -1;
+        float targetDecisionTime = 0;
+        float simulationTime = 0;
+        float saintSightTime = 0;
+        bool saintSightClear = false;
+        WorldPoint saintSightTarget = {0, 0};
+        int ritualCount = 0;
     };
 
     struct Projectile
@@ -38,6 +52,7 @@ class LevelOne
         bool companion;
         bool hostile = false;
         unsigned long long actorId = 0;
+        bool residentBattle = false;
     };
 
     enum class LootKind
@@ -59,12 +74,53 @@ class LevelOne
     };
 
     std::vector<Enemy> enemies;
+
+    struct ResidentCombatant
+    {
+        int id;
+        WorldPoint position;
+        float health, invulnerability;
+    };
+
+    std::vector<ResidentCombatant> residentCombatants;
+    std::vector<WorldPoint> encounterObservers;
+    std::set<World::Key> encounterRegions;
+    std::vector<World::Key> pendingEncounterRegions;
+    int damageResident = -1;
+
+    struct HitFeedback
+    {
+        WorldPoint position, direction;
+        float age = 0;
+        bool heavy = false;
+    };
+
+    std::vector<HitFeedback> hitFeedback;
+    float hitStop = 0, hitStopGuard = 0;
+
+    void UpdateHitFeedback(float dt)
+    {
+        hitStopGuard = (std::max)(0.f, hitStopGuard - dt);
+        for (auto& hit : hitFeedback)
+            hit.age += dt;
+        hitFeedback.erase(std::remove_if(hitFeedback.begin(),
+                                         hitFeedback.end(),
+                                         [](const HitFeedback& hit)
+                                         {
+                                             return hit.age >= .24f;
+                                         }),
+                          hitFeedback.end());
+    }
+
     std::vector<Projectile> projectiles;
     std::vector<Loot> loot;
     int level = 1, experience = 0, kills = 0, weapon = 0, stones = 0, spiritRank = 0;
     int failedUpgrades = 0;
+    int gold = 0, potions = 0, weaponStones = 0, spoils = 0;
     float health = 100, invulnerability = 0, cooldown = 0, companionCooldown = 0;
     float castTime = 0;
+    int damageSpirit = -1;
+    float spiritInvulnerability = 0;
     float dodgeTime = 0, dodgeCooldown = 0, hurtTime = 0;
     WorldPoint dodgeDirection = {0, 1};
 
@@ -127,9 +183,29 @@ class LevelOne
 
     void Hurt(float damage)
     {
+        if (damageResident >= 0 && damageResident < int(residentCombatants.size()))
+        {
+            auto& person = residentCombatants[damageResident];
+            if (person.invulnerability <= 0 && person.health > 0)
+            {
+                person.health = (std::max)(0.f, person.health - damage);
+                person.invulnerability = .55f;
+            }
+            return;
+        }
+        if (damageSpirit >= 0 && damageSpirit < static_cast<int>(collection.size()))
+        {
+            if (spiritInvulnerability <= 0)
+            {
+                auto& spirit = collection[damageSpirit];
+                spirit.health = (std::max)(0.f, spirit.health - damage);
+                spiritInvulnerability = .55f;
+            }
+            return;
+        }
         if (Dead() || invulnerability > 0 || dodgeTime > 0)
             return;
-        health = (std::max)(0.f, health - damage);
+        health = (std::max)(storyTrial ? 1.f : 0.f, health - damage);
         invulnerability = .55f;
         hurtTime = .22f;
         if (Dead())
@@ -176,11 +252,13 @@ class LevelOne
     std::mt19937 random{std::random_device{}()};
     CaptureRules captureRules;
     bool captureUnlocked = false;
+    bool storyTrial = false;
 
     struct SpiritInstance
     {
         int species = 0, rarity = 1;
         bool memory = false;
+        float health = 100;
     };
 
     std::vector<SpiritInstance> collection;
@@ -209,6 +287,14 @@ class LevelOne
     void Resolve(Enemy& enemy, bool purified)
     {
         enemy.health = 0;
+        if (enemy.weakened && enemy.remnantTime >= -1)
+        {
+            if (enemy.boss > 0)
+            {
+                resolvedBosses.insert(enemy.boss);
+            }
+            return;
+        }
         if (enemy.boss > 0)
             resolvedBosses.insert(enemy.boss);
         else
@@ -219,6 +305,8 @@ class LevelOne
         if (!purified)
             return;
         ++kills;
+        gold += 8;
+        ++spoils;
         const size_t firstDrop = loot.size();
         loot.push_back({enemy.position, LootKind::Experience});
         if (kills == 1 || Roll() < .35f)
@@ -236,8 +324,9 @@ class LevelOne
         }
         for (size_t i = firstDrop; i < loot.size(); ++i)
         {
-            const double angle = (i - firstDrop) * 2.39996;
-            const double radius = 18 + (i - firstDrop) * 5;
+            const double itemIndex = static_cast<double>(i - firstDrop);
+            const double angle = itemIndex * 2.39996;
+            const double radius = 18.0 + itemIndex * 5.0;
             loot[i].position.x += std::cos(angle) * radius;
             loot[i].position.y += std::sin(angle) * radius;
         }
@@ -251,8 +340,13 @@ class LevelOne
         Enemy& enemy = enemies[index];
         if (purify)
         {
+            if (enemy.boss == 5)
+            {
+                notice = "라엔: 첫 봉인이야. 낡은 봉인권을 선택하고 F로 포획해.";
+                return;
+            }
             Resolve(enemy, true);
-            notice = "주령을 정화했습니다. 전리품을 수집하세요.";
+            notice = "잔영을 흩어 보냈습니다. 처치 보상은 이미 지급되었습니다.";
             return;
         }
         if (tickets[selectedTicket] <= 0)
@@ -271,15 +365,12 @@ class LevelOne
             first ? 1.f : (enemy.boss == 4 ? captureRules.bossChance : captureRules.normalChance);
         if (Roll() <= chance)
         {
-            const float rarityRoll = Roll();
-            int rarity =
-                first ? 1
-                      : (rarityRoll < captureRules.rareChance
-                             ? 3
-                             : (rarityRoll < captureRules.rareChance + captureRules.uncommonChance
-                                    ? 2
-                                    : 1));
-            const int species = enemy.boss == 4 ? 3 : (first ? 0 : enemy.type);
+            int rarity = first ? 1 : enemy.remnantRarity;
+            const int species = enemy.boss == 4 ? SpiritCatalog::Saint : enemy.type;
+            if (species == SpiritCatalog::Saint)
+            {
+                rarity = (std::max)(rarity, 3);
+            }
             if (enemy.boss == 4)
                 rarity = 4;
             collection.push_back({species, rarity, !first && Roll() < .15f});
@@ -301,48 +392,151 @@ class LevelOne
         }
     }
 
-    void UseSkill(WorldPoint player)
+    void DamageEnemy(Enemy& enemy,
+                     float damage,
+                     WorldPoint source = {0, 0},
+                     bool heavy = false,
+                     bool feedback = true,
+                     bool residentOwned = false)
     {
-        if (collection.empty() || skillCooldown > 0 || Dead())
-            return;
-        for (const Enemy& enemy : enemies)
-            if (enemy.boss == 3 && enemy.alerted)
-            {
-                notice = "눈먼 수도사가 주령 능력을 봉쇄하고 있습니다.";
-                return;
-            }
-        bool affected = false;
-        for (Enemy& enemy : enemies)
-            if (enemy.health > 0 && !enemy.weakened && Distance(player, enemy.position) < Range())
-            {
-                enemy.slowed = 3;
-                affected = true;
-            }
-        if (!affected)
+        if (enemy.weakened || enemy.health <= 0)
         {
-            notice = "능력 범위 안에 적이 없습니다.";
             return;
         }
-        skillCooldown = 8;
-        ++skillsUsed;
-        notice = "붙잡는 손 · 주변 적의 움직임을 3초 동안 늦춥니다.";
+        if (feedback && damage > 0 && enemy.flash <= .05f)
+        {
+            const double dx = enemy.position.x - source.x, dy = enemy.position.y - source.y;
+            const double length = (std::max)(.001, std::hypot(dx, dy));
+            enemy.hitDirection = {dx / length, dy / length};
+            enemy.hitStrength = heavy ? 9.f : 4.f;
+            if (hitFeedback.size() >= 48)
+                hitFeedback.erase(hitFeedback.begin());
+            hitFeedback.push_back({enemy.position, enemy.hitDirection, 0, heavy});
+            if (heavy && hitStopGuard <= 0)
+            {
+                hitStop = .045f;
+                hitStopGuard = .18f;
+            }
+        }
+        enemy.health -= enemy.boss == 12 ? .05f : damage;
+        if (enemy.boss == 12)
+        {
+            enemy.health = (std::max)(1.f, enemy.health);
+        }
+        enemy.alerted = true;
+        if (feedback)
+            enemy.flash = .15f;
+        if (enemy.boss == 0 && enemy.phase == 0 && enemy.staggerGuard <= 0)
+        {
+            enemy.stagger = .16f;
+            enemy.staggerGuard = 1.2f;
+        }
+        const bool canCapture = !residentOwned && captureUnlocked &&
+                                (enemy.boss == 0 || enemy.boss == 4 || enemy.boss == 5 ||
+                                 enemy.boss == 9 || enemy.boss == 10 || enemy.boss == 11);
+        if (enemy.health <= 0)
+        {
+            Resolve(enemy, !residentOwned);
+            if (canCapture)
+            {
+                const float roll = Roll();
+                enemy.remnantRarity = enemy.boss == 4                      ? 4
+                                      : enemy.type == SpiritCatalog::Saint ? 3
+                                      : roll < captureRules.rareChance     ? 3
+                                      : roll < captureRules.rareChance + captureRules.uncommonChance
+                                          ? 2
+                                          : 1;
+                enemy.weakened = true;
+                enemy.health = 1;
+                enemy.alerted = enemy.returning = false;
+                enemy.phase = 0;
+                enemy.animation.moving = false;
+                enemy.remnantTime =
+                    enemy.boss == 5 ? -1.f
+                                    : (enemy.boss > 0 || enemy.remnantRarity >= 3 ? 60.f : 30.f);
+                if (enemy.boss == 5)
+                {
+                    resolvedBosses.erase(5);
+                }
+                notice = "주령을 처치했습니다. 남은 잔영에 가까이 가서 F로 포획할 수 있습니다.";
+            }
+        }
     }
 
-    template <class Collision> void EnsureBoss(int id, WorldPoint home, Collision blocked)
+    static bool IsCombatBoss(const Enemy& enemy)
+    {
+        return (enemy.boss >= 1 && enemy.boss <= 4) || enemy.boss == 12;
+    }
+
+    template <class Collision>
+    bool ClearSpawn(WorldPoint home, WorldPoint observer, Collision blocked) const
+    {
+        if (blocked(home) || !ClearLine(observer, home, blocked))
+        {
+            return false;
+        }
+        // A clear center alone can still bury the sprite or immediately block its attacks.
+        for (int i = 0; i < 16; ++i)
+        {
+            const double angle = i * 6.283185307 / 16;
+            if (!ClearLine(
+                    home, {home.x + std::cos(angle) * 64, home.y + std::sin(angle) * 64}, blocked))
+            {
+                return false;
+            }
+        }
+        for (const auto& enemy : enemies)
+        {
+            if (enemy.health > 0 && Distance(home, enemy.position) < 64)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    template <class Collision>
+    void EnsureBoss(int id, WorldPoint home, WorldPoint observer, Collision blocked)
     {
         if (resolvedBosses.count(id))
             return;
         for (const Enemy& enemy : enemies)
             if (enemy.boss == id)
                 return;
-        if (blocked(home))
+        const WorldPoint intended = home;
+        bool found = ClearSpawn(home, observer, blocked);
+        for (int ring = 1; ring <= 10 && !found; ++ring)
+        {
+            for (int direction = 0; direction < 16 && !found; ++direction)
+            {
+                const double angle = direction * 6.283185307 / 16;
+                home = {intended.x + std::cos(angle) * ring * 16,
+                        intended.y + std::sin(angle) * ring * 16};
+                found = ClearSpawn(home, observer, blocked);
+            }
+        }
+        if (!found)
+        {
             return;
+        }
         Enemy enemy;
         enemy.position = enemy.home = home;
         enemy.trail.push_back(home);
-        enemy.type = id == 4 ? 1 : 0;
+        enemy.type = id == 4 ? SpiritCatalog::Saint : SpiritCatalog::Forgotten;
+        if (id == 9 || id == 11)
+        {
+            enemy.type = 1;
+        }
+        if (id == 10)
+        {
+            enemy.type = 2;
+        }
         enemy.boss = id;
         enemy.maximum = id == 4 ? 420.f : (id == 1 ? 220.f : 160.f);
+        if (id >= 5)
+        {
+            enemy.maximum = id == 12 ? 200.f : 55.f;
+        }
         enemy.health = enemy.maximum;
         enemies.push_back(enemy);
     }
@@ -414,6 +608,17 @@ class LevelOne
             (std::max)(1, static_cast<int>(std::ceil(std::hypot(delta.x, delta.y) / 5)));
         for (int i = 0; i < steps; ++i)
         {
+            const WorldPoint diagonal = {position.x + delta.x / steps,
+                                         position.y + delta.y / steps};
+            if (ClearLine(position, diagonal, blocked))
+            {
+                position = diagonal;
+                if (trail)
+                {
+                    RecordTrail(*trail, position, blocked);
+                }
+                continue;
+            }
             WorldPoint next = {position.x + delta.x / steps, position.y};
             if (!blocked(next))
             {
@@ -448,7 +653,7 @@ class LevelOne
             return;
         if (!captured)
         {
-            notice = "주령석은 보관됩니다. 먼저 E로 주령을 포획하세요.";
+            notice = "주령석은 보관됩니다. 먼저 F로 주령을 포획하세요.";
             return;
         }
         if (spiritRank >= 10)
@@ -475,6 +680,19 @@ class LevelOne
         }
     }
 
+    void UsePotion()
+    {
+        if (Dead() || health >= MaximumHealth() || potions <= 0)
+        {
+            notice =
+                potions <= 0 ? "회복물약이 없습니다." : "지금은 회복물약을 사용할 수 없습니다.";
+            return;
+        }
+        --potions;
+        health = (std::min)(MaximumHealth(), health + MaximumHealth() * .3f);
+        notice = "회복물약 사용 · 본체 체력 30% 회복";
+    }
+
     void Collect(LootKind kind)
     {
         switch (kind)
@@ -494,17 +712,16 @@ class LevelOne
                 experience = 0;
             break;
         case LootKind::Weapon:
-            if (weapon < 20)
-                ++weapon;
-            notice = "무기 강화석 획득! 무기 피해량이 증가했습니다.";
+            ++weaponStones;
+            notice = "강화석 획득 · 대장장이에게서 사용·판매할 수 있습니다.";
             break;
         case LootKind::Healing:
-            health = (std::min)(MaximumHealth(), health + MaximumHealth() * .3f);
-            notice = "회복약을 사용해 최대 체력의 30%를 회복했습니다.";
+            ++potions;
+            notice = "회복물약 획득 · H로 필요할 때 사용하세요.";
             break;
         case LootKind::Stone:
             ++stones;
-            notice = "주령석 획득! G로 동행 주령을 강화하세요. 성공 확률 70%.";
+            notice = "주령석 획득! 봉인사에게서 동행 주령을 강화하세요. 성공 확률 70%.";
             break;
         case LootKind::Ticket:
             ++tickets[1];
@@ -552,80 +769,104 @@ class LevelOne
     void StreamEncounters(WorldPoint player, std::uint64_t seed, Collision blocked)
     {
         const World::Key region = {World::Index(player.x), World::Index(player.y)};
-        if (regionLoaded && activeRegion == region)
+        std::set<World::Key> needed;
+        std::vector<WorldPoint> observers = encounterObservers;
+        observers.push_back(player);
+        for (const auto& observer : observers)
+            for (int y = -1; y <= 1; ++y)
+                for (int x = -1; x <= 1; ++x)
+                    needed.insert({World::Index(observer.x) + x, World::Index(observer.y) + y});
+        const bool changed = !regionLoaded || encounterRegions != needed;
+        if (!changed && pendingEncounterRegions.empty())
             return;
+        if (changed)
+        {
+            pendingEncounterRegions.assign(needed.rbegin(), needed.rend());
+        }
+        encounterRegions = needed;
         activeRegion = region;
         regionLoaded = true;
         for (const Enemy& enemy : enemies)
-            if (enemy.boss == 0)
+            if (enemy.boss == 0 && !enemy.weakened)
                 camps[enemy.camp].health[enemy.slot] = enemy.health;
         enemies.erase(std::remove_if(enemies.begin(),
                                      enemies.end(),
                                      [&](const Enemy& enemy)
                                      {
-                                         return enemy.boss == 0 &&
-                                                (std::abs(enemy.camp.first - region.first) > 1 ||
-                                                 std::abs(enemy.camp.second - region.second) > 1);
+                                         return enemy.boss == 0 && !enemy.weakened &&
+                                                needed.count(enemy.camp) == 0;
                                      }),
                       enemies.end());
-        // A camp belongs to world coordinates, never to the player's position or a timer.
-        for (int y = -1; y <= 1; ++y)
-            for (int x = -1; x <= 1; ++x)
+        // Camps stay attached to world coordinates; only clear initial sightlines are accepted.
+        // At most two camps per frame, including the initial remote population load.
+        for (int budget = 0; budget < 2 && !pendingEncounterRegions.empty(); ++budget)
+        {
+            const auto key = pendingEncounterRegions.back();
+            pendingEncounterRegions.pop_back();
+            const double baseX = double(key.first) * World::ChunkSize;
+            const double baseY = double(key.second) * World::ChunkSize;
+            if (World::Village(baseX + 256, baseY + 256) ||
+                World::Settlement(baseX + 256, baseY + 256) ||
+                (baseX >= 512 && baseX <= 3584 && baseY >= -512 && baseY <= 0))
+                continue;
+            CampRecord& record = camps[key];
+            const auto hash = World::Hash(key.first, key.second, seed + 712);
+            for (int slot = 0; slot < 2 + int(hash % 3); ++slot)
             {
-                const World::Key key = {region.first + x, region.second + y};
-                const double baseX = double(key.first) * World::ChunkSize;
-                const double baseY = double(key.second) * World::ChunkSize;
-                if (World::Village(baseX + 256, baseY + 256))
+                if (enemies.size() >= 480)
+                    return;
+                if (record.defeated & (1u << slot))
                     continue;
-                CampRecord& record = camps[key];
-                const auto hash = World::Hash(key.first, key.second, seed + 712);
-                for (int slot = 0; slot < 2 + int(hash % 3); ++slot)
+                bool active = false;
+                for (const Enemy& enemy : enemies)
+                    if (enemy.boss == 0 && enemy.camp == key && enemy.slot == slot)
+                        active = true;
+                if (active)
+                    continue;
+                // Jittered, independent quadrants: no three-unit roadside formations.
+                // Keep margins across chunk borders and a clear exit to the road network.
+                WorldPoint home = {0, 0};
+                bool found = false;
+                for (int attempt = 0; attempt < 24 && !found; ++attempt)
                 {
-                    if (record.defeated & (1u << slot))
+                    const auto placement =
+                        World::Hash(key.first, key.second, seed + 1901 + slot * 97 + attempt * 17);
+                    const int quadrant = (slot + int((hash >> 8) % 4)) % 4;
+                    home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
+                            baseY + 60 + (quadrant / 2) * 256 + double((placement >> 16) % 120)};
+                    const WorldPoint exits[] = {{baseX + 24, home.y},
+                                                {baseX + 488, home.y},
+                                                {home.x, baseY + 24},
+                                                {home.x, baseY + 488}};
+                    WorldPoint nearestObserver = player;
+                    for (const auto& observer : observers)
+                        if (Distance(home, observer) < Distance(home, nearestObserver))
+                            nearestObserver = observer;
+                    if (!ClearSpawn(home, nearestObserver, blocked))
                         continue;
-                    bool active = false;
-                    for (const Enemy& enemy : enemies)
-                        if (enemy.boss == 0 && enemy.camp == key && enemy.slot == slot)
-                            active = true;
-                    if (active)
-                        continue;
-                    // Jittered, independent quadrants: no three-unit roadside formations.
-                    // Keep margins across chunk borders and a clear exit to the road network.
-                    WorldPoint home = {0, 0};
-                    bool found = false;
-                    for (int attempt = 0; attempt < 24 && !found; ++attempt)
-                    {
-                        const auto placement = World::Hash(
-                            key.first, key.second, seed + 1901 + slot * 97 + attempt * 17);
-                        const int quadrant = (slot + int((hash >> 8) % 4)) % 4;
-                        home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
-                                baseY + 60 + (quadrant / 2) * 256 +
-                                    double((placement >> 16) % 120)};
-                        const WorldPoint exits[] = {{baseX + 24, home.y},
-                                                    {baseX + 488, home.y},
-                                                    {home.x, baseY + 24},
-                                                    {home.x, baseY + 488}};
-                        if (blocked(home))
-                            continue;
-                        for (const auto& exit : exits)
-                            if (ClearLine(home, exit, blocked))
-                                found = true;
-                    }
-                    if (!found)
-                        continue;
-                    Enemy enemy;
-                    enemy.position = enemy.home = home;
-                    enemy.trail.push_back(home);
-                    enemy.camp = key;
-                    enemy.slot = slot;
-                    enemy.type = static_cast<int>((hash >> (slot * 8)) % 3);
-                    enemy.maximum = 48.f + enemy.type * 10.f;
-                    enemy.health = record.health[slot] < 0 ? enemy.maximum : record.health[slot];
-                    enemy.weakened =
-                        captureUnlocked && enemy.health <= enemy.maximum * captureRules.threshold;
-                    enemies.push_back(enemy);
+                    for (const auto& exit : exits)
+                        if (ClearLine(home, exit, blocked))
+                            found = true;
                 }
+                if (!found)
+                    continue;
+                Enemy enemy;
+                enemy.position = enemy.home = home;
+                enemy.trail.push_back(home);
+                enemy.camp = key;
+                enemy.slot = slot;
+                enemy.type = static_cast<int>((hash >> (slot * 8)) % 3);
+                // One rare saint in selected outlying camps; village/tutorial stays unchanged.
+                if (slot == 0 && hash % 7 == 0 && std::hypot(home.x, home.y) > 1200)
+                {
+                    enemy.type = SpiritCatalog::Saint;
+                }
+                enemy.maximum = SpiritCatalog::Get(enemy.type).health;
+                enemy.health = record.health[slot] < 0 ? enemy.maximum : record.health[slot];
+                enemy.weakened = false;
+                enemies.push_back(enemy);
             }
+        }
     }
 
     template <class Collision>
@@ -637,6 +878,78 @@ class LevelOne
             return;
         enemy.phaseTime -= dt;
         const double distance = Distance(enemy.position, player);
+        if (enemy.type == SpiritCatalog::Saint)
+        {
+            if (enemy.phase == 3)
+            {
+                if (enemy.phaseTime <= 0)
+                {
+                    enemy.phase = 0;
+                    enemy.saintSightTime = 0;
+                }
+                return;
+            }
+            if (enemy.phase == 1)
+            {
+                if (enemy.phaseTime > 0)
+                {
+                    return;
+                }
+                // A locked ground seal can be dodged; every third toll is a radial volley.
+                if (enemy.ritualCount % 3 != 2)
+                {
+                    if (Distance(player, enemy.ritualTarget) < 78 &&
+                        ClearLine(enemy.position, player, blocked))
+                    {
+                        Hurt(combat.rangedDamage * 1.35f);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        const double angle = i * 6.2831853 / 8;
+                        projectiles.push_back({enemy.position,
+                                               {std::cos(angle) * 220, std::sin(angle) * 220},
+                                               420,
+                                               combat.rangedDamage,
+                                               false,
+                                               true});
+                    }
+                }
+                ++enemy.ritualCount;
+                enemy.phase = 3;
+                enemy.phaseTime = 1.25f;
+                return;
+            }
+            enemy.saintSightTime -= dt;
+            if (distance < 360 &&
+                (enemy.saintSightTime <= 0 || Distance(player, enemy.saintSightTarget) > 48))
+            {
+                enemy.saintSightClear = ClearLine(enemy.position, player, blocked);
+                enemy.saintSightTarget = player;
+                enemy.saintSightTime = .2f;
+            }
+            if (distance < 360 && enemy.saintSightClear)
+            {
+                enemy.ritualTarget = player;
+                enemy.phase = 1;
+                enemy.phaseTime = 1.1f;
+                return;
+            }
+            if (distance > 280)
+            {
+                const double step = (std::min)(
+                    distance - 280,
+                    double(combat.chaseSpeed * .65f * dt * (enemy.slowed > 0 ? .35f : 1.f)));
+                Move(enemy.position,
+                     {(player.x - enemy.position.x) / distance * step,
+                      (player.y - enemy.position.y) / distance * step},
+                     blocked,
+                     &enemy.trail);
+            }
+            return;
+        }
         if (enemy.phase == 3)
         {
             if (enemy.type == 2 && distance > 1)
@@ -735,10 +1048,10 @@ class LevelOne
                                   : (enemy.type == 1 ? combat.chargeWindup : combat.rangedWindup);
             return;
         }
-        if (distance > 1)
+        if (distance > 62)
         {
             const double step = (std::min)(
-                distance, double(combat.chaseSpeed * dt * (enemy.slowed > 0 ? .35f : 1.f)));
+                distance - 62, double(combat.chaseSpeed * dt * (enemy.slowed > 0 ? .35f : 1.f)));
             Move(enemy.position,
                  {(player.x - enemy.position.x) / distance * step,
                   (player.y - enemy.position.y) / distance * step},
@@ -748,16 +1061,78 @@ class LevelOne
     }
 
     template <class Collision>
+    int ResidentTarget(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
+    {
+        const int previous = enemy.residentTargetIndex;
+        const bool valid = previous >= 0 && previous < int(residentCombatants.size()) &&
+                           residentCombatants[previous].id == enemy.npcTarget &&
+                           residentCombatants[previous].health > 0 &&
+                           Distance(residentCombatants[previous].position, enemy.position) < 600;
+        // A committed attack keeps its victim. Cancel it if that resident has fallen.
+        if (enemy.boss == 0 && (enemy.phase == 1 || enemy.phase == 2))
+        {
+            if (valid)
+                return previous;
+            if (enemy.npcTarget >= 0)
+            {
+                enemy.phase = 3;
+                enemy.phaseTime = .45f;
+            }
+            enemy.npcTarget = enemy.residentTargetIndex = -1;
+            return -1;
+        }
+        if (enemy.boss != 0 || Distance(player, enemy.position) <= 380)
+        {
+            enemy.npcTarget = enemy.residentTargetIndex = -1;
+            enemy.targetDecisionTime = 0;
+            return -1;
+        }
+        enemy.targetDecisionTime -= dt;
+        if (enemy.targetDecisionTime > 0)
+        {
+            if (valid)
+                return previous;
+            if (enemy.npcTarget < 0)
+                return -1;
+        }
+        enemy.targetDecisionTime = .35f + enemy.slot * .03f;
+        int chosen = -1;
+        double nearest = combat.aggro;
+        if (valid && Distance(residentCombatants[previous].position, enemy.position) < 340 &&
+            ClearLine(enemy.position, residentCombatants[previous].position, blocked))
+        {
+            chosen = previous;
+            // A new resident must be substantially closer before changing victims.
+            nearest = Distance(residentCombatants[previous].position, enemy.position) * .75;
+        }
+        for (size_t i = 0; i < residentCombatants.size(); ++i)
+        {
+            if (int(i) == chosen || residentCombatants[i].health <= 0)
+                continue;
+            const double distance = Distance(residentCombatants[i].position, enemy.position);
+            if (distance < nearest &&
+                ClearLine(enemy.position, residentCombatants[i].position, blocked))
+            {
+                nearest = distance;
+                chosen = int(i);
+            }
+        }
+        enemy.residentTargetIndex = chosen;
+        enemy.npcTarget = chosen >= 0 ? residentCombatants[chosen].id : -1;
+        return chosen;
+    }
+
+    template <class Collision, class TimeScale>
     void Update(float dt,
                 WorldPoint player,
                 WorldPoint companion,
                 bool captured,
                 bool controlling,
                 bool fireHeld,
-                bool pickupHeld,
-                bool lootAbsorption,
                 std::uint64_t worldSeed,
-                Collision blocked)
+                Collision blocked,
+                TimeScale timeScale,
+                double fullRateRadius = 1400)
     {
         if (Dead())
             return;
@@ -767,21 +1142,73 @@ class LevelOne
         cooldown = (std::max)(0.f, cooldown - dt);
         companionCooldown = (std::max)(0.f, companionCooldown - dt);
         skillCooldown = (std::max)(0.f, skillCooldown - dt);
-        StreamEncounters(player, worldSeed, blocked);
+        spiritInvulnerability = (std::max)(0.f, spiritInvulnerability - dt);
+        for (int i = 0; i < static_cast<int>(collection.size()); ++i)
+        {
+            if (!controlling || i != damageSpirit)
+            {
+                collection[i].health = (std::min)(100.f, collection[i].health + 5.f * dt);
+            }
+        }
+        const WorldPoint combatTarget = controlling ? companion : player;
+        StreamEncounters(combatTarget, worldSeed, blocked);
         for (Enemy& enemy : enemies)
         {
-            if (enemy.health <= 0 || enemy.weakened)
+            if (enemy.weakened)
+            {
+                if (enemy.remnantTime == -2)
+                {
+                    // Upgrade legacy weakened actors once, awarding their pending kill.
+                    enemy.weakened = false;
+                    DamageEnemy(enemy, enemy.maximum + 1, enemy.position, false, false);
+                }
+                if (enemy.remnantTime > 0)
+                {
+                    enemy.remnantTime = (std::max)(0.f, enemy.remnantTime - dt);
+                    if (enemy.remnantTime == 0)
+                    {
+                        enemy.health = 0;
+                    }
+                }
                 continue;
+            }
+            if (enemy.health <= 0)
+            {
+                continue;
+            }
             enemy.slowed = (std::max)(0.f, enemy.slowed - dt);
             enemy.flash = (std::max)(0.f, enemy.flash - dt);
+            const float scaledDt = dt * timeScale(enemy.position, IsCombatBoss(enemy) ? 1 : 0);
+            if (scaledDt <= 0)
+            {
+                // Frozen time must never be replayed after a domain releases its targets.
+                enemy.simulationTime = 0;
+                enemy.animation.moving = false;
+                continue;
+            }
+            enemy.simulationTime += scaledDt;
+            const bool distant =
+                enemy.boss == 0 && Distance(enemy.position, combatTarget) > fullRateRadius;
+            const float interval = enemy.alerted || enemy.returning ? .1f : .25f;
+            if (distant && enemy.simulationTime < interval)
+                continue;
+            const float enemyDt = enemy.simulationTime;
+            enemy.simulationTime = 0;
             const WorldPoint previous = enemy.position;
-            const double distance = Distance(player, enemy.position);
+            WorldPoint enemyTarget = combatTarget;
+            damageResident = ResidentTarget(enemy, combatTarget, enemyDt, blocked);
+            if (damageResident >= 0)
+            {
+                enemyTarget = residentCombatants[damageResident].position;
+            }
+            const double distance = Distance(enemyTarget, enemy.position);
             if (!enemy.returning && !enemy.alerted && distance < combat.aggro &&
-                ClearLine(enemy.position, player, blocked))
+                ClearLine(enemy.position, enemyTarget, blocked))
                 enemy.alerted = true;
             if (enemy.alerted &&
-                (Distance(player, enemy.home) > 650 || Distance(enemy.position, enemy.home) > 600 ||
-                 Distance(player, {0, 0}) <= 210 || enemy.trail.size() >= 2048))
+                (Distance(enemyTarget, enemy.home) > 650 ||
+                 Distance(enemy.position, enemy.home) > 600 ||
+                 Distance(enemyTarget, {0, 0}) <= 210 || enemy.trail.size() >= 2048))
             {
                 enemy.alerted = false;
                 enemy.returning = true;
@@ -792,13 +1219,13 @@ class LevelOne
                 while (enemy.returning && enemy.trail.size() > 1 &&
                        Distance(enemy.position, enemy.trail.back()) < .01)
                     enemy.trail.pop_back();
-                const WorldPoint target = enemy.returning ? enemy.trail.back() : player;
+                const WorldPoint target = enemy.returning ? enemy.trail.back() : combatTarget;
                 const double travel = Distance(enemy.position, target);
                 if (travel > (enemy.returning ? .001 : 24))
                 {
                     const double step =
                         (std::min)(travel,
-                                   double(enemy.returning ? 90 : 48 + enemy.type * 5) * dt *
+                                   double(enemy.returning ? 90 : 48 + enemy.type * 5) * enemyDt *
                                        (enemy.slowed > 0 ? .35 : 1.));
                     const WorldPoint delta = {(target.x - enemy.position.x) / travel * step,
                                               (target.y - enemy.position.y) / travel * step};
@@ -819,17 +1246,28 @@ class LevelOne
                 }
             }
 
+            const size_t previousProjectiles = projectiles.size();
             if (enemy.alerted)
-                AttackEnemy(enemy, player, dt, blocked);
+                AttackEnemy(enemy, enemyTarget, enemyDt, blocked);
+            if (damageResident >= 0)
+                for (size_t i = previousProjectiles; i < projectiles.size(); ++i)
+                    projectiles[i].residentBattle = true;
             const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
-            enemy.animation.Update((ax - ay) * .85, (ax + ay) * .43, dt, false);
+            enemy.animation.Update((ax - ay) * .85,
+                                   (ax + ay) * .43,
+                                   enemyDt,
+                                   false,
+                                   enemy.type == 0   ? 7.f
+                                   : enemy.type == 1 ? 11.f
+                                                     : 9.f);
         }
+        damageResident = -1;
         if (Dead())
         {
             projectiles.clear();
             return;
         }
-        if (dodgeTime <= 0 && !controlling && cooldown <= 0 && (automatic || fireHeld) &&
+        if (dodgeTime <= 0 && !controlling && cooldown <= 0 && fireHeld &&
             Shoot(player, false, blocked))
             cooldown = Interval();
         bool summonBlocked = false;
@@ -843,14 +1281,16 @@ class LevelOne
             float remainingTime = dt;
             while (remainingTime > 0 && shot.remaining > 0)
             {
+                const float scale = timeScale(shot.position, 2);
                 const float step =
-                    (std::min)((std::min)(remainingTime, .008f), shot.remaining / 440.f);
+                    (std::min)((std::min)(remainingTime, .008f), shot.remaining / (440.f * scale));
                 if (step <= 0)
                     break;
                 remainingTime -= step;
-                shot.remaining = (std::max)(0.f, shot.remaining - 440.f * step);
-                shot.position.x += shot.velocity.x * step;
-                shot.position.y += shot.velocity.y * step;
+                const float flightTime = step * scale;
+                shot.remaining = (std::max)(0.f, shot.remaining - 440.f * flightTime);
+                shot.position.x += shot.velocity.x * flightTime;
+                shot.position.y += shot.velocity.y * flightTime;
                 if (blocked(shot.position))
                 {
                     shot.remaining = 0;
@@ -858,9 +1298,23 @@ class LevelOne
                 }
                 if (shot.hostile)
                 {
-                    if (Distance(shot.position, player) < 18)
+                    for (size_t i = 0; i < residentCombatants.size(); ++i)
                     {
-                        if (Distance(player, {0, 0}) > 210)
+                        if (residentCombatants[i].health > 0 &&
+                            Distance(shot.position, residentCombatants[i].position) < 18)
+                        {
+                            damageResident = int(i);
+                            Hurt(shot.damage);
+                            damageResident = -1;
+                            shot.remaining = 0;
+                            break;
+                        }
+                    }
+                    if (shot.remaining <= 0)
+                        break;
+                    if (Distance(shot.position, combatTarget) < 18)
+                    {
+                        if (Distance(combatTarget, {0, 0}) > 210)
                             Hurt(shot.damage);
                         shot.remaining = 0;
                     }
@@ -871,28 +1325,11 @@ class LevelOne
                     if (enemy.weakened || enemy.returning || enemy.health <= 0 ||
                         Distance(shot.position, enemy.position) > 22)
                         continue;
-                    enemy.health -= shot.damage;
-                    enemy.alerted = true;
-                    enemy.flash = .15f;
-                    if (enemy.boss == 0 && enemy.phase == 0 && enemy.staggerGuard <= 0)
-                    {
-                        enemy.stagger = .16f;
-                        enemy.staggerGuard = 1.2f;
-                    }
-                    const bool canCapture = captureUnlocked && (enemy.boss == 0 || enemy.boss == 4);
-                    const float threshold =
-                        enemy.maximum *
-                        (enemy.boss == 4 ? captureRules.bossThreshold : captureRules.threshold);
-                    if (canCapture && enemy.health <= threshold)
-                    {
-                        enemy.health = threshold;
-                        enemy.weakened = true;
-                        enemy.alerted = false;
-                        notice = "주령이 약화되었습니다. 가까이에서 E로 포획하거나 X로 정화하세요.";
-                    }
+                    DamageEnemy(
+                        enemy,
+                        shot.damage,
+                        {shot.position.x - shot.velocity.x, shot.position.y - shot.velocity.y});
                     shot.remaining = 0;
-                    if (enemy.health <= 0)
-                        Resolve(enemy, true);
                     break;
                 }
             }
@@ -921,8 +1358,8 @@ class LevelOne
         {
             item.age += dt;
             const double distance = Distance(item.position, collector);
-            // Only the equipped gathering spirit grants passive collection.
-            item.attracted = lootAbsorption && !summonBlocked && distance < MagnetRange();
+            // Every controlled character attracts nearby loot, even during spirit suppression.
+            item.attracted = distance < MagnetRange();
             // Pickups are ethereal: attraction passes through scenery to avoid unreachable rewards.
             if (item.attracted && distance > 0)
             {
@@ -930,8 +1367,7 @@ class LevelOne
                 item.position.x += (collector.x - item.position.x) * t;
                 item.position.y += (collector.y - item.position.y) * t;
             }
-            if ((pickupHeld && distance < 65) ||
-                (item.attracted && Distance(item.position, collector) < 18))
+            if (item.attracted && Distance(item.position, collector) < 18)
             {
                 Collect(item.kind);
                 item.age = 1000;

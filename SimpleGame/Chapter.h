@@ -83,10 +83,24 @@ class Chapter
     void Advance(int kills, int captures)
     {
         if (!Current())
+        {
             return;
+        }
         ++step;
         baselineKills = kills;
         baselineCaptures = captures;
         rewardPending = true;
+    }
+
+    int Index(const std::string& id) const
+    {
+        for (size_t i = 0; i < quests.size(); ++i)
+        {
+            if (quests[i].id == id)
+            {
+                return static_cast<int>(i);
+            }
+        }
+        return static_cast<int>(quests.size());
     }
 };

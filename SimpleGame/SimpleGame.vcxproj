@@ -158,12 +158,16 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
+    <ClInclude Include="StoryLayout.h" />
+    <ClInclude Include="ClickNavigation.h" />
+    <ClInclude Include="PrototypeControls.inl" />
     <ClInclude Include="FrameProfiler.h" />
     <ClInclude Include="RenderStorage.h" />
     <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
     <ClInclude Include="LevelOne.h" />
+    <ClInclude Include="SpiritCatalog.h" />
     <ClInclude Include="SaveGame.h" />
     <ClInclude Include="PrototypeSave.inl" />
     <ClInclude Include="Chapter.h" />
@@ -173,6 +177,17 @@
     <ClInclude Include="ShaderFiles.h" />
     <ClInclude Include="PostProcessing.h" />
     <ClInclude Include="Prototype.h" />
+    <ClInclude Include="Monitoring.h" />
+    <ClInclude Include="Population.h" />
+    <ClInclude Include="PrototypePopulation.inl" />
+    <ClInclude Include="PrototypeMonitoring.inl" />
+    <ClInclude Include="PrototypeDomain.inl" />
+    <ClInclude Include="PrototypePolarity.inl" />
+    <ClInclude Include="PrototypeRed.inl" />
+    <ClInclude Include="PrototypeServices.inl" />
+    <ClInclude Include="PrototypeSpiritSkills.inl" />
+    <ClInclude Include="PrototypeSpiritEffects.inl" />
+    <ClInclude Include="PrototypeStoryProps.inl" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -218,6 +233,7 @@
     <None Include="Data\Chapter1.tsv" />
     <None Include="Data\Capture.ini" />
     <None Include="Data\Combat.ini" />
+    <None Include="Data\Monitoring.ini" />
     <None Include="Assets\Characters\protagonist.png" />
     <None Include="Assets\Characters\mira.png" />
     <None Include="Assets\Characters\keeper.png" />

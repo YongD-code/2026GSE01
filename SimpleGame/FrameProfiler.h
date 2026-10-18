@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <fstream>
 #include <array>
+#include <algorithm>
 #include <sstream>
 
 class FrameProfiler
@@ -17,6 +18,42 @@ class FrameProfiler
     {
         return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
     }
+
+    enum class Stage
+    {
+        Population,
+        Combat,
+        Streaming,
+        SceneSync,
+        WorldDraw,
+        InterfaceDraw,
+        Monitoring,
+        Count
+    };
+
+    class Scope
+    {
+      public:
+        explicit Scope(Stage stage) : stage(stage), start(Clock::now())
+        {
+        }
+
+        ~Scope()
+        {
+            auto& result = Data().sections[static_cast<size_t>(stage)];
+            const double ms = Milliseconds(start);
+            result.total += ms;
+            result.maximum = (std::max)(result.maximum, ms);
+            ++result.samples;
+        }
+
+        Scope(const Scope&) = delete;
+        Scope& operator=(const Scope&) = delete;
+
+      private:
+        Stage stage;
+        Clock::time_point start;
+    };
 
     static void Event(const char* type, const std::string& key, size_t bytes, double ms = 0)
     {
@@ -65,13 +102,14 @@ class FrameProfiler
                 s.events << s.startup.str();
                 s.startup.str("");
                 std::ofstream metadata((stem + L"-session.txt").c_str());
-                metadata << "schema=1\npatch=1.0.7v\nbatching="
+                metadata << "schema=1\npatch=1.0.65v\nbatching="
                          << RenderStorage::Enabled(L"GSE_RENDER_BATCH")
                          << "\ndisk_cache=" << RenderStorage::Enabled(L"GSE_MESH_DISK_CACHE")
                          << "\nGL_VENDOR=" << glGetString(GL_VENDOR)
                          << "\nGL_RENDERER=" << glGetString(GL_RENDERER)
                          << "\nGL_VERSION=" << glGetString(GL_VERSION)
-                         << "\nTimer delay=16ms; CPU submission is not GPU execution time.\n";
+                         << "\nTimer targets 16ms including update cost; "
+                            "CPU submission is not GPU execution time.\n";
                 std::printf("[성능] 분석 로그: %ls\n", stem.c_str());
                 if (!s.csv || !s.events || !metadata)
                     std::printf(
@@ -198,6 +236,26 @@ class FrameProfiler
             return;
         Event("mesh_ram_hits_interval", "", s.cacheHits);
         s.cacheHits = 0;
+        const char* sectionNames[] = {"population",
+                                      "combat",
+                                      "world_stream",
+                                      "scene_sync",
+                                      "world_draw",
+                                      "interface_draw",
+                                      "monitoring"};
+        for (size_t i = 0; i < s.sections.size(); ++i)
+        {
+            auto& section = s.sections[i];
+            if (section.samples)
+            {
+                Event("cpu_section_avg",
+                      sectionNames[i],
+                      section.samples,
+                      section.total / section.samples);
+                Event("cpu_section_max", sectionNames[i], section.samples, section.maximum);
+            }
+            section = {};
+        }
         std::printf("[성능] FPS %.1f | DrawCall 최근 %llu · 평균 %.1f · 최소 %llu · 최대 %llu"
                     " | 일반 %llu · 인스턴싱 %llu · 픽셀 %llu | 인스턴스 %llu | CPU 렌더 %.2fms · "
                     "화면교환 %.2fms · 갱신 %.2fms\n",
@@ -225,6 +283,14 @@ class FrameProfiler
   private:
     struct Statistics
     {
+        struct Section
+        {
+            double total = 0, maximum = 0;
+            size_t samples = 0;
+        };
+
+        std::array<Section, static_cast<size_t>(Stage::Count)> sections;
+
         struct Query
         {
             GLuint id = 0;
