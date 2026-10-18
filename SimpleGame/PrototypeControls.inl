@@ -16,6 +16,10 @@ struct SkillEffect
 
 std::vector<WorldPoint> moveRoute;
 size_t routeIndex = 0;
+WorldPoint moveDestination = {0, 0};
+bool hasMoveDestination = false, moveRouteComplete = false;
+float navigationWait = 0, movementBlockedTime = 0;
+int navigationRecoveries = 0;
 int cursorX = 640, cursorY = 400;
 bool attackHeld = false;
 
@@ -39,16 +43,73 @@ void BufferCommand(int action)
 void MoveTo(WorldPoint target)
 {
     attackHeld = false;
-    moveRoute = ClickNavigation::Find(controlling ? spirit : player,
-                                      target,
-                                      [this](WorldPoint p)
-                                      {
-                                          return Blocked(p);
-                                      });
+    bufferedCommand.action = -1;
+    moveDestination = target;
+    hasMoveDestination = true;
+    moveRouteComplete = false;
+    moveRoute.clear();
     routeIndex = 0;
+    movementBlockedTime = 0;
+    navigationRecoveries = 0;
+    // Repeated clicks replace the destination without bypassing the search rate limit.
+}
+
+void StopMovement()
+{
+    hasMoveDestination = false;
+    moveRouteComplete = false;
+    moveRoute.clear();
+    routeIndex = 0;
+    movementVelocity = {0, 0};
+    navigationWait = movementBlockedTime = 0;
+    navigationRecoveries = 0;
+}
+
+void RetryMovement()
+{
+    moveRoute.clear();
+    routeIndex = 0;
+    movementVelocity = {0, 0};
+    movementBlockedTime = 0;
+    moveRouteComplete = false;
+    if (++navigationRecoveries >= 3)
+    {
+        StopMovement();
+        Say("이동", "해당 위치로 이동할 수 없습니다.");
+        return;
+    }
+    navigationWait = (std::max)(navigationWait, .18f);
+}
+
+void UpdateMoveRoute(float dt)
+{
+    if (!hasMoveDestination || routeIndex < moveRoute.size() || navigationWait > 0 || dt <= 0)
+    {
+        return;
+    }
+    const WorldPoint actor = controlling ? spirit : player;
+    if (moveRouteComplete || Distance(actor, moveDestination) < 2)
+    {
+        StopMovement();
+        return;
+    }
+    moveRoute = ClickNavigation::Find(
+        actor,
+        moveDestination,
+        [this](WorldPoint p)
+        {
+            return Blocked(p);
+        },
+        768,
+        2.0,
+        true,
+        &moveDestination,
+        &moveRouteComplete);
+    routeIndex = 0;
+    navigationWait = .12f;
     if (moveRoute.empty())
     {
-        Say("이동", "해당 위치로 이동할 수 없습니다.");
+        RetryMovement();
     }
 }
 
@@ -63,17 +124,20 @@ void UpdateBufferedCommand(float dt)
     {
         return;
     }
-    bufferedCommand.remaining -= dt;
-    if (bufferedCommand.remaining < 0)
+    // Preparation, hit stop and dodging must not consume the acceptance window.
+    if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0)
     {
-        bufferedCommand.action = -1;
         return;
     }
     const int action = bufferedCommand.action;
-    if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0 ||
-        (action < 4 && skillTimers[SkillSet()][action] > 0) ||
+    if ((action < 4 && skillTimers[SkillSet()][action] > 0) ||
         (action == 4 && levelOne.cooldown > 0))
     {
+        bufferedCommand.remaining -= dt;
+        if (bufferedCommand.remaining <= 0)
+        {
+            bufferedCommand.action = -1;
+        }
         return;
     }
     replayingCommand = true;
@@ -81,8 +145,6 @@ void UpdateBufferedCommand(float dt)
         CastSkill(action);
     else if (action == 4)
         BasicAttack();
-    else
-        MoveTo(bufferedCommand.target);
     replayingCommand = false;
     bufferedCommand.action = -1;
 }
@@ -157,9 +219,9 @@ bool PreparingSkill() const
 
 void ResetControls(bool restoring = false)
 {
+    talkingResident = -1;
     serviceNpc.clear();
-    moveRoute.clear();
-    routeIndex = 0;
+    StopMovement();
     attackHeld = false;
     bufferedCommand.action = -1;
     spiritHasteTime = 0;
@@ -176,32 +238,6 @@ void ResetControls(bool restoring = false)
             timer = restoring ? levelOne.skillCooldown : 0;
         }
     }
-}
-
-std::string ControlText(std::string text) const
-{
-    const std::pair<const char*, const char*> changes[] = {
-        {"죽이지 마. 낡은 봉인권을 받아.", "처치하면 포획할 잔영이 남아. 낡은 봉인권을 받아."},
-        {"약화시키고", "처치한 뒤 잔영을"},
-        {"약화된 주령", "주령의 잔영"},
-        {"약화시켜 포획하거나 정화할 수 있다.", "처치한 뒤 남은 잔영을 포획할 수 있다."},
-        {"약화되면", "처치 후 남은 잔영을"},
-        {"Space 공격", "좌클릭 공격"},
-        {"E로", "F로"},
-        {"E를", "F를"},
-        {"기술 V 사용하기", "B로 주령을 조종한 뒤 W 망령의 손 사용하기"},
-        {"V로", "W로"}};
-    for (const auto& change : changes)
-    {
-        const std::string before = change.first, after = change.second;
-        size_t at = 0;
-        while ((at = text.find(before, at)) != std::string::npos)
-        {
-            text.replace(at, before.size(), after);
-            at += after.size();
-        }
-    }
-    return text;
 }
 
 bool ControlsActive() const
@@ -353,16 +389,25 @@ void BasicAttack(bool buffer = false)
 
 void CastSkill(int slot)
 {
-    if (!ControlsActive() || PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0)
+    if (!ControlsActive())
     {
-        BufferCommand(slot);
+        return;
+    }
+    if (chapter.step < chapter.Index("P005"))
+    {
+        Say("술식", "아직 주력을 다루는 법을 모릅니다. 묘지에서 라엔을 만나세요.");
         return;
     }
     const int set = SkillSet();
-    if (skillTimers[set][slot] > 0)
+    // Do not reserve unavailable skills for an entire cooldown, even during another cast.
+    if (skillTimers[set][slot] > .3f)
     {
-        if (skillTimers[set][slot] <= .3f)
-            BufferCommand(slot);
+        return;
+    }
+    if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0 ||
+        skillTimers[set][slot] > 0)
+    {
+        BufferCommand(slot);
         return;
     }
     if (!replayingCommand)
@@ -393,11 +438,12 @@ void CastSkill(int slot)
     static const float waits[4] = {6, 9, 12, 40};
     skillTimers[set][slot] = waits[slot];
     levelOne.skillCooldown = (std::max)(levelOne.skillCooldown, waits[slot]);
-    if (set > 0)
+    const auto* quest = chapter.Current();
+    if (set > 0 && (!quest || quest->trigger != "skill" || (set == 1 && slot == quest->amount)))
     {
         ++levelOne.skillsUsed;
     }
-    moveRoute.clear();
+    // Retain the destination and safe route so movement resumes after preparation.
     movementVelocity = {0, 0};
     attackHeld = false;
     FaceCast(origin, target);
@@ -707,6 +753,7 @@ void DrawSkillBar()
 {
     const auto bounds = SkillBarBounds();
     const int set = SkillSet();
+    const bool locked = chapter.step < chapter.Index("P005");
     const char* keys = "QWER";
     for (int i = 0; i < 4; ++i)
     {
@@ -714,10 +761,12 @@ void DrawSkillBar()
         const UIRect cell = {bounds.x + i * stride, bounds.y, stride - 4, bounds.h};
         Panel(cell.x, cell.y, cell.w, cell.h);
         std::string label(1, keys[i]);
-        label += skillTimers[set][i] > 0
+        label += locked ? " 잠김"
+                 : skillTimers[set][i] > 0
                      ? " " + std::to_string(int(std::ceil(skillTimers[set][i]))) + "초"
                      : " 준비";
-        r.Text(cell.x + 7, cell.y + 17, label, Color(.7f, .85f, 1));
+        r.Text(
+            cell.x + 7, cell.y + 17, label, locked ? Color(.55f, .58f, .64f) : Color(.7f, .85f, 1));
         r.Text(cell.x + 5, cell.y + 37, SkillName(set, i), Color(.9f, .9f, .85f));
     }
 }

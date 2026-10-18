@@ -10,21 +10,47 @@
 
 namespace ClickNavigation
 {
-// Bounded, click-time A*: no path search in the per-frame movement loop.
+// Callers schedule bounded searches; partial routes can be continued in a later frame.
 template <class Collision>
 std::vector<WorldPoint> Find(WorldPoint start,
                              WorldPoint goal,
                              Collision blocked,
                              int maximumNodes = 4096,
                              double milliseconds = 0,
-                             bool allowPartial = false)
+                             bool allowPartial = false,
+                             WorldPoint* resolvedGoal = nullptr,
+                             bool* complete = nullptr)
 {
     const auto began = std::chrono::steady_clock::now();
+    if (resolvedGoal)
+    {
+        *resolvedGoal = goal;
+    }
+    if (complete)
+    {
+        *complete = false;
+    }
+    bool exhausted = false;
+    auto expired = [&]()
+    {
+        if (!exhausted && milliseconds > 0)
+        {
+            const double elapsed =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began)
+                    .count();
+            exhausted = elapsed >= milliseconds;
+        }
+        return exhausted;
+    };
     auto clear = [&](WorldPoint a, WorldPoint b)
     {
         const int count = (std::max)(1, int(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / 4)));
         for (int i = 1; i <= count; ++i)
         {
+            if ((i == 1 || i % 16 == 0) && expired())
+            {
+                return false;
+            }
             const double t = double(i) / count;
             if (blocked({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t}))
             {
@@ -40,6 +66,10 @@ std::vector<WorldPoint> Find(WorldPoint start,
         {
             for (int i = 0; i < 24; ++i)
             {
+                if (expired())
+                {
+                    return {};
+                }
                 const double angle = i * 6.283185307 / 24;
                 WorldPoint candidate = {goal.x + std::cos(angle) * radius,
                                         goal.y + std::sin(angle) * radius};
@@ -56,8 +86,16 @@ std::vector<WorldPoint> Find(WorldPoint start,
             return {};
         }
     }
+    if (resolvedGoal)
+    {
+        *resolvedGoal = goal;
+    }
     if (clear(start, goal))
     {
+        if (complete)
+        {
+            *complete = true;
+        }
         return {goal};
     }
     using Key = std::pair<int, int>;
@@ -85,7 +123,7 @@ std::vector<WorldPoint> Find(WorldPoint start,
     Key last = {0, 0};
     bool reached = false;
     double closest = distance(start, goal);
-    for (int visited = 0; !open.empty() && visited < maximumNodes;)
+    for (int visited = 0; !open.empty() && visited < maximumNodes && !expired();)
     {
         Key current = open.top().second;
         open.pop();
@@ -107,12 +145,6 @@ std::vector<WorldPoint> Find(WorldPoint start,
         {
             last = current;
             reached = true;
-            break;
-        }
-        if (milliseconds > 0 && visited % 8 == 0 &&
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began)
-                    .count() >= milliseconds)
-        {
             break;
         }
         for (int x = -1; x <= 1; ++x)
@@ -145,6 +177,10 @@ std::vector<WorldPoint> Find(WorldPoint start,
     {
         return {};
     }
+    if (complete)
+    {
+        *complete = reached;
+    }
     std::vector<WorldPoint> reverse;
     if (reached)
     {
@@ -161,7 +197,8 @@ std::vector<WorldPoint> Find(WorldPoint start,
     for (size_t i = 0; i < reverse.size();)
     {
         size_t furthest = i;
-        while (furthest + 1 < reverse.size() && clear(anchor, reverse[furthest + 1]))
+        // Keep already checked grid edges when the budget is spent on searching.
+        while (furthest + 1 < reverse.size() && !expired() && clear(anchor, reverse[furthest + 1]))
         {
             ++furthest;
         }

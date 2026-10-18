@@ -1,0 +1,46 @@
+{
+  "generator": "built-in imagegen",
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "rowsInOrder": [
+      "front",
+      "right",
+      "left",
+      "back"
+    ],
+    "directionsInGame": 8,
+    "authoredDirections": 4,
+    "framesPerDirection": 4
+  },
+  "style": "Japanese supernatural isometric RPG, hand-painted 2.5D, transparent RGBA, full-body consistent anchors",
+  "constraints": "One character per equally sized cell, same identity/scale, no background/text/grid, no neighboring-cell overlap",
+  "assets": [
+    {
+      "path": "SimpleGame/Assets/Enemies/Story/hungry_hound_walk.png",
+      "subject": "A hungry feral cemetery hound, lean charcoal brown shaggy fur, long ears, bared teeth, pale blue cursed eyes, ragged rope collar. An animal on all four legs, unmistakably a dog. Four animation columns: neutral stand, left diagonal legs forward, passing step, right diagonal legs forward. No humanoid proportions.",
+      "source": "C:/Users/dydrk/.codex/generated_images/01a0c825-3844-7051-a639-238a616d7913/exec-8dd40ed8-47b8-47e3-aae8-4016604ee8a7.png"
+    },
+    {
+      "path": "SimpleGame/Assets/Enemies/Story/weeping_devourer_walk.png",
+      "subject": "The Weeping Devourer, a unique large cemetery curse boss: hunched long-armed dark indigo beast under a ragged burial mantle, a single enormous weeping mouth in its chest emitting faint cyan tears, no visible normal human head, many mourning ribbon strips, two clawed feet. Silhouette broad and intimidating. Four animation columns: idle, left foot stride, passing step, right foot stride.",
+      "source": "C:/Users/dydrk/.codex/generated_images/01a0c825-3844-7051-a639-238a616d7913/exec-48f541a4-9afc-4720-ba4d-ab0e1cb95ee3.png"
+    },
+    {
+      "path": "SimpleGame/Assets/Enemies/Story/monastery_warden_walk.png",
+      "subject": "The Monastery Warden, a distinct cursed guardian boss: massive armored standing humanoid with chipped dark stone lamellar armor, bronze shrine mask, sacred paper seals tied to shoulders, a broad stone polearm held vertically in right hand. Earthy gray and oxidized teal, strong stocky silhouette, a creature rather than a human NPC. Four animation columns: idle, left foot stride, passing step, right foot stride.",
+      "source": "C:/Users/dydrk/.codex/generated_images/01a0c825-3844-7051-a639-238a616d7913/exec-5cc366ff-929b-46a7-a468-b84ff319956b.png"
+    },
+    {
+      "path": "SimpleGame/Assets/Enemies/Story/blind_monk_walk.png",
+      "subject": "The Blind Monk, unique monastery curse boss: tall gaunt hoodless monk, tightly wrapped ivory cloth over his eyes, charcoal and faded maroon layered ritual robes, bronze ringed staff and heavy prayer beads, sealed dark aura at wrists, pale gray skin, no halo. Sinister but not gore. Four animation columns: idle, left foot stride, passing step, right foot stride.",
+      "source": "C:/Users/dydrk/.codex/generated_images/01a0c825-3844-7051-a639-238a616d7913/exec-43783ea6-7aeb-4a9c-b814-2ad41fde64b1.png"
+    }
+  ],
+  "commonPrompt": "Use case: stylized-concept. Asset type: production transparent PNG sprite atlas for a Japanese supernatural isometric action RPG. Create ONE exact 4 columns x 4 rows equally spaced sprite sheet, all 16 cells occupied, no drawn grid. {subject} Row 1 faces the camera/front (south). Row 2 faces screen right/east profile. Row 3 faces screen left/west profile. Row 4 faces away from camera/north, back clearly visible. Each cell shows the SAME single full-body creature, consistent identity, identical scale and baseline/ground anchor, all weapons and cloth inside its own cell with generous transparent margins. High quality hand-painted 2.5D game sprite, crisp fine outlines, readable at 100 pixels tall, three-quarter overhead camera tilt matching an isometric village, soft restrained cel shading, non-chibi. Canvas square. Genuine transparent RGBA background, no environment, no ground plane, no text, no labels, no watermark, no glow reaching neighboring cells. Exactly 16 isolated sprites, 4 directions and 4 movement poses.",
+  "actualDimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "gridBoundaryRule": "floor(index * dimension / cellCount), matching SpriteSheet::Load; no image resampling"
+}

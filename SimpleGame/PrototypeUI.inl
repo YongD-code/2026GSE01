@@ -39,7 +39,7 @@ std::string ObjectiveHint() const
     const auto* quest = chapter.Current();
     if (!quest)
         return chapter.quests.empty() ? "퀘스트 데이터를 읽지 못했습니다." : "1장 완료 · 자유 탐험";
-    return ControlText(quest->objective);
+    return quest->objective;
 }
 
 UIRect JournalBounds() const
@@ -111,7 +111,7 @@ std::vector<std::string> JournalEntries()
         add("이야기 물품 · 성자의 잔재 " + std::to_string(levelOne.saintRemains));
         if (levelOne.resolvedBosses.count(1))
             add("이야기 물품 · 검은 파편 / 특수 봉인 조각");
-        if (levelOne.complete)
+        if (levelOne.complete || chapter.step > chapter.Index("C109_RELIC"))
             add("성유물 · 일곱 번째 종이 울리는 날, 문이 열린다.");
     }
     else if (menuTab == 2)
@@ -139,7 +139,7 @@ std::vector<std::string> JournalEntries()
         for (int i = 0; i < chapter.step && i < static_cast<int>(chapter.quests.size()); ++i)
         {
             add("완료 · " + chapter.quests[i].title);
-            add(ControlText(chapter.quests[i].dialogue));
+            add(chapter.quests[i].dialogue);
         }
     }
     else
@@ -281,17 +281,18 @@ void DrawJournalSlot(int index, int local)
                                "성자의 잔재",
                                "검은 파편",
                                "성유물"};
-        const int amounts[] = {levelOne.potions,
-                               levelOne.weaponStones,
-                               levelOne.stones,
-                               levelOne.spoils,
-                               levelOne.tickets[0],
-                               levelOne.tickets[1],
-                               levelOne.tickets[2],
-                               levelOne.tickets[3],
-                               levelOne.saintRemains,
-                               int(levelOne.resolvedBosses.count(1)),
-                               int(levelOne.complete)};
+        const int amounts[] = {
+            levelOne.potions,
+            levelOne.weaponStones,
+            levelOne.stones,
+            levelOne.spoils,
+            levelOne.tickets[0],
+            levelOne.tickets[1],
+            levelOne.tickets[2],
+            levelOne.tickets[3],
+            levelOne.saintRemains,
+            int(levelOne.resolvedBosses.count(1)),
+            int(levelOne.complete || chapter.step > chapter.Index("C109_RELIC"))};
         const int icons[] = {2, 1, 3, 0, 4, 4, 4, 4, 3, 3, 3};
         lootSheets[icons[index]].Draw(
             r, {box.x + 41, box.y + 78}, 48, pose, Color(1, 1, 1), width, height);
@@ -537,12 +538,8 @@ void DrawQuestTracker()
                                          : "1장 완료",
                 text,
                 1);
-    WrappedText(box.x + 12,
-                box.y + 66,
-                box.w - 24,
-                quest ? ControlText(quest->objective) : ObjectiveHint(),
-                muted,
-                2);
+    WrappedText(
+        box.x + 12, box.y + 66, box.w - 24, quest ? quest->objective : ObjectiveHint(), muted, 2);
     r.Rect(box.x + 12, box.y + 101, box.w - 24, 5, Color(.16f, .20f, .23f));
     if (progress > 0)
     {
@@ -552,6 +549,61 @@ void DrawQuestTracker()
            box.y + 120,
            "완료 " + std::to_string(chapter.step) + " / " + std::to_string(chapter.quests.size()),
            muted);
+}
+
+UIRect ChildDialogueButton(int index) const
+{
+    const float w = (std::min)(640.f, float(width) - 40);
+    return {(width - w) / 2 + 24, (height - 190.f) / 2 + 64 + index * 56, w - 48, 44};
+}
+
+UIRect MessageBounds() const
+{
+    const bool beside = hudVisible && height < 550;
+    const float left = beside ? QuestTrackerBounds().x + QuestTrackerBounds().w + 12 : 20;
+    const float w = (std::min)(760.f, width - left - 20);
+    const float y = beside ? (std::max)(height - 262.f, MinimapBounds().y + MinimapBounds().h + 12)
+                           : height - 262.f;
+    return {beside ? left : (width - w) / 2, y, w, 130};
+}
+
+std::vector<std::string> DialoguePages() const
+{
+    const float limit = (std::max)(16.f, MessageBounds().w - 32);
+    std::vector<std::string> lines;
+    std::string line;
+    float used = 0;
+    for (size_t i = 0; i < message.size();)
+    {
+        const unsigned char lead = static_cast<unsigned char>(message[i]);
+        const size_t bytes =
+            lead < 128 ? 1 : ((lead & 0xe0) == 0xc0 ? 2 : ((lead & 0xf0) == 0xe0 ? 3 : 4));
+        const float advance = lead < 128 ? 8.f : 16.f;
+        if (message[i] == '\n' || (!line.empty() && used + advance > limit))
+        {
+            lines.push_back(line);
+            line.clear();
+            used = 0;
+        }
+        if (message[i] != '\n')
+        {
+            line += message.substr(i, bytes);
+            used += advance;
+        }
+        i += bytes;
+    }
+    if (!line.empty() || lines.empty())
+        lines.push_back(line);
+    std::vector<std::string> pages;
+    for (size_t i = 0; i < lines.size(); ++i)
+    {
+        if (i % 3 == 0)
+            pages.emplace_back();
+        else
+            pages.back() += '\n';
+        pages.back() += lines[i];
+    }
+    return pages;
 }
 
 void HUD()
@@ -598,7 +650,7 @@ void HUD()
         {
             const char* choices[] = {"1  대화하기", "2  종료하기"};
             for (int i = 0; i < 2; ++i)
-                UIButton({x + 24, y + 64 + i * 56, w - 48, 44}, choices[i]);
+                UIButton(ChildDialogueButton(i), choices[i]);
         }
         else
         {
@@ -658,11 +710,13 @@ void HUD()
         r.Text(20, sh - 12, "ESC 메뉴 · Ctrl 회피 · 아이템 자동 흡수 · Tab 기록", muted);
 
     std::string heading, body;
-    const int weak = dialoguePending ? -1 : levelOne.Capturable(player);
+    const auto* nearbyStory = NearbyStory();
+    const int weak =
+        dialoguePending || IsStoryObjective(nearbyStory) ? -1 : levelOne.Capturable(player);
     if (weak >= 0)
     {
         const char* tickets[] = {"낡은 봉인권", "봉인권", "고급 봉인권"};
-        const float chance = levelOne.collection.empty() ? 1.f
+        const float chance = levelOne.enemies[weak].boss == 5 ? 1.f
                              : levelOne.enemies[weak].boss == 4
                                  ? levelOne.captureRules.bossChance
                                  : levelOne.captureRules.normalChance;
@@ -671,13 +725,27 @@ void HUD()
             levelOne.enemies[weak].remnantTime < 0
                 ? " · 퀘스트 보호"
                 : " · " + std::to_string(int(std::ceil(levelOne.enemies[weak].remnantTime))) + "초";
-        body = std::string("T 선택 · ") + tickets[levelOne.selectedTicket] + " " +
-               std::to_string(levelOne.tickets[levelOne.selectedTicket]) + "장\nF 포획 / X 정화";
+        body = levelOne.enemies[weak].boss == 5
+                   ? "낡은 봉인권 · 라엔 지원\nF 첫 봉인 / 튜토리얼 잔영은 사라지지 않습니다."
+                   : std::string("T 선택 · ") + tickets[levelOne.selectedTicket] + " " +
+                         std::to_string(levelOne.tickets[levelOne.selectedTicket]) +
+                         "장\nF 포획 / X 정화";
     }
-    else if (messageTime > 0)
+    else if (messageTime > 0 || dialoguePending)
     {
-        heading = speaker + (dialoguePending ? " · F / Enter 계속" : " · 알림");
+        heading = speaker + (dialoguePending ? (talkingResident >= 0 ? " · F / Enter 대화 종료"
+                                                                     : " · F / Enter 계속")
+                                             : " · 알림");
         body = message;
+        if (dialoguePending)
+        {
+            const auto pages = DialoguePages();
+            dialoguePage = (std::min)(dialoguePage, int(pages.size()) - 1);
+            body = pages[dialoguePage];
+            heading = speaker + " · F / Enter " +
+                      (dialoguePage + 1 < int(pages.size()) ? "다음" : "대화 종료") + " · " +
+                      std::to_string(dialoguePage + 1) + " / " + std::to_string(pages.size());
+        }
     }
     else
     {
@@ -699,10 +767,15 @@ void HUD()
             heading = "주변 전리품";
             body = std::string(names[static_cast<int>(nearest->kind)]) + " · 가까이 가면 자동 흡수";
         }
-        else if (const auto* site = NearbyStory())
+        else if (const auto* site = nearbyStory)
         {
             heading = site->name;
             body = site->kind == StoryLayout::Kind::Evidence ? "F · 조사" : "F · 대화";
+        }
+        else if (NearbyResident())
+        {
+            heading = "마을 주민";
+            body = "F · 대화하기";
         }
         else if (Nearby() >= 0)
         {
@@ -713,17 +786,10 @@ void HUD()
     }
     if (!body.empty())
     {
-        // On short windows keep the conversation beside, not over, the quest tracker.
-        const float left =
-            hudVisible && sh < 550 ? QuestTrackerBounds().x + QuestTrackerBounds().w + 12 : 20;
-        const float w = (std::min)(760.f, sw - left - 20);
-        const float x = hudVisible && sh < 550 ? left : (sw - w) / 2;
-        const float y = hudVisible && sh < 550
-                            ? (std::max)(sh - 262, MinimapBounds().y + MinimapBounds().h + 12)
-                            : sh - 262;
-        Panel(x, y, w, 130);
-        r.Text(x + 16, y + 27, heading, gold);
-        r.Rect(x + 16, y + 38, w - 32, 1, Color(.28f, .34f, .35f));
-        WrappedText(x + 16, y + 61, w - 32, body, ivory, 3);
+        const auto box = MessageBounds();
+        Panel(box.x, box.y, box.w, box.h);
+        WrappedText(box.x + 16, box.y + 27, box.w - 32, heading, gold, 1);
+        r.Rect(box.x + 16, box.y + 38, box.w - 32, 1, Color(.28f, .34f, .35f));
+        WrappedText(box.x + 16, box.y + 61, box.w - 32, body, ivory, 3);
     }
 }

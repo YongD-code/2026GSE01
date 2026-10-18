@@ -357,7 +357,10 @@ void Prototype::StoryPerson(const StoryLayout::Site& site, WorldPoint position)
         r, p, childPortrait ? 55.f : 78.f, animation, Color(1, 1, 1), width, height);
 }
 
-void Prototype::DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color)
+void Prototype::DrawWorldLabel(WorldPoint position,
+                               float elevation,
+                               const std::string& text,
+                               Color color)
 {
     const Point p = Screen(position.x, position.y, elevation);
     if (p.x < -90 || p.x > width + 90 || p.y < -20 || p.y > height + 20)
@@ -373,12 +376,15 @@ void Prototype::DrawWorldLabel(WorldPoint position, float elevation, const std::
         }
     }
     const float labelWidth = (std::min)(textWidth + 12, float(width) - 16);
-    UIRect box = {(std::max)(8.f, (std::min)(float(width) - labelWidth - 8, p.x - labelWidth * .5f)),
-                  (std::max)(12.f, (std::min)(float(height) - 100, p.y - 17)), labelWidth, 24};
+    UIRect box = {
+        (std::max)(8.f, (std::min)(float(width) - labelWidth - 8, p.x - labelWidth * .5f)),
+        (std::max)(12.f, (std::min)(float(height) - 100, p.y - 17)),
+        labelWidth,
+        24};
     auto overlaps = [](const UIRect& a, const UIRect& b)
     {
-        return a.x < b.x + b.w + 4 && a.x + a.w + 4 > b.x &&
-               a.y < b.y + b.h + 4 && a.y + a.h + 4 > b.y;
+        return a.x < b.x + b.w + 4 && a.x + a.w + 4 > b.x && a.y < b.y + b.h + 4 &&
+               a.y + a.h + 4 > b.y;
     };
     // Search nearby rows first; names remain on the overlay and never overlap each other.
     const float preferred = box.y;
@@ -387,18 +393,22 @@ void Prototype::DrawWorldLabel(WorldPoint position, float elevation, const std::
         box.y = std::fmod(preferred + row * 28, (std::max)(28.f, float(height) - 110));
         box.y = (std::max)(12.f, box.y);
         bool blocked = false;
-        for (const auto& other : occupiedLabels) blocked = blocked || overlaps(box, other);
+        for (const auto& other : occupiedLabels)
+            blocked = blocked || overlaps(box, other);
         if (hudVisible)
         {
-            blocked = blocked || overlaps(box, {20, 20, 330, 200}) || overlaps(box, MinimapBounds());
+            blocked =
+                blocked || overlaps(box, {20, 20, 330, 200}) || overlaps(box, MinimapBounds());
         }
         for (const auto& site : StoryLayout::Sites())
         {
-            if (site.kind == StoryLayout::Kind::Evidence || !StoryLayout::Visible(site, chapter)) continue;
+            if (site.kind == StoryLayout::Kind::Evidence || !StoryLayout::Visible(site, chapter))
+                continue;
             const Point body = Screen(site.position.x, site.position.y);
             blocked = blocked || overlaps(box, {body.x - 24, body.y - 65, 48, 70});
         }
-        if (!blocked) break;
+        if (!blocked)
+            break;
     }
     occupiedLabels.push_back(box);
     r.Rect(box.x, box.y, box.w, box.h, Color(.015f, .025f, .035f, .92f));
@@ -454,7 +464,8 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
         const float reaction = std::sin((1 - enemy.flash / .15f) * 3.14159265f) *
                                enemy.hitStrength * (enemy.boss > 0 ? .4f : 1.f);
         p.x += float(enemy.hitDirection.x - enemy.hitDirection.y) * .85f * reaction;
-        p.y += float(enemy.hitDirection.x + enemy.hitDirection.y) * .43f * reaction - reaction * .25f;
+        p.y +=
+            float(enemy.hitDirection.x + enemy.hitDirection.y) * .43f * reaction - reaction * .25f;
     }
     if (p.x < -140 || p.x > width + 140 || p.y < -30 || p.y > height + 160)
     {
@@ -476,24 +487,18 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
                                       1.f);
         return;
     }
-    if (enemy.boss >= 6 && enemy.boss <= 8)
-    {
-        // Temporary silhouette until an authored dog sheet is available.
-        r.Ellipse(p.x, p.y, 20, 7, Color(0, 0, 0, .3f));
-        r.Ellipse(p.x, p.y - 17, 19, 10, Color(.27f, .24f, .20f));
-        r.Ellipse(p.x + 17, p.y - 25, 9, 8, Color(.32f, .28f, .22f));
-        r.Triangle({p.x + 12, p.y - 28},
-                   {p.x + 17, p.y - 40},
-                   {p.x + 21, p.y - 28},
-                   Color(.22f, .19f, .16f));
-        r.Line({p.x - 12, p.y - 13}, {p.x - 15, p.y - 2}, 4, Color(.22f, .19f, .16f));
-        r.Line({p.x + 10, p.y - 13}, {p.x + 13, p.y - 2}, 4, Color(.22f, .19f, .16f));
-        r.Rect(p.x - 20, p.y - 46, 40, 3, Color(.16f, .10f, .10f));
-        r.Rect(p.x - 20, p.y - 46, 40 * enemy.health / enemy.maximum, 3, Color(.65f, .25f, .20f));
-        return;
-    }
+    const auto& encounter = StoryEncounter::Get(enemy.boss);
+    const float size = enemy.boss ? encounter.size : SpiritCatalog::Get(enemy.type).size;
     r.Ellipse(p.x, p.y, 20, 7, Color(0, 0, 0, .3f));
-    if (spiritSheets[enemy.type].Ready())
+    if (encounter.sprite >= 0)
+    {
+        if (storyEnemySheets[encounter.sprite].Ready())
+            storyEnemySheets[encounter.sprite].Draw(
+                r, p, size, enemy.animation, Color(1, 1, 1), width, height);
+        else
+            r.Text(p.x - 45, p.y - 32, "전용 외형 로드 실패", Color(1, .6f, .5f));
+    }
+    else if (spiritSheets[enemy.type].Ready())
     {
         SpriteAnimation animation = enemy.animation;
         if (enemy.castPose > 0 && enemy.type != SpiritCatalog::Saint)
@@ -503,7 +508,7 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
         }
         spiritSheets[enemy.type].Draw(r,
                                       p,
-                                      enemy.boss > 0 ? 100.f : SpiritCatalog::Get(enemy.type).size,
+                                      size,
                                       animation,
                                       Color(1, 1, 1),
                                       width,
@@ -519,7 +524,7 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
     }
     if (!enemy.alerted && !enemy.weakened && enemy.flash <= 0 && enemy.boss == 0)
         return;
-    const float barY = p.y - (enemy.boss > 0 ? 111.f : 79.f);
+    const float barY = p.y - size - 11;
     r.Rect(p.x - 20, barY, 40, 4, Color(.15f, .08f, .09f));
     r.Rect(p.x - 20,
            barY,
@@ -534,8 +539,8 @@ void Prototype::DrawCombatWarnings()
     {
         // Include the full ranged telegraph/charge reach, but skip distant NPC battles.
         const Point warningOrigin = Screen(enemy.position.x, enemy.position.y);
-        if (warningOrigin.x < -680 || warningOrigin.x > width + 680 ||
-            warningOrigin.y < -500 || warningOrigin.y > height + 600)
+        if (warningOrigin.x < -680 || warningOrigin.x > width + 680 || warningOrigin.y < -500 ||
+            warningOrigin.y > height + 600)
         {
             continue;
         }

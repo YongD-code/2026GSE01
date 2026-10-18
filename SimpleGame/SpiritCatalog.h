@@ -45,7 +45,7 @@ inline const Definition& Get(int species)
           67,
           2},
          {"기도하지 않는 성자",
-          "응답 없는 종탑에서 기도를 버린 성자. 종소리로 침입자를 심판한다.",
+          "인간의 실험으로 훼손된 신앙의 주령. 빼앗긴 기도 대신 종소리로 침입자를 심판한다.",
           L"Assets/Spirits/unpraying_saint_4dir.png",
           125,
           88,

@@ -159,6 +159,7 @@
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
     <ClInclude Include="StoryLayout.h" />
+    <ClInclude Include="StoryEncounter.h" />
     <ClInclude Include="ClickNavigation.h" />
     <ClInclude Include="PrototypeControls.inl" />
     <ClInclude Include="FrameProfiler.h" />

@@ -410,16 +410,18 @@ void Prototype::SynchronizeScene()
              {
                  DrawResident(population.people[i]);
              });
-        bind(id + "/label",
-             "residents",
-             person.position,
-             ActorLayer::WorldLabel,
-             [this, i](const Actor&)
-             {
-                 const auto& npc = population.people[i];
-                 DrawWorldLabel(
-                     npc.position, 88, Population::Name(npc.id), Color(.75f, .94f, .83f));
-             });
+        if (ResidentNameVisible(person))
+            bind(id + "/label",
+                 "residents",
+                 person.position,
+                 ActorLayer::WorldLabel,
+                 [this, i](const Actor&)
+                 {
+                     const auto& npc = population.people[i];
+                     if (ResidentNameVisible(npc))
+                         DrawWorldLabel(
+                             npc.position, 88, Population::Name(npc.id), Color(.75f, .94f, .83f));
+                 });
     }
     if (captured)
         bind("characters/companion",
@@ -469,6 +471,21 @@ void Prototype::SynchronizeScene()
                  visual.position = {p.x, p.y};
                  DrawEnemy(visual);
              });
+        if (enemy.boss > 0)
+        {
+            const auto& encounter = StoryEncounter::Get(enemy.boss);
+            const std::string name = encounter.name;
+            const float elevation = enemy.weakened ? 78.f : encounter.size + 27;
+            bind(id + "/label",
+                 "enemies",
+                 enemy.position,
+                 ActorLayer::WorldLabel,
+                 [this, name, elevation](const Actor& node)
+                 {
+                     const auto at = node.WorldPosition();
+                     DrawWorldLabel({at.x, at.y}, elevation, name, Color(.94f, .82f, .62f));
+                 });
+        }
     }
 
     for (auto& item : levelOne.loot)
@@ -624,11 +641,11 @@ void Prototype::SynchronizeScene()
                  DrawSkillEffect(effect);
              });
     }
-    if (routeIndex < moveRoute.size())
+    if (hasMoveDestination)
     {
         bind("effects/move-target",
              "effects",
-             moveRoute.back(),
+             moveDestination,
              ActorLayer::Warning,
              [this](const Actor& node)
              {

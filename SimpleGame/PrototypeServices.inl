@@ -83,6 +83,18 @@ void ServiceAction(int action)
             : serviceNpc == "sealer"
                 ? "봉인사: 봉인권으로 잔영을 포획하고, 주령석으로 동행을 강화하세요."
                 : "잡화상: 물약은 가방에 보관해 두었다가 H로 마시면 돼요. 전리품도 사 드립니다.";
+        if (serviceNpc == "merchant")
+        {
+            for (const auto& site : StoryLayout::Sites())
+            {
+                if (site.id == serviceNpc)
+                {
+                    l.notice = "잡화상: " + StoryDialogue(site) +
+                               " 물약은 H로 사용하고 전리품은 여기서 팔면 돼요.";
+                    break;
+                }
+            }
+        }
     }
     else if (serviceNpc == "smith")
     {

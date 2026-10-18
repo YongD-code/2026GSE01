@@ -27,6 +27,7 @@ class Prototype
     bool hudVisible = true;
     bool dodgeHeld = false, screenShake = true;
     bool dialoguePending = false;
+    int dialoguePage = 0;
     bool pauseMenu = false, exitConfirm = false, exitRequested = false, skipExitSave = false;
     enum class SlotMode
     {
@@ -59,6 +60,7 @@ class Prototype
     SpriteSheet attackSheet, protagonistRunSheet;
     bool blenderProtagonist = false, protagonistSprinting = false;
     SpriteSheet spiritSheets[SpiritCatalog::Count];
+    SpriteSheet storyEnemySheets[StoryEncounter::SpriteCount];
     SpriteSheet lootSheets[5];
     SpriteAnimation companionAnimation;
     std::string serviceNpc;
@@ -129,8 +131,10 @@ class Prototype
 
     void Say(const std::string& name, const std::string& text)
     {
+        talkingResident = -1;
         speaker = name;
-        message = ControlText(text);
+        message = text;
+        dialoguePage = 0;
         messageTime = 8;
     }
 
@@ -184,6 +188,23 @@ class Prototype
         return closest;
     }
 
+    bool IsStoryObjective(const StoryLayout::Site* site) const
+    {
+        const auto* quest = chapter.Current();
+        return site && quest &&
+               (quest->trigger == "talk:" + site->id || quest->trigger == "inspect:" + site->id ||
+                quest->trigger == "choice:" + site->id);
+    }
+
+    void AdvanceChapter()
+    {
+        chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+        storyTrialTime = 0;
+        const auto* quest = chapter.Current();
+        if (quest && quest->trigger == "skill")
+            levelOne.skillsUsed = 0;
+    }
+
     int Nearby() const
     {
         return !controlling && Distance(player, fire) < 65 ? 3 : -1;
@@ -195,26 +216,26 @@ class Prototype
         {
             return;
         }
-        if (levelOne.Capturable(player) >= 0)
+        const auto* quest = chapter.Current();
+        const auto* site = NearbyStory();
+        const bool storyObjective = IsStoryObjective(site);
+        if (!storyObjective && levelOne.Capturable(player) >= 0)
         {
             levelOne.Capture(player, false);
             return;
         }
-        const auto* quest = chapter.Current();
-        const auto* site = NearbyStory();
         if (site)
         {
-            const std::string suffix = ":" + site->id;
-            if (quest &&
-                (quest->trigger == "talk" + suffix || quest->trigger == "inspect" + suffix ||
-                 quest->trigger == "choice" + suffix))
+            if (storyObjective)
             {
-                Say(site->name, quest->dialogue);
+                ClearInput();
                 if (quest->trigger == "choice:child")
                 {
+                    Say(site->name, "아이에게 동생의 행방을 물어볼까요?");
                     chapter.choicePending = true;
                     return;
                 }
+                Say(site->name, quest->dialogue);
                 if (quest->id == "C100")
                 {
                     levelOne.tickets[1] += 3;
@@ -229,7 +250,7 @@ class Prototype
                     levelOne.health = levelOne.MaximumHealth();
                 }
                 dialoguePending = true;
-                chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+                AdvanceChapter();
                 autoSaveTime = 30;
             }
             else
@@ -240,11 +261,13 @@ class Prototype
                     ClearInput();
                     return;
                 }
-                Say(site->name,
-                    site->kind == StoryLayout::Kind::Evidence
-                        ? "이곳의 흔적을 기록해 두었다. 현재 조사는 Tab에서 확인하자."
-                        : "지금 해야 할 일은 기록창에서 확인할 수 있다.");
+                Say(site->name, StoryDialogue(*site));
             }
+            return;
+        }
+        if (const auto* resident = NearbyResident())
+        {
+            TalkResident(resident->id);
             return;
         }
         if (Nearby() == 3)
@@ -252,6 +275,58 @@ class Prototype
             levelOne.health = levelOne.MaximumHealth();
             Say("벨른의 불씨", "잠시 쉬어 체력을 회복했습니다.");
         }
+    }
+
+    std::string StoryDialogue(const StoryLayout::Site& site) const
+    {
+        const bool forgotten = chapter.step >= chapter.Index("P008_VILLAGER");
+        if (site.id == "sibling")
+            return "길이 엇갈리면 돌담의 표시를 따라와. 우리 같이 집으로 돌아가야지.";
+        if (site.id == "parent")
+            return forgotten ? "너는 외동이야. 창고의 옷과 물건도 네가 어릴 때 쓰던 거잖니."
+                   : chapter.step >= chapter.Index("P001")
+                       ? "아직 동생을 못 찾았니? 마을 아이가 공동묘지 길에서 봤다고 하더구나."
+                       : "심부름 잘 다녀오렴. 너희 둘이 함께 가니 마음이 놓이는구나.";
+        if (site.id == "child")
+            return forgotten ? "동생이라니? 난 네가 혼자 다니는 모습만 기억하는데."
+                             : "공동묘지로 가는 길은 무서워. 물어볼 게 있으면 이야기해.";
+        if (site.id.compare(0, 5, "raen_") == 0)
+            return forgotten
+                       ? "나도 네 동생을 기억해. 사람들이 잊었다고 해서 남은 흔적까지 사라지진 "
+                         "않아."
+                       : "주령은 강한 기억과 감정에서 태어나. 저 목소리만으로 사람이라 믿지는 마.";
+        if (site.id == "merchant")
+            return forgotten ? "지난번에도 혼자 꾸러미를 가져왔잖니. 필요한 물건이 있으면 말하렴."
+                             : "동생이 이웃 몫까지 챙겼더구나. 둘이 길을 조심해서 다니렴.";
+        if (site.id == "stranger")
+            return "집에 가야 하는데…. 돌아가는 길이 기억나지 않아….";
+        const auto* quest = chapter.Current();
+        for (int i = 0; i < chapter.step && i < int(chapter.quests.size()); ++i)
+        {
+            if (chapter.quests[i].trigger == "inspect:" + site.id)
+                return chapter.quests[i].dialogue;
+        }
+        return quest ? "아직 이 흔적의 의미를 알 수 없다. 현재 조사는 Tab 기록창에서 확인하자."
+                     : "수도원에서 얻은 기록과 성유물이 다음 의식 장소를 가리키고 있다.";
+    }
+
+    void ChooseChildDialogue(bool talk)
+    {
+        const auto* quest = chapter.Current();
+        if (!chapter.choicePending || !quest || quest->id != "P001_WITNESS")
+            return;
+        chapter.choicePending = false;
+        ClearInput();
+        if (!talk)
+        {
+            dialoguePending = false;
+            messageTime = 0;
+            return;
+        }
+        Say("마을 아이", quest->dialogue);
+        dialoguePending = true;
+        AdvanceChapter();
+        autoSaveTime = 30;
     }
 
     void UpdateChapter()
@@ -276,6 +351,7 @@ class Prototype
                     "성유물을 확보했다. 수도원 밖을 성흔회가 포위한다. 여기까지가 이번 여정이다. "
                     "자유 탐험과 저장을 계속할 수 있다.");
                 dialoguePending = true;
+                ClearInput();
             }
             return;
         }
@@ -286,6 +362,7 @@ class Prototype
                                 quest->trigger == "survive" || quest->trigger == "skill";
             Say(quest->title, battle ? quest->dialogue : quest->objective);
             dialoguePending = true;
+            ClearInput();
             if (quest->id == "P005")
             {
                 levelOne.captureUnlocked = true;
@@ -293,10 +370,6 @@ class Prototype
                 levelOne.selectedTicket = 0;
             }
             storyTrialTime = 0;
-            if (quest->trigger == "skill")
-            {
-                levelOne.skillsUsed = 0;
-            }
             return;
         }
         const bool encounter = quest->trigger == "fight" || quest->trigger == "first_capture" ||
@@ -330,7 +403,24 @@ class Prototype
         }
         if (done)
         {
-            chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
+            if (quest->trigger == "first_capture" && !levelOne.collection.empty())
+            {
+                for (int i = int(levelOne.collection.size()) - 1; i >= 0; --i)
+                {
+                    if (levelOne.collection[i].species == SpiritCatalog::Forgotten)
+                    {
+                        selectedCompanion = i;
+                        break;
+                    }
+                }
+                capturedSpirit = levelOne.collection[selectedCompanion].species;
+                captured = true;
+                controlling = false;
+                movementWasControlling = false;
+                spirit = player;
+                ClearInput();
+            }
+            AdvanceChapter();
         }
         if (!levelOne.collection.empty() && !captured)
         {
@@ -462,15 +552,34 @@ class Prototype
         const auto& npcSprites = StoryLayout::NpcSprites();
         const auto outposts = Population::Buildings();
         villageObjects.insert(villageObjects.end(), outposts.begin(), outposts.end());
+        const wchar_t* residentWalkFiles[] = {L"Assets/Characters/Townsfolk/farmer_walk.png",
+                                              L"Assets/Characters/Townsfolk/merchant_walk.png",
+                                              L"Assets/Characters/Townsfolk/artisan_walk.png",
+                                              L"Assets/Characters/Townsfolk/hunter_walk.png"};
         for (int i = 0; i < 4; ++i)
         {
             SpriteLayout residentLayout = storyLayout;
             residentLayout.columns = residentLayout.rows = 4;
             residentLayout.directionRows.fill(i);
             residentLayout.directionIdleColumns = {{0, 2, 2, 2, 3, 1, 1, 1}};
+            residentLayout.anchorAtFeet = false;
+            residentLayout.anchorAtTorso = true;
+            residentLayout.normalizeFrameHeight = true;
             if (!populationSheets[i].Load(L"Assets/Characters/Townsfolk/residents.png",
                                           residentLayout))
                 std::cerr << "생활 NPC 외형 로드 실패: " << i << std::endl;
+            SpriteLayout walkLayout;
+            walkLayout.columns = 8;
+            walkLayout.rows = 4;
+            walkLayout.directionRows = {{0, 2, 2, 2, 3, 1, 1, 1}};
+            walkLayout.directionIdleColumns.fill(-1);
+            walkLayout.firstWalkFrame = 0;
+            walkLayout.walkFrames = 8;
+            walkLayout.anchorAtTorso = true;
+            walkLayout.normalizeFrameHeight = true;
+            walkLayout.blendWalkFrames = false;
+            if (!populationWalkSheets[i].Load(residentWalkFiles[i], walkLayout))
+                std::cerr << "생활 NPC 걷기 원화 로드 실패: " << i << std::endl;
         }
         for (int i = 0; i < StoryLayout::NpcCount; ++i)
         {
@@ -520,6 +629,18 @@ class Prototype
             }
             if (!spiritSheets[i].Load(SpiritCatalog::Get(i).sprite, speciesLayout))
                 std::cerr << "주령 이미지 로드 실패: " << SpiritName(i) << std::endl;
+        }
+        SpriteLayout encounterLayout;
+        encounterLayout.directionRows = {{0, 2, 2, 2, 3, 1, 1, 1}};
+        encounterLayout.firstWalkFrame = 0;
+        encounterLayout.walkFrames = 4;
+        encounterLayout.anchorAtTorso = true;
+        encounterLayout.normalizeFrameHeight = true;
+        encounterLayout.blendWalkFrames = false;
+        for (int i = 0; i < StoryEncounter::SpriteCount; ++i)
+        {
+            if (!storyEnemySheets[i].Load(StoryEncounter::SpritePath(i), encounterLayout))
+                std::cerr << "이야기 몬스터 전용 외형 로드 실패: " << i << std::endl;
         }
         chapter.Load();
         SpriteLayout lootLayout;
@@ -649,21 +770,11 @@ class Prototype
         }
         if (button == 2)
         {
-            attackHeld = false;
-            if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0)
-            {
-                BufferCommand(5);
-            }
-            else
-            {
-                bufferedCommand.action = -1;
-                MoveTo(CursorWorld());
-            }
+            MoveTo(CursorWorld());
         }
         if (button == 0)
         {
-            moveRoute.clear();
-            movementVelocity = {0, 0};
+            StopMovement();
             attackHeld = true;
             BasicAttack(true);
         }
@@ -761,34 +872,34 @@ class Prototype
         {
             if (key == '1' || key == '2')
             {
-                chapter.choicePending = false;
-                if (key == '1')
-                {
-                    dialoguePending = true;
-                    chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
-                    autoSaveTime = 30;
-                }
-                else
-                {
-                    dialoguePending = false;
-                    messageTime = 0;
-                }
+                ChooseChildDialogue(key == '1');
             }
             return;
         }
         if (!journal && dialoguePending && (key == 'f' || key == 13))
         {
+            const int pages = int(DialoguePages().size());
+            dialoguePage = (std::min)(dialoguePage, pages - 1);
+            if (dialoguePage + 1 < pages)
+            {
+                ++dialoguePage;
+                return;
+            }
             dialoguePending = false;
+            dialoguePage = 0;
+            talkingResident = -1;
             messageTime = 0;
             return;
         }
         if (key == '\t')
         {
+            ClearInput();
             journal = !journal;
             return;
         }
         if (key == 'j')
         {
+            ClearInput();
             if (journal && menuTab == 2)
                 journal = false;
             else
@@ -879,8 +990,7 @@ class Prototype
         if (key == 's')
         {
             bufferedCommand.action = -1;
-            moveRoute.clear();
-            movementVelocity = {0, 0};
+            StopMovement();
             attackHeld = false;
         }
         if (key == 'b')
@@ -932,8 +1042,7 @@ class Prototype
         for (bool& k : keys)
             k = false;
         bufferedCommand.action = -1;
-        moveRoute.clear();
-        movementVelocity = {0, 0};
+        StopMovement();
         attackHeld = false;
     }
 

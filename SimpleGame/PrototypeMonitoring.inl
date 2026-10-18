@@ -78,6 +78,8 @@ void PublishMonitoring()
     int npcWorking = 0, npcHunting = 0, npcRecovering = 0, npcGold = 0, npcKills = 0;
     const auto* quest = chapter.Current();
     const auto* nearby = inWorld ? NearbyStory() : nullptr;
+    const auto* nearbyResident =
+        inWorld && !nearby && ControlsActive() ? NearbyResident() : nullptr;
     std::ostringstream npcs, monsters;
     npcs.imbue(std::locale::classic());
     monsters.imbue(std::locale::classic());
@@ -134,13 +136,16 @@ void PublishMonitoring()
     {
         npcs << ',';
         const int region = regionOf(npc.position);
+        const bool speaking = inWorld && dialoguePending && talkingResident == npc.id;
         if (inWorld)
         {
             ++activeNpc;
             ++regionNpc[region];
-            npcWorking += npc.action == Population::Working || npc.action == Population::Trading;
-            npcHunting += npc.action == Population::Hunting || npc.action == Population::Fighting;
-            npcRecovering += npc.action == Population::Recovering;
+            npcWorking += !speaking &&
+                          (npc.action == Population::Working || npc.action == Population::Trading);
+            npcHunting += !speaking &&
+                          (npc.action == Population::Hunting || npc.action == Population::Fighting);
+            npcRecovering += !speaking && npc.action == Population::Recovering;
             npcGold += npc.gold;
             npcKills += npc.kills;
         }
@@ -152,12 +157,16 @@ void PublishMonitoring()
              << ",\"home_region\":"
              << Monitoring::Quote(npc.district == 0 ? regionIds[0] : regionIds[npc.district + 4])
              << ",\"status\":"
-             << Monitoring::Quote(inWorld ? Population::ActionId(npc.action) : "waiting")
+             << Monitoring::Quote(!inWorld   ? "waiting"
+                                  : speaking ? "talking"
+                                             : Population::ActionId(npc.action))
              << ",\"active\":" << (inWorld ? "true" : "false")
              << ",\"health\":" << number(npc.health)
              << ",\"maximum\":100,\"stamina\":" << number(npc.stamina) << ",\"gold\":" << npc.gold
              << ",\"earned\":" << npc.earned << ",\"kills\":" << npc.kills
-             << ",\"goods\":" << npc.goods << ",\"quest_target\":false,\"interactable\":false"
+             << ",\"goods\":" << npc.goods
+             << ",\"quest_target\":" << (ResidentQuestTarget(npc.id) ? "true" : "false")
+             << ",\"interactable\":" << (nearbyResident == &npc ? "true" : "false")
              << ",\"destination\":" << position(npc.destination)
              << ",\"position\":" << (inWorld ? position(npc.position) : "null")
              << ",\"region\":" << (inWorld ? Monitoring::Quote(regionIds[region]) : "null") << '}';
@@ -185,8 +194,9 @@ void PublishMonitoring()
                                                     std::to_string(enemy.camp.second) + "-" +
                                                     std::to_string(enemy.slot);
             monsters << "{\"id\":" << Monitoring::Quote(id) << ",\"type\":" << enemy.type
-                     << ",\"boss\":" << enemy.boss
-                     << ",\"species_name\":" << Monitoring::Quote(SpiritName(enemy.type))
+                     << ",\"boss\":" << enemy.boss << ",\"species_name\":"
+                     << Monitoring::Quote(enemy.boss ? StoryEncounter::Get(enemy.boss).name
+                                                     : SpiritName(enemy.type))
                      << ",\"health\":" << number(enemy.weakened ? 0.f : enemy.health)
                      << ",\"maximum\":" << number(enemy.maximum) << ",\"status\":"
                      << Monitoring::Quote(enemy.weakened    ? "remnant"
@@ -213,7 +223,7 @@ void PublishMonitoring()
     {
         json << "{\"id\":" << Monitoring::Quote(quest->id)
              << ",\"title\":" << Monitoring::Quote(quest->title)
-             << ",\"objective\":" << Monitoring::Quote(ControlText(quest->objective)) << '}';
+             << ",\"objective\":" << Monitoring::Quote(quest->objective) << '}';
     }
     else
     {

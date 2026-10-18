@@ -1,8 +1,102 @@
 Population population;
 SpriteSheet populationSheets[4];
+SpriteSheet populationWalkSheets[4];
+int talkingResident = -1;
+
+bool ResidentQuestTarget(int id) const
+{
+    const auto* quest = chapter.Current();
+    return quest && quest->trigger == "talk:resident-" + std::to_string(id);
+}
+
+bool ResidentNameVisible(const Population::Person& person) const
+{
+    return ResidentQuestTarget(person.id) || (dialoguePending && talkingResident == person.id);
+}
+
+const Population::Person* NearbyResident() const
+{
+    if (controlling)
+        return nullptr;
+    const Population::Person* nearest = nullptr;
+    double reach = 62;
+    for (const auto& person : population.people)
+    {
+        if (person.health <= 0 || person.action == Population::Fighting ||
+            person.action == Population::Fleeing || person.action == Population::Recovering)
+            continue;
+        const double distance = Distance(player, person.position);
+        if (distance < 62 && ResidentQuestTarget(person.id))
+            return &person;
+        if (distance < reach)
+        {
+            reach = distance;
+            nearest = &person;
+        }
+    }
+    return nearest;
+}
+
+void TalkResident(int id)
+{
+    if (id < 0 || id >= int(population.people.size()))
+        return;
+    auto& person = population.people[id];
+    const auto* quest = chapter.Current();
+    const bool objective = ResidentQuestTarget(person.id);
+    const char* greetings[] = {
+        "오늘은 약초와 채소를 거두러 나왔어요. 마을 밖에서는 길을 벗어나지 마세요.",
+        "마을을 돌며 물건을 나르고 있소. 낯선 종소리가 들리는 길은 피하는 게 좋겠소.",
+        "일감을 마치면 공방으로 돌아갈 거예요. 장비를 손보려면 광장의 대장장이를 찾아가세요.",
+        "주령의 흔적을 살피는 중이오. 혼자 깊은 숲에 들어가지는 마시오."};
+    const std::string line =
+        objective ? quest->dialogue
+        : person.action == Population::Returning
+            ? "오늘 일은 마쳤어요. 이제 집으로 돌아가는 길이에요."
+        : person.action == Population::Resting ? "잠깐 쉬는 중이에요. 당신도 무리하지 마세요."
+        : person.action == Population::Working ? "손이 조금 바쁘네요. 일을 마치고 다시 이야기해요."
+                                               : greetings[person.role];
+    Say(Population::Name(person.id), line);
+    talkingResident = person.id;
+    dialoguePending = true;
+    person.animation.moving = false;
+    person.visualVelocity = {0, 0};
+    person.stopTime = .1f;
+    SpriteAnimation facing;
+    const double dx = player.x - person.position.x, dy = player.y - person.position.y;
+    if (std::hypot(dx, dy) > .01)
+    {
+        facing.Update((dx - dy) * .85, (dx + dy) * .43, 0, false);
+        person.animation.facing = facing.facing;
+    }
+    if (objective)
+    {
+        AdvanceChapter();
+        autoSaveTime = 30;
+    }
+    ClearInput();
+}
+
+void RestoreResidentDialogue()
+{
+    talkingResident = -1;
+    if (!dialoguePending)
+        return;
+    for (auto& person : population.people)
+    {
+        if (speaker == Population::Name(person.id) && Distance(player, person.position) < 100)
+        {
+            talkingResident = person.id;
+            person.animation.moving = false;
+            person.stopTime = .1f;
+            return;
+        }
+    }
+}
 
 void InitializePopulation()
 {
+    talkingResident = -1;
     population.Initialize(world.seed,
                           [this](WorldPoint p)
                           {
@@ -63,20 +157,18 @@ void DrawResident(const Population::Person& person)
     Point p = Screen(person.position.x, person.position.y);
     if (p.x < -100 || p.x > width + 100 || p.y < -30 || p.y > height + 130)
         return;
-    const bool working =
-        person.action == Population::Working || person.action == Population::Fighting;
-    const float bob = person.animation.moving ? std::sin(time * 4 + person.id) * .6f : 0.f;
-    if (working)
-        p.x += std::sin(time * 7 + person.id) * 1.2f;
     const float shade = .88f + (person.id % 4) * .04f;
     r.Ellipse(p.x, p.y, 13, 5, Color(0, 0, 0, .22f));
-    populationSheets[person.role].Draw(r,
-                                       {p.x, p.y + bob},
-                                       67,
-                                       person.animation,
-                                       Color(shade, 1.f, .94f + (person.id % 3) * .02f),
-                                       width,
-                                       height);
+    auto& sheet = person.animation.moving && populationWalkSheets[person.role].Ready()
+                      ? populationWalkSheets[person.role]
+                      : populationSheets[person.role];
+    sheet.Draw(r,
+               p,
+               67,
+               person.animation,
+               Color(shade, 1.f, .94f + (person.id % 3) * .02f),
+               width,
+               height);
     if (person.action == Population::Fighting && person.attackWait > .85f)
     {
         const float glow = (person.attackWait - .85f) / .25f;

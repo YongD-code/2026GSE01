@@ -38,6 +38,9 @@ class Population
         float health = 100, stamina = 100, timer = 0, decision = 0, attackWait = 0,
               invulnerability = 0;
         float pathWait = 0, simulationTime = 0;
+        WorldPoint visualVelocity = {0, 0}, separation = {0, 0};
+        float stopTime = 0;
+        bool locomotionInitialized = false;
         int action = Walking, nextAction = Working, target = -1;
         unsigned cycle = 0;
         std::vector<WorldPoint> route;
@@ -175,6 +178,55 @@ class Population
         {
             p.route.clear();
             p.waypoint = 0;
+        }
+    }
+
+    static void UpdateLocomotion(Person& p, WorldPoint previous, float dt)
+    {
+        const double dx = p.position.x - previous.x, dy = p.position.y - previous.y;
+        const double distance = std::hypot(dx, dy);
+        const bool first = !p.locomotionInitialized;
+        if (first)
+        {
+            p.animation.phase = std::fmod(p.id * .731f, 8.f);
+            p.locomotionInitialized = true;
+        }
+        if (distance > 64)
+        {
+            p.visualVelocity = p.separation = {0, 0};
+            p.animation.moving = false;
+            p.stopTime = .1f;
+            return;
+        }
+        const double response = 1 - std::exp(-dt * 18);
+        const double inverseTime = dt > .0001f ? 1. / dt : 0;
+        p.visualVelocity.x += ((dx - dy) * .85 * inverseTime - p.visualVelocity.x) * response;
+        p.visualVelocity.y += ((dx + dy) * .43 * inverseTime - p.visualVelocity.y) * response;
+        if (distance > .03)
+        {
+            p.stopTime = 0;
+            p.animation.moving = true;
+            const double stride = p.role == Hunter ? 50. : p.role == Merchant ? 48. : 44.;
+            p.animation.phase = std::fmod(p.animation.phase + float(distance * 8 / stride), 8.f);
+            if (std::hypot(p.visualVelocity.x, p.visualVelocity.y) > 1)
+            {
+                const double quarter = .7853981633974483;
+                const double angle = std::atan2(-p.visualVelocity.x, p.visualVelocity.y);
+                const double difference =
+                    std::remainder(angle - int(p.animation.facing) * quarter, 6.283185307179586);
+                // Small steering/separation corrections must not flip the portrait every step.
+                if (first || std::abs(difference) > quarter * .5 + .12)
+                {
+                    const int direction = (int(std::floor(angle / quarter + .5)) + 8) % 8;
+                    p.animation.facing = static_cast<Facing>(direction);
+                }
+            }
+        }
+        else
+        {
+            p.stopTime += dt;
+            if (p.stopTime >= .09f)
+                p.animation.moving = false;
         }
     }
 
@@ -345,18 +397,28 @@ class Population
                 }
                 else
                 {
-                    if (p.waypoint >= p.route.size() && p.pathWait <= 0 && plans > 0)
+                    const bool finishingSegment =
+                        !p.route.empty() && p.waypoint + 1 >= p.route.size() &&
+                        Level::Distance(p.position, p.route.back()) < 45 &&
+                        Level::Distance(p.route.back(), p.destination) > 18;
+                    if ((p.waypoint >= p.route.size() || finishingSegment) && p.pathWait <= 0 &&
+                        plans > 0)
                     {
                         const double d = Level::Distance(p.position, p.destination);
                         const double t = (std::min)(1., 260. / d);
                         const WorldPoint step = {
                             p.position.x + (p.destination.x - p.position.x) * t,
                             p.position.y + (p.destination.y - p.position.y) * t};
-                        p.route = ClickNavigation::Find(p.position, step, blocked, 192, 1.5, true);
-                        p.waypoint = 0;
+                        auto route =
+                            ClickNavigation::Find(p.position, step, blocked, 192, 1.5, true);
                         p.pathWait = .3f;
                         --plans;
-                        if (p.route.empty())
+                        if (!route.empty())
+                        {
+                            p.route = std::move(route);
+                            p.waypoint = 0;
+                        }
+                        else if (p.waypoint >= p.route.size())
                         {
                             p.pathWait = 1.f + p.id % 4 * .15f;
                             p.destination = OpenPoint(p.destination, blocked);
@@ -364,41 +426,68 @@ class Population
                     }
                     if (p.waypoint < p.route.size())
                     {
-                        const auto target = p.route[p.waypoint];
-                        const double d = Level::Distance(p.position, target);
-                        const double travel = (std::min)(d,
-                                                         stepDt * (p.action == Fleeing ? 92.
-                                                                   : p.role == Hunter  ? 78.
-                                                                                       : 53.));
-                        if (d > .001)
+                        WorldPoint separation = {0, 0};
+                        for (const auto& other : people)
                         {
-                            WorldPoint separation = {0, 0};
-                            for (const auto& other : people)
+                            const double distance = Level::Distance(p.position, other.position);
+                            if (other.id != p.id && distance > .01 && distance < 24)
                             {
-                                const double distance = Level::Distance(p.position, other.position);
-                                if (other.id != p.id && distance > .01 && distance < 24)
-                                {
-                                    separation.x += (p.position.x - other.position.x) / distance *
-                                                    (24 - distance);
-                                    separation.y += (p.position.y - other.position.y) / distance *
-                                                    (24 - distance);
-                                }
+                                separation.x +=
+                                    (p.position.x - other.position.x) / distance * (24 - distance);
+                                separation.y +=
+                                    (p.position.y - other.position.y) / distance * (24 - distance);
                             }
+                        }
+                        const double spread = std::hypot(separation.x, separation.y);
+                        if (spread > 14)
+                        {
+                            separation.x *= 14 / spread;
+                            separation.y *= 14 / spread;
+                        }
+                        const double ease = 1 - std::exp(-stepDt * 10);
+                        p.separation.x += (separation.x - p.separation.x) * ease;
+                        p.separation.y += (separation.y - p.separation.y) * ease;
+                        const double speed = p.action == Fleeing ? 92.
+                                             : p.role == Hunter  ? 78.
+                                                                 : 53.;
+                        double remaining = stepDt * speed;
+                        // Spend the rest of this step on the next waypoint instead of pausing
+                        // for a frame at every short path segment.
+                        for (int hop = 0;
+                             hop < 8 && p.waypoint < p.route.size() && remaining > .001;
+                             ++hop)
+                        {
+                            const auto target = p.route[p.waypoint];
+                            const double d = Level::Distance(p.position, target);
+                            if (d < .01)
+                            {
+                                ++p.waypoint;
+                                continue;
+                            }
+                            const double travel = (std::min)(d, remaining);
+                            const WorldPoint before = p.position;
+                            const double portion = travel / speed;
                             Level::Move(
                                 p.position,
-                                {(target.x - p.position.x) / d * travel + separation.x * stepDt,
-                                 (target.y - p.position.y) / d * travel + separation.y * stepDt},
+                                {(target.x - p.position.x) / d * travel + p.separation.x * portion,
+                                 (target.y - p.position.y) / d * travel + p.separation.y * portion},
                                 blocked);
+                            remaining -= travel;
+                            if (Level::Distance(before, p.position) < .001)
+                            {
+                                p.route.clear();
+                                p.pathWait = (std::max)(p.pathWait, .3f);
+                                break;
+                            }
+                            if (Level::Distance(p.position, target) < 4)
+                                ++p.waypoint;
+                            else
+                                break;
                         }
-                        if (d < 8)
-                            ++p.waypoint;
-                        else if (Level::Distance(previous, p.position) < .001 && dt > 0)
-                            p.route.clear();
                     }
                 }
             }
-            const double dx = p.position.x - previous.x, dy = p.position.y - previous.y;
-            p.animation.Update((dx - dy) * .85, (dx + dy) * .43, stepDt, false, 12);
+            UpdateLocomotion(p, previous, stepDt);
         }
         planningCursor = (planningCursor + 1) % people.size();
     }

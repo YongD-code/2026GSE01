@@ -103,6 +103,41 @@ bool SaveProgress(bool manual, int slot = 0)
     return true;
 }
 
+void RefreshSavedStoryDialogue()
+{
+    if (chapter.choicePending)
+    {
+        Say("마을 아이", "아이에게 동생의 행방을 물어볼까요?");
+        return;
+    }
+    if (!dialoguePending)
+        return;
+    const auto* current = chapter.Current();
+    if (current &&
+        (speaker == current->title || (current->id == "P005" && speaker == "마지막 일격 대신") ||
+         (current->id == "P006" && speaker == "붙잡는 손")))
+    {
+        speaker = current->title;
+        const bool battle = current->trigger == "fight" || current->trigger == "first_capture" ||
+                            current->trigger == "survive" || current->trigger == "skill";
+        message = battle ? current->dialogue : current->objective;
+        return;
+    }
+    if (chapter.step <= 0 || chapter.step > int(chapter.quests.size()))
+        return;
+    const auto& previous = chapter.quests[chapter.step - 1];
+    for (const auto& site : StoryLayout::Sites())
+    {
+        if (speaker == site.name &&
+            (previous.trigger == "talk:" + site.id || previous.trigger == "inspect:" + site.id ||
+             previous.trigger == "choice:" + site.id))
+        {
+            message = previous.dialogue;
+            return;
+        }
+    }
+}
+
 bool LoadProgress(bool startup = false, int slot = 0)
 {
     if (slot == 0)
@@ -195,6 +230,9 @@ bool LoadProgress(bool startup = false, int slot = 0)
     eventPage = 0;
     protagonistAnimation = SpriteAnimation();
     ResetControls(true);
+    dialoguePage = 0;
+    RefreshSavedStoryDialogue();
+    RestoreResidentDialogue();
     for (int set = 0; set < 5; ++set)
     {
         for (int slotIndex = 0; slotIndex < 4; ++slotIndex)

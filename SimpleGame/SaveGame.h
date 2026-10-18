@@ -53,11 +53,11 @@ class SaveGame
     {
         std::ostringstream out;
         out.imbue(std::locale::classic());
-        out << std::setprecision(17);
+        out << std::setprecision(17) << "chapter1-structure-v1\n";
         for (const auto& q : chapter.quests)
         {
-            out << std::quoted(q.id) << std::quoted(q.trigger) << std::quoted(q.title)
-                << std::quoted(q.objective) << std::quoted(q.dialogue) << q.destination.x << ' '
+            // Editorial changes do not invalidate progress; ordering and logic still must match.
+            out << std::quoted(q.id) << std::quoted(q.trigger) << q.destination.x << ' '
                 << q.destination.y << ' ' << q.amount << '\n';
         }
         return Hash(out.str());
@@ -326,9 +326,11 @@ class SaveGame
             // Snapshots are accepted only outside combat. Resume idle actors without attack phases.
             if (a.reading)
             {
-                if (e.boss == 4)
+                if (e.boss > 0)
                 {
-                    e.type = SpiritCatalog::Saint;
+                    e.type = StoryEncounter::Get(e.boss).species;
+                    if (e.boss == 10 && e.weakened)
+                        e.remnantRarity = (std::max)(3, e.remnantRarity);
                 }
                 e.trail.push_back(e.home);
                 if (LevelOne::Distance(e.home, e.position) > .001)
@@ -609,6 +611,17 @@ class SaveGame
         if (!Transfer(archive, candidate, version))
         {
             return false;
+        }
+        // Explicit migration from the authored 36-quest layout through patch 1.0.67.
+        // Never accept arbitrary mismatches or silently remap numeric quest indices.
+        if (candidate.story == 17577236682408322091ULL &&
+            StoryHash(chapter) == 12606591398302679102ULL)
+        {
+            candidate.story = StoryHash(chapter);
+            if (candidate.chapter.step == chapter.Index("P006"))
+            {
+                candidate.level.skillsUsed = 0;
+            }
         }
         archive.stream >> std::ws;
         if (!archive.stream.eof() || !Validate(candidate, chapter))

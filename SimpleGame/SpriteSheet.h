@@ -34,6 +34,7 @@ struct SpriteLayout
     bool anchorAtFeet = false;
     bool anchorAtTorso = false;
     bool pingPongWalk = false;
+    bool blendWalkFrames = true, normalizeFrameHeight = false;
     // Authored Blender sheets share a camera and ground origin across every frame.
     bool fixedCanvas = false;
     bool detectLocomotionColumns = false;
@@ -479,10 +480,14 @@ class SpriteSheet
             else
                 step = static_cast<int>(animation.phase) % layout.walkFrames;
             column = layout.firstWalkFrame + step;
+            // Single-pose directional atlases still need their direction-specific column.
+            if (layout.walkFrames == 1 && directionColumn >= 0)
+                column = directionColumn;
         }
         // Smooth only locomotion, not discrete cast poses. Fractional phase survives between
         // frames.
-        if (animation.moving && casting <= 0 && emission < 1.f && layout.walkFrames > 1)
+        if (layout.blendWalkFrames && animation.moving && casting <= 0 && emission < 1.f &&
+            layout.walkFrames > 1)
         {
             const float fraction = animation.phase - std::floor(animation.phase);
             int next = static_cast<int>(animation.phase) + 1;
@@ -497,12 +502,13 @@ class SpriteSheet
                 next %= layout.walkFrames;
             const Frame& from = frames[row * layout.columns + column];
             const Frame& to = frames[row * layout.columns + layout.firstWalkFrame + next];
-            const float scale = size / referenceHeight;
             const float mix = fraction * fraction * (3 - 2 * fraction);
             auto pose = [&](const Frame& f, float alpha)
             {
                 if (alpha < .001f)
                     return;
+                const float scale =
+                    size / (layout.normalizeFrameHeight ? f.height : referenceHeight);
                 renderer.Sprite(texture,
                                 feet.x - f.anchorX * scale,
                                 feet.y - f.anchorY * scale,
@@ -520,7 +526,8 @@ class SpriteSheet
             return;
         }
         const Frame& frame = frames[row * layout.columns + column];
-        float scale = size / referenceHeight, w = frame.width * scale, h = frame.height * scale;
+        float scale = size / (layout.normalizeFrameHeight ? frame.height : referenceHeight);
+        float w = frame.width * scale, h = frame.height * scale;
         if (feet.x + w < 0 || feet.x - w > width || feet.y < 0 || feet.y - h > height)
             return;
         if (spiritMotion >= 0)

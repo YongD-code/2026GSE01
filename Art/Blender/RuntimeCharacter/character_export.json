@@ -1,0 +1,45 @@
+{
+  "source": "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend",
+  "output": "SimpleGame\\Assets\\Characters\\Runtime\\protagonist.meshbin",
+  "vertices": 73902,
+  "triangles": 24634,
+  "bones": [
+    "root",
+    "hips",
+    "chest",
+    "head",
+    "arm.L",
+    "forearm.L",
+    "arm.R",
+    "forearm.R",
+    "thigh.L",
+    "shin.L",
+    "foot.L",
+    "thigh.R",
+    "shin.R",
+    "foot.R"
+  ],
+  "sourceHeight": 2.5487157702445984,
+  "sourceGround": 0.025663673877716064,
+  "layout": "18 float32 vertex, 10 float32 TRS",
+  "clips": [
+    {
+      "name": "idle",
+      "frames": 32
+    },
+    {
+      "name": "walk",
+      "frames": 48
+    },
+    {
+      "name": "run",
+      "frames": 40
+    },
+    {
+      "name": "cast",
+      "frames": 32
+    }
+  ],
+  "sourceModified": false,
+  "imagesRendered": false
+}

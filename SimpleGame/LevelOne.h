@@ -3,6 +3,7 @@
 #include "SpriteSheet.h"
 #include "CaptureRules.h"
 #include "SpiritCatalog.h"
+#include "StoryEncounter.h"
 #include <algorithm>
 #include <random>
 #include <string>
@@ -349,6 +350,13 @@ class LevelOne
             notice = "잔영을 흩어 보냈습니다. 처치 보상은 이미 지급되었습니다.";
             return;
         }
+        const bool first = enemy.boss == 5;
+        if (first)
+        {
+            // The mandatory lesson always consumes an old ticket and cannot be stranded.
+            selectedTicket = 0;
+            tickets[0] = (std::max)(1, tickets[0]);
+        }
         if (tickets[selectedTicket] <= 0)
         {
             notice = "선택한 봉인권이 없습니다. T로 변경하거나 X로 정화하세요.";
@@ -360,7 +368,6 @@ class LevelOne
             return;
         }
         --tickets[selectedTicket];
-        const bool first = collection.empty();
         const float chance =
             first ? 1.f : (enemy.boss == 4 ? captureRules.bossChance : captureRules.normalChance);
         if (Roll() <= chance)
@@ -431,9 +438,8 @@ class LevelOne
             enemy.stagger = .16f;
             enemy.staggerGuard = 1.2f;
         }
-        const bool canCapture = !residentOwned && captureUnlocked &&
-                                (enemy.boss == 0 || enemy.boss == 4 || enemy.boss == 5 ||
-                                 enemy.boss == 9 || enemy.boss == 10 || enemy.boss == 11);
+        const bool canCapture =
+            !residentOwned && captureUnlocked && StoryEncounter::Get(enemy.boss).capturable;
         if (enemy.health <= 0)
         {
             Resolve(enemy, !residentOwned);
@@ -441,6 +447,7 @@ class LevelOne
             {
                 const float roll = Roll();
                 enemy.remnantRarity = enemy.boss == 4                      ? 4
+                                      : enemy.boss == 10                   ? 3
                                       : enemy.type == SpiritCatalog::Saint ? 3
                                       : roll < captureRules.rareChance     ? 3
                                       : roll < captureRules.rareChance + captureRules.uncommonChance
@@ -522,15 +529,7 @@ class LevelOne
         Enemy enemy;
         enemy.position = enemy.home = home;
         enemy.trail.push_back(home);
-        enemy.type = id == 4 ? SpiritCatalog::Saint : SpiritCatalog::Forgotten;
-        if (id == 9 || id == 11)
-        {
-            enemy.type = 1;
-        }
-        if (id == 10)
-        {
-            enemy.type = 2;
-        }
+        enemy.type = StoryEncounter::Get(id).species;
         enemy.boss = id;
         enemy.maximum = id == 4 ? 420.f : (id == 1 ? 220.f : 160.f);
         if (id >= 5)
@@ -1253,13 +1252,15 @@ class LevelOne
                 for (size_t i = previousProjectiles; i < projectiles.size(); ++i)
                     projectiles[i].residentBattle = true;
             const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
+            const float authoredStride = StoryEncounter::Get(enemy.boss).walkFrameDistance;
             enemy.animation.Update((ax - ay) * .85,
                                    (ax + ay) * .43,
                                    enemyDt,
                                    false,
-                                   enemy.type == 0   ? 7.f
-                                   : enemy.type == 1 ? 11.f
-                                                     : 9.f);
+                                   authoredStride > 0 ? authoredStride
+                                   : enemy.type == 0  ? 7.f
+                                   : enemy.type == 1  ? 11.f
+                                                      : 9.f);
         }
         damageResident = -1;
         if (Dead())

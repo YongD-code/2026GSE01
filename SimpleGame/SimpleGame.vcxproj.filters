@@ -38,6 +38,7 @@
     <ClInclude Include="SaveGame.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PrototypeSave.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Chapter.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="StoryEncounter.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="CaptureRules.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PrototypeMenu.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PrototypeUI.inl"><Filter>헤더 파일</Filter></ClInclude>

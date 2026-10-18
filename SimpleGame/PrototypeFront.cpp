@@ -467,13 +467,13 @@ bool Prototype::GameUIClick(int x, int y)
     const float left = (width - w) / 2, top = (height - h) / 2;
     for (int i = 0; i < 2; ++i)
     {
-        const UIRect button = {
-            left + 24, top + (choice ? 64 : 62) + i * (choice ? 56 : 58), w - 48, 44};
+        const UIRect button =
+            choice ? ChildDialogueButton(i) : UIRect{left + 24, top + 62 + i * 58, w - 48, 44};
         if (!button.Contains(x, y))
             continue;
         ClearInput();
         if (choice)
-            Key(static_cast<unsigned char>('1' + i), true);
+            ChooseChildDialogue(i == 0);
         else if (i == 0)
             ProgressKey(true);
         else

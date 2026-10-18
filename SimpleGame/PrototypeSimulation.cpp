@@ -6,7 +6,9 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
 {
     if (openingPlaying || titleScreen || slotMode != SlotMode::Closed)
     {
-        movementVelocity = {0, 0};
+        StopMovement();
+        bufferedCommand.action = -1;
+        attackHeld = false;
         time += (std::min)(dt, .05f);
         return;
     }
@@ -37,101 +39,122 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
     const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
     const bool dodgePressed = ctrl && !dodgeHeld;
     dodgeHeld = ctrl;
-    if (serviceNpc.empty() && !pauseMenu && !journal && !chapter.choicePending &&
-        !dialoguePending && !levelOne.Dead() && !PreparingSkill())
+    if (ControlsActive())
     {
-        WorldPoint actorPosition = controlling ? spirit : player;
-        while (routeIndex < moveRoute.size() &&
-               Distance(actorPosition, moveRoute[routeIndex]) <
-                   (routeIndex + 1 == moveRoute.size() ? 2.0 : 7.0))
-        {
-            ++routeIndex;
-        }
-        float sx = 0, sy = 0;
-        double remaining = 0;
-        if (routeIndex < moveRoute.size())
-        {
-            const double x = moveRoute[routeIndex].x - actorPosition.x;
-            const double y = moveRoute[routeIndex].y - actorPosition.y;
-            sx = static_cast<float>((x - y) * .85);
-            sy = static_cast<float>((x + y) * .43);
-            remaining = std::hypot(sx, sy);
-        }
-        // Convert the route direction from screen space to world space.
-        float dx = sx / .85f + sy / .43f, dy = -sx / .85f + sy / .43f;
-        float length = std::sqrt(sx * sx + sy * sy);
+        // Release preparation and replay queued input before deciding this frame's movement.
+        navigationWait = (std::max)(0.f, navigationWait - dt);
+        UpdateSkills(dt);
+        UpdateBufferedCommand(inputDt);
+    }
+    if (ControlsActive() && !PreparingSkill())
+    {
         if (movementWasControlling != controlling)
         {
-            movementVelocity = {0, 0};
-            moveRoute.clear();
-            sx = sy = length = 0;
+            StopMovement();
         }
         movementWasControlling = controlling;
+        UpdateMoveRoute(dt);
+        WorldPoint& actor = controlling ? spirit : player;
+        WorldPoint dodgeDirection = {0, 0};
+        if (routeIndex < moveRoute.size())
+        {
+            dodgeDirection = {moveRoute[routeIndex].x - actor.x, moveRoute[routeIndex].y - actor.y};
+        }
         if (dodgePressed)
         {
             const WorldPoint aim = CursorWorld();
-            dx = static_cast<float>(aim.x - player.x);
-            dy = static_cast<float>(aim.y - player.y);
+            dodgeDirection = {aim.x - player.x, aim.y - player.y};
         }
+        const bool dodging =
+            !controlling &&
+            (levelOne.dodgeTime > 0 || (dodgePressed && levelOne.dodgeCooldown <= 0 &&
+                                        std::hypot(dodgeDirection.x, dodgeDirection.y) > .001));
         if (!controlling)
             levelOne.Dodge(dt,
                            player,
-                           {dx, dy},
+                           dodgeDirection,
                            dodgePressed,
                            [this](WorldPoint p)
                            {
                                return Blocked(p);
                            });
-        if (controlling || levelOne.dodgeTime <= 0)
+        if (!dodging && routeIndex < moveRoute.size())
         {
+            const double x = moveRoute[routeIndex].x - actor.x;
+            const double y = moveRoute[routeIndex].y - actor.y;
+            const double remaining = std::hypot((x - y) * .85, (x + y) * .43);
             const float pace = sprint ? 1.8f : 1.f;
             float speed = (controlling ? 110.f : 90.f) * pace * (spiritHasteTime > 0 ? 1.5f : 1.f);
             if (!controlling && InsideDomain(player))
             {
                 speed *= 1.5f;
             }
-            if (routeIndex + 1 >= moveRoute.size())
+            if (moveRouteComplete && routeIndex + 1 == moveRoute.size())
             {
-                speed = (std::min)(speed, static_cast<float>(std::sqrt(2 * 1100 * remaining)));
+                speed = (std::min)(speed, static_cast<float>(std::sqrt(2 * 1800 * remaining)));
             }
-            const WorldPoint desired = length > 0
-                                           ? WorldPoint{sx / length * speed, sy / length * speed}
-                                           : WorldPoint{0, 0};
-            const WorldPoint before = movementVelocity;
-            // Exponential steering keeps velocity continuous through turns and speed changes.
-            const double response = length > 0 ? 11.0 : 15.0;
-            const double decay = std::exp(-response * dt);
-            movementVelocity.x = desired.x + (before.x - desired.x) * decay;
-            movementVelocity.y = desired.y + (before.y - desired.y) * decay;
-            const double screenX = desired.x * dt + (before.x - desired.x) * (1 - decay) / response;
-            const double screenY = desired.y * dt + (before.y - desired.y) * (1 - decay) / response;
-            dx = static_cast<float>((screenX / .85 + screenY / .43) * .5);
-            dy = static_cast<float>((-screenX / .85 + screenY / .43) * .5);
-            const double travel = std::hypot((dx - dy) * .85, (dx + dy) * .43);
-            if (travel > remaining && travel > 0)
+            // Change heading immediately; only speed eases in. Gait still follows actual travel.
+            const double before = std::hypot(movementVelocity.x, movementVelocity.y);
+            const double decay = std::exp(-40.0 * dt);
+            const double currentSpeed = speed + (before - speed) * decay;
+            double travel = (std::max)(0.0, speed * dt + (before - speed) * (1 - decay) / 40.0);
+            bool collided = false;
+            for (int segment = 0; segment < 8 && routeIndex < moveRoute.size(); ++segment)
             {
-                dx *= static_cast<float>(remaining / travel);
-                dy *= static_cast<float>(remaining / travel);
-                movementVelocity = {0, 0};
+                const WorldPoint waypoint = moveRoute[routeIndex];
+                const double wx = waypoint.x - actor.x, wy = waypoint.y - actor.y;
+                const double sx = (wx - wy) * .85, sy = (wx + wy) * .43;
+                const double distance = std::hypot(sx, sy);
+                if (distance < .25)
+                {
+                    ++routeIndex;
+                    continue;
+                }
+                movementVelocity = {sx / distance * currentSpeed, sy / distance * currentSpeed};
+                if (travel <= 0)
+                {
+                    break;
+                }
+                const double step = (std::min)(travel, distance);
+                const WorldPoint delta = {wx * step / distance, wy * step / distance};
+                const WorldPoint start = actor;
+                LevelOne::Move(actor,
+                               delta,
+                               [this](WorldPoint p)
+                               {
+                                   return Blocked(p);
+                               });
+                moving = moving || Distance(start, actor) > .001;
+                collided =
+                    std::hypot(actor.x - start.x - delta.x, actor.y - start.y - delta.y) > .01;
+                if (collided)
+                {
+                    break;
+                }
+                travel -= step;
+                if (step < distance)
+                {
+                    break;
+                }
+                // Spend the remaining distance on the next segment without a pause or speed reset.
+                ++routeIndex;
             }
-            WorldPoint& actor = controlling ? spirit : player;
-            const WorldPoint start = actor;
-            LevelOne::Move(actor,
-                           {dx, dy},
-                           [this](WorldPoint p)
-                           {
-                               return Blocked(p);
-                           });
-            moving = Distance(start, actor) > .001;
-            if (!moving && length > 0 && std::hypot(dx, dy) > .01)
+            movementBlockedTime = collided ? movementBlockedTime + dt : 0;
+            if (movementBlockedTime >= .12f)
             {
-                moveRoute.clear();
-                movementVelocity = {0, 0};
+                RetryMovement();
+            }
+            else if (routeIndex >= moveRoute.size() && moveRouteComplete)
+            {
+                StopMovement();
             }
         }
         else
         {
-            movementVelocity = {0, 0};
+            if (!hasMoveDestination || dodging)
+            {
+                movementVelocity = {0, 0};
+            }
         }
         if (captured && !controlling)
         {
@@ -150,7 +173,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         movementVelocity = {0, 0};
         if (!ControlsActive())
         {
-            moveRoute.clear();
+            StopMovement();
             attackHeld = false;
         }
     }
@@ -159,8 +182,6 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         UpdateChapter();
         if (ControlsActive())
         {
-            UpdateSkills(dt);
-            UpdateBufferedCommand(inputDt);
             if (attackHeld && bufferedCommand.action < 0)
             {
                 BasicAttack();
