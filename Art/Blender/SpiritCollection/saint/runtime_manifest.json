@@ -1,0 +1,79 @@
+{
+  "species": "saint",
+  "id": 3,
+  "name": "기도하지 않는 성자",
+  "status": "integrated_model_atlas",
+  "cellSize": 128,
+  "columns": 32,
+  "rows": 8,
+  "clips": {
+    "idle": {
+      "first": 0,
+      "frames": 12
+    },
+    "glide": {
+      "first": 12,
+      "frames": 12
+    },
+    "cast": {
+      "first": 24,
+      "frames": 8
+    }
+  },
+  "directionRows": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "directionYaws": [
+    -0.0,
+    -0.42424096855172794,
+    -1.5707963267948966,
+    -2.7173516850380652,
+    -3.141592653589793,
+    2.7173516850380652,
+    1.570796326794897,
+    0.4242409685517281
+  ],
+  "loopSeconds": 2.0,
+  "bones": 16,
+  "worldOriginAnchorY": 0.8568742410215808,
+  "protectedBefore": {
+    "SimpleGame\\Assets\\Spirits\\mourning_bell_4dir.png": "24bb1efad0a57bdfb585e909809ad47877720d8a232cea402b9c6ddd195088e1",
+    "SimpleGame\\Assets\\Spirits\\briar_fox_4dir.png": "664f9afd6f7e83f88266b0884a6dab62a38e096787767ffe754928e7270a1908",
+    "SimpleGame\\Assets\\Spirits\\unpraying_saint_4dir.png": "f9644940d8e07242144f31535d9d3806d5d0315479cc487970b2fbb2c765f7cc",
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "SimpleGame\\Assets\\Spirits\\Forgotten\\lantern_a.png": "1485721bd7e2b1f26ccec51a3a0c28da9f07bc16d06d77caf5070cbf19fcf981"
+  },
+  "protectedAfter": {
+    "SimpleGame\\Assets\\Spirits\\mourning_bell_4dir.png": "24bb1efad0a57bdfb585e909809ad47877720d8a232cea402b9c6ddd195088e1",
+    "SimpleGame\\Assets\\Spirits\\briar_fox_4dir.png": "664f9afd6f7e83f88266b0884a6dab62a38e096787767ffe754928e7270a1908",
+    "SimpleGame\\Assets\\Spirits\\unpraying_saint_4dir.png": "f9644940d8e07242144f31535d9d3806d5d0315479cc487970b2fbb2c765f7cc",
+    "Art\\Blender\\SpiritStudy\\forgotten_candidate.blend": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+    "SimpleGame\\Assets\\Spirits\\Forgotten\\lantern_a.png": "1485721bd7e2b1f26ccec51a3a0c28da9f07bc16d06d77caf5070cbf19fcf981"
+  },
+  "gameBuildRunTested": false,
+  "runtimeIntegrated": true,
+  "atlas": "SimpleGame\\Assets\\Spirits\\Models\\saint.png",
+  "dimensions": [
+    4096,
+    1024
+  ],
+  "canvasAnchorY": 0.90625,
+  "canvasCharacterHeight": 0.7890625,
+  "alphaBounds": [
+    35,
+    13,
+    93,
+    114
+  ],
+  "rgbaBytes": 16777216,
+  "emptyCells": 0,
+  "clippedCells": 0,
+  "atlasSha256": "d0e48d6003e78cd3fad957bd2539dfb623af4bdfb5d4b9dcdfdbda4c7699ab93"
+}
