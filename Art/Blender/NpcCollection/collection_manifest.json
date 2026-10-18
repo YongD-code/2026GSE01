@@ -1,0 +1,322 @@
+{
+  "status": "candidates_not_applied",
+  "designs": [
+    {
+      "id": "travelling_merchant",
+      "label": "행상인",
+      "category": "crowd",
+      "role": 1,
+      "coat": [
+        0.2,
+        0.11,
+        0.055
+      ],
+      "trim": [
+        0.58,
+        0.4,
+        0.19
+      ],
+      "hair": [
+        0.15,
+        0.09,
+        0.04
+      ],
+      "style": "short",
+      "outfit": "haori",
+      "gear": "pack",
+      "width": 1.07
+    },
+    {
+      "id": "artisan",
+      "label": "생활 장인",
+      "category": "crowd",
+      "role": 2,
+      "coat": [
+        0.69,
+        0.56,
+        0.37
+      ],
+      "trim": [
+        0.34,
+        0.09,
+        0.04
+      ],
+      "hair": [
+        0.035,
+        0.018,
+        0.013
+      ],
+      "style": "bun",
+      "outfit": "apron",
+      "gear": "tools",
+      "female": true
+    },
+    {
+      "id": "hunter",
+      "label": "주령 사냥꾼",
+      "category": "crowd",
+      "role": 3,
+      "coat": [
+        0.035,
+        0.105,
+        0.12
+      ],
+      "trim": [
+        0.62,
+        0.49,
+        0.31
+      ],
+      "hair": [
+        0.025,
+        0.019,
+        0.017
+      ],
+      "style": "long",
+      "outfit": "splitcoat",
+      "gear": "sword"
+    },
+    {
+      "id": "sibling",
+      "label": "동생",
+      "category": "story",
+      "source": "sibling",
+      "coat": [
+        0.76,
+        0.69,
+        0.52
+      ],
+      "trim": [
+        0.095,
+        0.12,
+        0.2
+      ],
+      "hair": [
+        0.065,
+        0.035,
+        0.022
+      ],
+      "style": "bob",
+      "outfit": "haori",
+      "gear": "ribbon",
+      "child": true,
+      "female": true
+    },
+    {
+      "id": "parent",
+      "label": "부모",
+      "category": "story",
+      "source": "parent",
+      "coat": [
+        0.22,
+        0.095,
+        0.13
+      ],
+      "trim": [
+        0.69,
+        0.59,
+        0.4
+      ],
+      "hair": [
+        0.045,
+        0.028,
+        0.017
+      ],
+      "style": "bun",
+      "outfit": "kimono",
+      "gear": "apron",
+      "female": true
+    },
+    {
+      "id": "village_merchant",
+      "label": "잡화상",
+      "category": "story",
+      "source": "merchant",
+      "coat": [
+        0.52,
+        0.29,
+        0.055
+      ],
+      "trim": [
+        0.17,
+        0.24,
+        0.2
+      ],
+      "hair": [
+        0.14,
+        0.1,
+        0.065
+      ],
+      "style": "bald",
+      "outfit": "haori",
+      "gear": "ledger",
+      "width": 1.24,
+      "elder": true
+    },
+    {
+      "id": "child",
+      "label": "마을 아이",
+      "category": "story",
+      "source": "child",
+      "coat": [
+        0.15,
+        0.2,
+        0.085
+      ],
+      "trim": [
+        0.37,
+        0.27,
+        0.15
+      ],
+      "hair": [
+        0.115,
+        0.06,
+        0.022
+      ],
+      "style": "tousled",
+      "outfit": "haori",
+      "gear": "satchel",
+      "child": true
+    },
+    {
+      "id": "stranger",
+      "label": "돌아가지 못한 사람",
+      "category": "story",
+      "source": "stranger",
+      "coat": [
+        0.12,
+        0.135,
+        0.13
+      ],
+      "trim": [
+        0.32,
+        0.3,
+        0.24
+      ],
+      "hair": [
+        0.055,
+        0.045,
+        0.03
+      ],
+      "style": "long",
+      "outfit": "ragged",
+      "gear": "rope",
+      "width": 0.9
+    },
+    {
+      "id": "raen",
+      "label": "라엔",
+      "category": "story",
+      "source": "raen",
+      "coat": [
+        0.035,
+        0.045,
+        0.065
+      ],
+      "trim": [
+        0.23,
+        0.035,
+        0.055
+      ],
+      "hair": [
+        0.78,
+        0.82,
+        0.85
+      ],
+      "style": "bob",
+      "outfit": "armour",
+      "gear": "scarf",
+      "female": true
+    },
+    {
+      "id": "sealer",
+      "label": "봉인사",
+      "category": "story",
+      "source": "sealer",
+      "coat": [
+        0.12,
+        0.055,
+        0.18
+      ],
+      "trim": [
+        0.69,
+        0.54,
+        0.24
+      ],
+      "hair": [
+        0.68,
+        0.65,
+        0.57
+      ],
+      "style": "bun",
+      "outfit": "ceremonial",
+      "gear": "seals",
+      "female": true,
+      "elder": true
+    },
+    {
+      "id": "smith",
+      "label": "대장장이",
+      "category": "story",
+      "source": "smith",
+      "coat": [
+        0.04,
+        0.045,
+        0.05
+      ],
+      "trim": [
+        0.25,
+        0.115,
+        0.045
+      ],
+      "hair": [
+        0.025,
+        0.018,
+        0.012
+      ],
+      "style": "short",
+      "outfit": "apron",
+      "gear": "hammer",
+      "width": 1.16
+    }
+  ],
+  "protectedBefore": {
+    "Art\\Blender\\TownsfolkRefinement\\gatherer_candidate.blend": "990a9781b44cac06d92b547c505831fd52e301fe9c14b955dd89cd18e6127b75",
+    "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend": "c8dcbe1c04153df3b30c24a5760bf995b6d4dc238ff5ab9065ac0d01f92e3539",
+    "SimpleGame\\Assets\\Characters\\Story\\child.png": "32ba3b7f15da38d64a0e5a20ef6e04fcdedec5ad4d7966a9787f2d37f445449f",
+    "SimpleGame\\Assets\\Characters\\Story\\merchant.png": "d08d6e5150655c5ce56fca8c884d10f36089c95c5abd7c9dfbaeb0ab4707489c",
+    "SimpleGame\\Assets\\Characters\\Story\\parent.png": "f22eda5634b9c07d52048219b25f238ca6a223bf409fb19106b1a92fc9fbdd78",
+    "SimpleGame\\Assets\\Characters\\Story\\raen.png": "ddc82fa2232e1ccdcd97764d219dd93de33e94494f307833bf3ba2970efcd341",
+    "SimpleGame\\Assets\\Characters\\Story\\sealer.png": "9e7ee66028d70966ff3fe3e953a22bfc8160a448a557dfbfc0e43487eb2cde4b",
+    "SimpleGame\\Assets\\Characters\\Story\\sibling.png": "c34e2130a74245e169adc7b0307a2866ee9200e65302a4ea24da0510370b6e8e",
+    "SimpleGame\\Assets\\Characters\\Story\\smith.png": "5a7f39e12eba23777f70f4cbfe085838f78d0be4096c4d9f487433da21c4952c",
+    "SimpleGame\\Assets\\Characters\\Story\\stranger.png": "92f75aba1b008d558b466f0321e05fb17fcd344e94a79a08bec63238134758b4",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\artisan_walk.png": "f0f1f52f2e6631cefbdea9641fb48f8d5b7cc3d993bdb921b6f9dadaffe94ea1",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\farmer_walk.png": "0393afb6a92f53bb49dab54b423a48f5c17be0e1cfdc1811dc858e1266051026",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\hunter_walk.png": "1e300cb0cb0c634b798cfabac5ec155a10cebdb5b8ec329bb4d72e7a141b9b3e",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\merchant_walk.png": "71122787bb5dd2426cce64fd974a592e0fe38f2508c8dfa2fe9360bef1f8567f",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\residents.png": "dc9dc94e1894ec526257207a76bfd0d763a4d2dd8fc5ef0bb9965060ce0b2633"
+  },
+  "protectedAfter": {
+    "Art\\Blender\\TownsfolkRefinement\\gatherer_candidate.blend": "990a9781b44cac06d92b547c505831fd52e301fe9c14b955dd89cd18e6127b75",
+    "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend": "c8dcbe1c04153df3b30c24a5760bf995b6d4dc238ff5ab9065ac0d01f92e3539",
+    "SimpleGame\\Assets\\Characters\\Story\\child.png": "32ba3b7f15da38d64a0e5a20ef6e04fcdedec5ad4d7966a9787f2d37f445449f",
+    "SimpleGame\\Assets\\Characters\\Story\\merchant.png": "d08d6e5150655c5ce56fca8c884d10f36089c95c5abd7c9dfbaeb0ab4707489c",
+    "SimpleGame\\Assets\\Characters\\Story\\parent.png": "f22eda5634b9c07d52048219b25f238ca6a223bf409fb19106b1a92fc9fbdd78",
+    "SimpleGame\\Assets\\Characters\\Story\\raen.png": "ddc82fa2232e1ccdcd97764d219dd93de33e94494f307833bf3ba2970efcd341",
+    "SimpleGame\\Assets\\Characters\\Story\\sealer.png": "9e7ee66028d70966ff3fe3e953a22bfc8160a448a557dfbfc0e43487eb2cde4b",
+    "SimpleGame\\Assets\\Characters\\Story\\sibling.png": "c34e2130a74245e169adc7b0307a2866ee9200e65302a4ea24da0510370b6e8e",
+    "SimpleGame\\Assets\\Characters\\Story\\smith.png": "5a7f39e12eba23777f70f4cbfe085838f78d0be4096c4d9f487433da21c4952c",
+    "SimpleGame\\Assets\\Characters\\Story\\stranger.png": "92f75aba1b008d558b466f0321e05fb17fcd344e94a79a08bec63238134758b4",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\artisan_walk.png": "f0f1f52f2e6631cefbdea9641fb48f8d5b7cc3d993bdb921b6f9dadaffe94ea1",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\farmer_walk.png": "0393afb6a92f53bb49dab54b423a48f5c17be0e1cfdc1811dc858e1266051026",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\hunter_walk.png": "1e300cb0cb0c634b798cfabac5ec155a10cebdb5b8ec329bb4d72e7a141b9b3e",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\merchant_walk.png": "71122787bb5dd2426cce64fd974a592e0fe38f2508c8dfa2fe9360bef1f8567f",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\residents.png": "dc9dc94e1894ec526257207a76bfd0d763a4d2dd8fc5ef0bb9965060ce0b2633"
+  },
+  "runtimeImagesExported": false,
+  "gameRunTested": false,
+  "reviewBoards": [
+    "crowd_candidates.png",
+    "story_candidates.png"
+  ]
+}
