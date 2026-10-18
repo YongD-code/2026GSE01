@@ -194,16 +194,11 @@ bool LoadProgress(bool startup = false, int slot = 0)
     population.people = std::move(state.residents);
     population.seed = world.seed;
     population.planningCursor = 0;
-    for (auto& person : population.people)
-    {
-        if (Blocked(person.position))
-            person.position = Population::OpenPoint(person.home,
-                                                    [this](WorldPoint p)
-                                                    {
-                                                        return Blocked(p);
-                                                    });
-        person.destination = person.position;
-    }
+    population.RepairPlacement(
+        [this](WorldPoint p)
+        {
+            return Blocked(p);
+        });
     chapter = std::move(state.chapter);
     storyTrialTime = 0;
     player = state.player;

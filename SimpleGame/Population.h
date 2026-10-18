@@ -123,22 +123,147 @@ class Population
         return result;
     }
 
+    static bool TownInterior(WorldPoint p)
+    {
+        // Include a body-width margin so a person never straddles a town boundary.
+        if (std::abs(p.x) < 536 && std::abs(p.y) < 536)
+            return true;
+        for (const auto& hub : Hubs())
+            if (std::abs(p.x - hub.x) < 304 && std::abs(p.y - hub.y) < 324)
+                return true;
+        return false;
+    }
+
+    static WorldPoint OutsideTown(WorldPoint p)
+    {
+        auto exclude = [&](WorldPoint hub, double halfWidth, double halfDepth)
+        {
+            const double dx = p.x - hub.x, dy = p.y - hub.y;
+            if (std::abs(dx) >= halfWidth || std::abs(dy) >= halfDepth)
+                return;
+            if (halfWidth - std::abs(dx) < halfDepth - std::abs(dy))
+                p.x = hub.x + (dx < 0 ? -1 : 1) * (halfWidth + 8);
+            else
+                p.y = hub.y + (dy < 0 ? -1 : 1) * (halfDepth + 8);
+        };
+        exclude({0, 0}, 536, 536);
+        for (const auto& hub : Hubs())
+            exclude(hub, 304, 324);
+        return p;
+    }
+
+    static WorldPoint CampAnchor(int district, int id, bool workplace = false)
+    {
+        const auto hub = Hubs()[district];
+        const double angle = (id % 8) * .7853981633974483 + (workplace ? .24 : 0.);
+        const double radius = (district == 0 ? 850. : 490.) + (workplace ? 110. : 0.);
+        return OutsideTown({hub.x + std::cos(angle) * radius, hub.y + std::sin(angle) * radius});
+    }
+
+    static bool CrossesTown(WorldPoint start, WorldPoint end, int district)
+    {
+        const auto hub = Hubs()[district];
+        const double halfWidth = district == 0 ? 536. : 304.;
+        const double halfDepth = district == 0 ? 536. : 324.;
+        double enter = 0, leave = 1;
+        auto slab = [&](double at, double change, double low, double high)
+        {
+            if (std::abs(change) < .00001)
+                return at > low && at < high;
+            double a = (low - at) / change, b = (high - at) / change;
+            if (a > b)
+                std::swap(a, b);
+            enter = (std::max)(enter, a);
+            leave = (std::min)(leave, b);
+            return enter < leave;
+        };
+        return slab(start.x, end.x - start.x, hub.x - halfWidth, hub.x + halfWidth) &&
+               slab(start.y, end.y - start.y, hub.y - halfDepth, hub.y + halfDepth);
+    }
+
+    static WorldPoint RoutingGoal(WorldPoint start, WorldPoint destination)
+    {
+        // Give the small local pathfinder a reachable goal around a town-sized exclusion.
+        // Otherwise its 260-unit probe can land deep inside the forbidden rectangle.
+        auto clear = [&](WorldPoint goal)
+        {
+            for (int i = 0; i < int(Hubs().size()); ++i)
+                if (CrossesTown(start, goal, i))
+                    return false;
+            return true;
+        };
+        if (clear(destination))
+            return destination;
+        WorldPoint result = start;
+        double best = 1.e30;
+        for (int i = 0; i < int(Hubs().size()); ++i)
+        {
+            if (!CrossesTown(start, destination, i))
+                continue;
+            const auto hub = Hubs()[i];
+            const double x = i == 0 ? 568. : 336., y = i == 0 ? 568. : 356.;
+            for (int sx : {-1, 1})
+                for (int sy : {-1, 1})
+                {
+                    const WorldPoint corner = {hub.x + sx * x, hub.y + sy * y};
+                    const double reach = std::hypot(corner.x - start.x, corner.y - start.y);
+                    const double cost =
+                        reach + std::hypot(destination.x - corner.x, destination.y - corner.y);
+                    if (reach > 24 && cost < best && clear(corner))
+                    {
+                        result = corner;
+                        best = cost;
+                    }
+                }
+        }
+        return result;
+    }
+
     template <class Collision> static WorldPoint OpenPoint(WorldPoint desired, Collision blocked)
     {
+        desired = OutsideTown(desired);
         if (!blocked(desired))
             return desired;
-        for (int ring = 1; ring <= 14; ++ring)
+        for (int ring = 1; ring <= 32; ++ring)
         {
             for (int i = 0; i < 16; ++i)
             {
                 const double angle = i * 6.2831853 / 16;
                 WorldPoint p = {desired.x + std::cos(angle) * ring * 20,
                                 desired.y + std::sin(angle) * ring * 20};
-                if (!blocked(p))
+                if (!TownInterior(p) && !blocked(p))
                     return p;
             }
         }
         return desired;
+    }
+
+    template <class Collision> void RepairPlacement(Collision blocked)
+    {
+        // Migrate old saves without losing identity, earnings, health or collected goods.
+        for (auto& p : people)
+        {
+            if (TownInterior(p.home) || blocked(p.home))
+                p.home = OpenPoint(CampAnchor(p.district, p.id), blocked);
+            if (TownInterior(p.workplace) || blocked(p.workplace))
+                p.workplace = OpenPoint(CampAnchor(p.district, p.id, true), blocked);
+            const bool relocate = TownInterior(p.position) || blocked(p.position);
+            if (relocate)
+                p.position = OpenPoint(p.home, blocked);
+            if (relocate || TownInterior(p.destination))
+            {
+                p.destination = p.home;
+                p.action = Returning;
+                p.nextAction = Resting;
+                p.route.clear();
+                p.waypoint = 0;
+                p.target = -1;
+                p.pathWait = p.simulationTime = 0;
+                p.visualVelocity = p.separation = {0, 0};
+                p.animation.moving = false;
+                p.stopTime = .1f;
+            }
+        }
     }
 
     template <class Collision> void Initialize(std::uint64_t worldSeed, Collision blocked)
@@ -152,12 +277,8 @@ class Population
             p.id = id;
             p.district = id / 8;
             p.role = id % 8 >= 5 ? Hunter : id % 3;
-            const auto hub = Hubs()[p.district];
-            p.home = OpenPoint(
-                {hub.x - 190 + (id % 4) * 115., hub.y + 80 + (id % 8 / 4) * 90. + (id % 2) * 15.},
-                blocked);
-            p.workplace = OpenPoint(
-                {hub.x - 210 + (id % 4) * 135., hub.y + 210 + (id % 8 / 4) * 60.}, blocked);
+            p.home = OpenPoint(CampAnchor(p.district, id), blocked);
+            p.workplace = OpenPoint(CampAnchor(p.district, id, true), blocked);
             p.position = p.destination = p.home;
             p.action = Resting;
             p.timer = 1.f + id % 6;
@@ -230,16 +351,36 @@ class Population
     }
 
     template <class Level, class Collision>
-    void Update(
-        float dt, WorldPoint player, Level& level, Collision blocked, double fullRateRadius = 1400)
+    void Update(float dt,
+                WorldPoint player,
+                Level& level,
+                Collision worldBlocked,
+                double fullRateRadius = 1400)
     {
         if (people.empty() || dt <= 0)
             return;
+        auto blocked = [&](WorldPoint p)
+        {
+            return TownInterior(p) || worldBlocked(p);
+        };
         int plans = 1;
         // Rotating traversal prevents a blocked early agent from taking every pathfinding slot.
         for (size_t n = 0; n < people.size(); ++n)
         {
             auto& p = people[(planningCursor + n) % people.size()];
+            if (TownInterior(p.position))
+            {
+                p.position = OpenPoint(p.home, blocked);
+                p.destination = p.position;
+                p.route.clear();
+                p.waypoint = 0;
+                p.target = -1;
+                p.action = Resting;
+                p.timer = 1;
+                p.visualVelocity = p.separation = {0, 0};
+                p.animation.moving = false;
+                p.stopTime = .1f;
+            }
             p.invulnerability = (std::max)(0.f, p.invulnerability - dt);
             // Keep visible movement continuous; distant jobs and hunts still advance in time.
             const double playerDistance = Level::Distance(p.position, player);
@@ -279,7 +420,8 @@ class Population
                 for (size_t i = 0; i < level.enemies.size(); ++i)
                 {
                     const auto& enemy = level.enemies[i];
-                    if (enemy.boss != 0 || enemy.weakened || enemy.returning || enemy.health <= 0)
+                    if (enemy.boss != 0 || enemy.weakened || enemy.returning || enemy.health <= 0 ||
+                        TownInterior(enemy.position))
                         continue;
                     const double d = Level::Distance(p.position, enemy.position);
                     if (d < danger)
@@ -368,18 +510,18 @@ class Population
                             p.goods = (std::min)(2 + int(p.cycle % 3), p.gold / 2);
                             p.gold -= p.goods * 2;
                         }
-                        const auto hub = Hubs()[destination];
-                        Travel(p, OpenPoint({hub.x, hub.y + 150}, blocked), Trading);
+                        Travel(p, OpenPoint(CampAnchor(destination, p.id, true), blocked), Trading);
                     }
                     else if (p.role == Hunter)
                     {
                         const double angle = (p.id * 2.39996 + ++p.cycle * 1.7);
                         const auto hub = Hubs()[p.district];
-                        Travel(p,
-                               OpenPoint(
-                                   {hub.x + std::cos(angle) * 560, hub.y + std::sin(angle) * 560},
-                                   blocked),
-                               Hunting);
+                        Travel(
+                            p,
+                            OpenPoint({hub.x + std::cos(angle) * (p.district == 0 ? 980. : 640.),
+                                       hub.y + std::sin(angle) * (p.district == 0 ? 980. : 640.)},
+                                      blocked),
+                            Hunting);
                     }
                     else
                         Travel(p, p.workplace, Working);
@@ -403,11 +545,18 @@ class Population
                     if ((p.waypoint >= p.route.size() || finishingSegment) && p.pathWait <= 0 &&
                         plans > 0)
                     {
-                        const double d = Level::Distance(p.position, p.destination);
+                        const auto goal = RoutingGoal(p.position, p.destination);
+                        const double d = Level::Distance(p.position, goal);
+                        if (d < .01)
+                        {
+                            p.pathWait = .5f;
+                            p.animation.moving = false;
+                            p.stopTime = .1f;
+                            continue;
+                        }
                         const double t = (std::min)(1., 260. / d);
-                        const WorldPoint step = {
-                            p.position.x + (p.destination.x - p.position.x) * t,
-                            p.position.y + (p.destination.y - p.position.y) * t};
+                        const WorldPoint step = {p.position.x + (goal.x - p.position.x) * t,
+                                                 p.position.y + (goal.y - p.position.y) * t};
                         auto route =
                             ClickNavigation::Find(p.position, step, blocked, 192, 1.5, true);
                         p.pathWait = .3f;
