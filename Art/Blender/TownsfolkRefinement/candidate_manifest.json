@@ -1,0 +1,97 @@
+{
+  "source": "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend",
+  "output": "Art\\Blender\\TownsfolkRefinement\\gatherer_candidate.blend",
+  "status": "candidate_not_applied",
+  "bodyTopologyReference": [
+    "맞춤 코트 몸판",
+    "바지 허리",
+    "얼굴 조형",
+    "콧대",
+    "귓바퀴",
+    "귓바퀴.001",
+    "연속 바지 L",
+    "가죽 부츠 L",
+    "밑창 L",
+    "연속 소매 L",
+    "손바닥 L",
+    "손가락",
+    "손가락.001",
+    "손가락.002",
+    "손가락.003",
+    "엄지",
+    "연속 바지 R",
+    "가죽 부츠 R",
+    "밑창 R",
+    "연속 소매 R",
+    "손바닥 R",
+    "손가락.004",
+    "손가락.005",
+    "손가락.006",
+    "손가락.007",
+    "엄지.001",
+    "제복 앞섶",
+    "귀",
+    "귀.001"
+  ],
+  "bones": 14,
+  "camera": {
+    "resolution": [
+      640,
+      800
+    ],
+    "orthoScale": 2.86
+  },
+  "renderer": "BLENDER_EEVEE",
+  "material": "three-band cel / subtle woven and leather grain",
+  "protectedBefore": {
+    "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend": "c8dcbe1c04153df3b30c24a5760bf995b6d4dc238ff5ab9065ac0d01f92e3539",
+    "Art\\Blender\\TownsfolkStudy\\gatherer.blend": "0d799c301c4e4126e3032238d2eceea6fcc2fa765f1c594c94037bb756593af2",
+    "SimpleGame\\Assets\\Characters\\Blender\\walk.png": "f3b96a3a747f9809375ad58658743db253b543919107582f3ac3277db12d3f2c",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\Gatherer\\walk.png": "5526fcbae331bef940c9626bf5b5c6cc3665c32c9c6de4013e65da78597e9941"
+  },
+  "protectedAfter": {
+    "Art\\Blender\\CharacterRefinement\\protagonist_refined.blend": "c8dcbe1c04153df3b30c24a5760bf995b6d4dc238ff5ab9065ac0d01f92e3539",
+    "Art\\Blender\\TownsfolkStudy\\gatherer.blend": "0d799c301c4e4126e3032238d2eceea6fcc2fa765f1c594c94037bb756593af2",
+    "SimpleGame\\Assets\\Characters\\Blender\\walk.png": "f3b96a3a747f9809375ad58658743db253b543919107582f3ac3277db12d3f2c",
+    "SimpleGame\\Assets\\Characters\\Townsfolk\\Gatherer\\walk.png": "5526fcbae331bef940c9626bf5b5c6cc3665c32c9c6de4013e65da78597e9941"
+  },
+  "gameAssetsModified": false,
+  "gameBuildRunTested": false,
+  "reviews": {
+    "comparison.png": {
+      "size": [
+        1280,
+        940
+      ],
+      "frames": 1
+    },
+    "previous_comparison.png": {
+      "size": [
+        1280,
+        940
+      ],
+      "frames": 1
+    },
+    "turnaround.png": {
+      "size": [
+        1920,
+        940
+      ],
+      "frames": 1
+    },
+    "candidate_portrait.png": {
+      "size": [
+        640,
+        800
+      ],
+      "frames": 1
+    },
+    "walk_preview.gif": {
+      "size": [
+        360,
+        450
+      ],
+      "frames": 16
+    }
+  }
+}
