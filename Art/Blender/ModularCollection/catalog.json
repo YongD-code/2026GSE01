@@ -429,5 +429,40 @@
     "Accessory index -1 means no accessory.",
     "All pieces share the same local origin; instantiate selected meshes together.",
     "NPC assembly, animation, collision and game import are future integration work."
-  ]
+  ],
+  "riggedPartFile": "npc_rigged.glb",
+  "rigFile": "npc_rigged.blend",
+  "rigName": "NPC_SHARED_RIG",
+  "clips": {
+    "idle": {
+      "firstFrame": 1,
+      "lastFrame": 33,
+      "loop": true
+    },
+    "walk": {
+      "firstFrame": 1,
+      "lastFrame": 25,
+      "loop": true
+    },
+    "run": {
+      "firstFrame": 1,
+      "lastFrame": 17,
+      "loop": true
+    },
+    "jump": {
+      "firstFrame": 1,
+      "lastFrame": 25,
+      "loop": false
+    },
+    "turn_left": {
+      "firstFrame": 1,
+      "lastFrame": 13,
+      "loop": false
+    },
+    "turn_right": {
+      "firstFrame": 1,
+      "lastFrame": 13,
+      "loop": false
+    }
+  }
 }

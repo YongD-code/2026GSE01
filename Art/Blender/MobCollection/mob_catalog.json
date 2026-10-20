@@ -1,0 +1,350 @@
+{
+  "schemaVersion": 1,
+  "animationFps": 24,
+  "species": [
+    {
+      "id": 0,
+      "key": "forgotten",
+      "name": "남겨진 자",
+      "disposition": "gentle",
+      "gait": "hover",
+      "model": "forgotten/model.blend",
+      "export": "forgotten/model.glb",
+      "rig": "남겨진 자 · 부유 리그",
+      "source": "Art/Blender/SpiritStudy/forgotten_candidate.blend",
+      "sourceSha256": "bac8977f1693bb8d99946eb3ca3368c325f0a90a769bec377dd9d3324429228c",
+      "meshCount": 204,
+      "boneCount": 16,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 1,
+      "key": "pilgrim",
+      "name": "목 없는 순례자",
+      "disposition": "ambivalent",
+      "gait": "hover",
+      "model": "pilgrim/model.blend",
+      "export": "pilgrim/model.glb",
+      "rig": "목 없는 순례자 · 리그",
+      "source": "Art/Blender/SpiritCollection/pilgrim/model.blend",
+      "sourceSha256": "d1f42f434c47cea99cbe8cfa28f2658dd43763e4d5e2365de124b64811881321",
+      "meshCount": 89,
+      "boneCount": 16,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 2,
+      "key": "hands",
+      "name": "기도하는 손",
+      "disposition": "gentle",
+      "gait": "quadruped",
+      "model": "hands/model.blend",
+      "export": "hands/model.glb",
+      "rig": "기도하는 손 · 리그",
+      "source": "Art/Blender/SpiritCollection/hands/model.blend",
+      "sourceSha256": "0b85417c6a88b56028fd8f737b71edc0ae3ba6bd9d8649e4f0026a1b35f1295c",
+      "meshCount": 168,
+      "boneCount": 20,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 3,
+      "key": "saint",
+      "name": "기도하지 않는 성자",
+      "disposition": "dangerous",
+      "gait": "hover",
+      "model": "saint/model.blend",
+      "export": "saint/model.glb",
+      "rig": "기도하지 않는 성자 · 리그",
+      "source": "Art/Blender/SpiritCollection/saint/model.blend",
+      "sourceSha256": "6c66e1a361235445f902c50b1e99d310477d180216bedaa7e2ff21eda9ead797",
+      "meshCount": 162,
+      "boneCount": 16,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 4,
+      "key": "eater",
+      "name": "울음 먹는 자",
+      "disposition": "dangerous",
+      "gait": "biped",
+      "model": "eater/model.blend",
+      "export": "eater/model.glb",
+      "rig": "MOB_EATER_RIG",
+      "source": null,
+      "sourceSha256": null,
+      "meshCount": 11,
+      "boneCount": 12,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "attack": {
+          "firstFrame": 1,
+          "lastFrame": 19,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 5,
+      "key": "stag",
+      "name": "길지기 사슴",
+      "disposition": "gentle",
+      "gait": "quadruped",
+      "model": "stag/model.blend",
+      "export": "stag/model.glb",
+      "rig": "MOB_STAG_RIG",
+      "source": null,
+      "sourceSha256": null,
+      "meshCount": 13,
+      "boneCount": 14,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "attack": {
+          "firstFrame": 1,
+          "lastFrame": 19,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    },
+    {
+      "id": 6,
+      "key": "hound",
+      "name": "재 먹는 들개",
+      "disposition": "dangerous",
+      "gait": "quadruped",
+      "model": "hound/model.blend",
+      "export": "hound/model.glb",
+      "rig": "MOB_HOUND_RIG",
+      "source": null,
+      "sourceSha256": null,
+      "meshCount": 13,
+      "boneCount": 14,
+      "clips": {
+        "idle": {
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": true
+        },
+        "walk": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": true
+        },
+        "run": {
+          "firstFrame": 1,
+          "lastFrame": 17,
+          "loop": true
+        },
+        "jump": {
+          "firstFrame": 1,
+          "lastFrame": 25,
+          "loop": false
+        },
+        "turn_left": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "turn_right": {
+          "firstFrame": 1,
+          "lastFrame": 13,
+          "loop": false
+        },
+        "attack": {
+          "firstFrame": 1,
+          "lastFrame": 19,
+          "loop": false
+        }
+      },
+      "turnStepDegrees": 45
+    }
+  ]
+}
