@@ -1,0 +1,433 @@
+{
+  "schemaVersion": 1,
+  "coordinateSystem": "Blend: Z-up/front -Y; GLB: glTF Y-up conversion; metres, origin at feet",
+  "characterHeightMetres": 2.4,
+  "proportions": "three-head chibi",
+  "partFile": "npc_parts.glb",
+  "sceneryFile": "world_props.glb",
+  "parts": {
+    "body": [
+      {
+        "index": 0,
+        "mesh": "NPC_BODY_M_00",
+        "slot": "body",
+        "vertices": 226,
+        "triangles": 388
+      },
+      {
+        "index": 1,
+        "mesh": "NPC_BODY_F_01",
+        "slot": "body",
+        "vertices": 226,
+        "triangles": 388
+      }
+    ],
+    "hair": [
+      {
+        "index": 0,
+        "mesh": "NPC_HAIR_SHORT_00",
+        "slot": "hair",
+        "vertices": 78,
+        "triangles": 124
+      },
+      {
+        "index": 1,
+        "mesh": "NPC_HAIR_TOUSLED_01",
+        "slot": "hair",
+        "vertices": 78,
+        "triangles": 124
+      },
+      {
+        "index": 2,
+        "mesh": "NPC_HAIR_BOB_02",
+        "slot": "hair",
+        "vertices": 84,
+        "triangles": 140
+      },
+      {
+        "index": 3,
+        "mesh": "NPC_HAIR_LONG_03",
+        "slot": "hair",
+        "vertices": 96,
+        "triangles": 160
+      },
+      {
+        "index": 4,
+        "mesh": "NPC_HAIR_BUN_04",
+        "slot": "hair",
+        "vertices": 96,
+        "triangles": 160
+      },
+      {
+        "index": 5,
+        "mesh": "NPC_HAIR_BOB_05",
+        "slot": "hair",
+        "vertices": 84,
+        "triangles": 140
+      },
+      {
+        "index": 6,
+        "mesh": "NPC_HAIR_BRAID_06",
+        "slot": "hair",
+        "vertices": 138,
+        "triangles": 228
+      }
+    ],
+    "outfit": [
+      {
+        "index": 0,
+        "mesh": "NPC_OUTFIT_TUNIC_00",
+        "slot": "outfit",
+        "vertices": 116,
+        "triangles": 196
+      },
+      {
+        "index": 1,
+        "mesh": "NPC_OUTFIT_TRAVELLER_01",
+        "slot": "outfit",
+        "vertices": 136,
+        "triangles": 228
+      },
+      {
+        "index": 2,
+        "mesh": "NPC_OUTFIT_APRON_02",
+        "slot": "outfit",
+        "vertices": 116,
+        "triangles": 192
+      },
+      {
+        "index": 3,
+        "mesh": "NPC_OUTFIT_ARMOR_03",
+        "slot": "outfit",
+        "vertices": 152,
+        "triangles": 252
+      },
+      {
+        "index": 4,
+        "mesh": "NPC_OUTFIT_ARCHER_04",
+        "slot": "outfit",
+        "vertices": 120,
+        "triangles": 200
+      },
+      {
+        "index": 5,
+        "mesh": "NPC_OUTFIT_RITUAL_05",
+        "slot": "outfit",
+        "vertices": 136,
+        "triangles": 228
+      },
+      {
+        "index": 6,
+        "mesh": "NPC_OUTFIT_RAGGED_06",
+        "slot": "outfit",
+        "vertices": 132,
+        "triangles": 220
+      }
+    ],
+    "accessory": [
+      {
+        "index": 0,
+        "mesh": "NPC_ACCESSORY_SATCHEL_00",
+        "slot": "accessory",
+        "vertices": 20,
+        "triangles": 32
+      },
+      {
+        "index": 1,
+        "mesh": "NPC_ACCESSORY_BOW_01",
+        "slot": "accessory",
+        "vertices": 88,
+        "triangles": 148
+      },
+      {
+        "index": 2,
+        "mesh": "NPC_ACCESSORY_HAMMER_02",
+        "slot": "accessory",
+        "vertices": 20,
+        "triangles": 32
+      },
+      {
+        "index": 3,
+        "mesh": "NPC_ACCESSORY_SEAL_03",
+        "slot": "accessory",
+        "vertices": 32,
+        "triangles": 52
+      },
+      {
+        "index": 4,
+        "mesh": "NPC_ACCESSORY_LEDGER_04",
+        "slot": "accessory",
+        "vertices": 16,
+        "triangles": 24
+      },
+      {
+        "index": 5,
+        "mesh": "NPC_ACCESSORY_RIBBON_05",
+        "slot": "accessory",
+        "vertices": 20,
+        "triangles": 32
+      },
+      {
+        "index": 6,
+        "mesh": "NPC_ACCESSORY_SCARF_06",
+        "slot": "accessory",
+        "vertices": 24,
+        "triangles": 40
+      },
+      {
+        "index": 7,
+        "mesh": "NPC_ACCESSORY_TOOLS_07",
+        "slot": "accessory",
+        "vertices": 32,
+        "triangles": 52
+      },
+      {
+        "index": 8,
+        "mesh": "NPC_ACCESSORY_STAFF_08",
+        "slot": "accessory",
+        "vertices": 24,
+        "triangles": 40
+      }
+    ]
+  },
+  "scenery": [
+    {
+      "index": 0,
+      "mesh": "BUILDING_HOME_00",
+      "slot": "building",
+      "vertices": 198,
+      "triangles": 302
+    },
+    {
+      "index": 1,
+      "mesh": "BUILDING_SMITHY_01",
+      "slot": "building",
+      "vertices": 214,
+      "triangles": 326
+    },
+    {
+      "index": 2,
+      "mesh": "BUILDING_SHOP_02",
+      "slot": "building",
+      "vertices": 230,
+      "triangles": 354
+    },
+    {
+      "index": 3,
+      "mesh": "BUILDING_MONASTERY_RUIN_03",
+      "slot": "building",
+      "vertices": 100,
+      "triangles": 156
+    },
+    {
+      "index": 4,
+      "mesh": "BUILDING_CEMETERY_GATE_04",
+      "slot": "building",
+      "vertices": 96,
+      "triangles": 156
+    },
+    {
+      "index": 5,
+      "mesh": "BUILDING_WELL_05",
+      "slot": "building",
+      "vertices": 144,
+      "triangles": 244
+    },
+    {
+      "index": 6,
+      "mesh": "NATURE_TREE_OAK_06",
+      "slot": "nature",
+      "vertices": 86,
+      "triangles": 144
+    },
+    {
+      "index": 7,
+      "mesh": "NATURE_TREE_PINE_07",
+      "slot": "nature",
+      "vertices": 38,
+      "triangles": 60
+    },
+    {
+      "index": 8,
+      "mesh": "NATURE_TREE_DEAD_08",
+      "slot": "nature",
+      "vertices": 68,
+      "triangles": 112
+    },
+    {
+      "index": 9,
+      "mesh": "NATURE_BUSH_09",
+      "slot": "nature",
+      "vertices": 36,
+      "triangles": 60
+    },
+    {
+      "index": 10,
+      "mesh": "NATURE_GRASS_10",
+      "slot": "nature",
+      "vertices": 20,
+      "triangles": 24
+    },
+    {
+      "index": 11,
+      "mesh": "NATURE_ROCK_11",
+      "slot": "nature",
+      "vertices": 24,
+      "triangles": 40
+    },
+    {
+      "index": 12,
+      "mesh": "NATURE_STONES_12",
+      "slot": "nature",
+      "vertices": 36,
+      "triangles": 60
+    },
+    {
+      "index": 13,
+      "mesh": "NATURE_STUMP_13",
+      "slot": "nature",
+      "vertices": 28,
+      "triangles": 48
+    }
+  ],
+  "npcs": [
+    {
+      "id": "travelling_merchant",
+      "label": "행상인",
+      "partIndices": {
+        "body": 0,
+        "hair": 1,
+        "outfit": 1,
+        "accessory": 0
+      },
+      "scale": 1.0,
+      "storyRole": "resident"
+    },
+    {
+      "id": "artisan",
+      "label": "생활 장인",
+      "partIndices": {
+        "body": 1,
+        "hair": 4,
+        "outfit": 2,
+        "accessory": 7
+      },
+      "scale": 1.0,
+      "storyRole": "resident"
+    },
+    {
+      "id": "hunter",
+      "label": "주령 사냥꾼",
+      "partIndices": {
+        "body": 0,
+        "hair": 3,
+        "outfit": 4,
+        "accessory": 1
+      },
+      "scale": 1.0,
+      "storyRole": "resident"
+    },
+    {
+      "id": "sibling",
+      "label": "동생",
+      "partIndices": {
+        "body": 1,
+        "hair": 2,
+        "outfit": 0,
+        "accessory": 5
+      },
+      "scale": 0.84,
+      "storyRole": "story"
+    },
+    {
+      "id": "parent",
+      "label": "부모",
+      "partIndices": {
+        "body": 1,
+        "hair": 4,
+        "outfit": 2,
+        "accessory": 0
+      },
+      "scale": 1.0,
+      "storyRole": "story"
+    },
+    {
+      "id": "village_merchant",
+      "label": "잡화상",
+      "partIndices": {
+        "body": 0,
+        "hair": 0,
+        "outfit": 1,
+        "accessory": 4
+      },
+      "scale": 1.05,
+      "storyRole": "story"
+    },
+    {
+      "id": "child",
+      "label": "마을 아이",
+      "partIndices": {
+        "body": 0,
+        "hair": 1,
+        "outfit": 0,
+        "accessory": 0
+      },
+      "scale": 0.82,
+      "storyRole": "story"
+    },
+    {
+      "id": "stranger",
+      "label": "돌아가지 못한 사람",
+      "partIndices": {
+        "body": 0,
+        "hair": 3,
+        "outfit": 6,
+        "accessory": -1
+      },
+      "scale": 0.98,
+      "storyRole": "story"
+    },
+    {
+      "id": "raen",
+      "label": "라엔",
+      "partIndices": {
+        "body": 1,
+        "hair": 5,
+        "outfit": 3,
+        "accessory": 6
+      },
+      "scale": 1.0,
+      "storyRole": "story"
+    },
+    {
+      "id": "sealer",
+      "label": "봉인사",
+      "partIndices": {
+        "body": 1,
+        "hair": 4,
+        "outfit": 5,
+        "accessory": 3
+      },
+      "scale": 1.0,
+      "storyRole": "story"
+    },
+    {
+      "id": "smith",
+      "label": "대장장이",
+      "partIndices": {
+        "body": 0,
+        "hair": 0,
+        "outfit": 2,
+        "accessory": 2
+      },
+      "scale": 1.07,
+      "storyRole": "story"
+    }
+  ],
+  "notes": [
+    "Part indices are zero-based and stable within this catalog.",
+    "Accessory index -1 means no accessory.",
+    "All pieces share the same local origin; instantiate selected meshes together.",
+    "NPC assembly, animation, collision and game import are future integration work."
+  ]
+}
