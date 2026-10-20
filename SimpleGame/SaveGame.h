@@ -19,6 +19,8 @@ class SaveGame
         WorldPoint player = {0, 0}, spirit = {0, 0}, keeper = {0, 0};
         LevelOne level;
         std::vector<Population::Person> residents;
+        Population::Society society;
+        int formatVersion = 7;
         Chapter chapter;
         int companion = 0, facing = 0;
         bool controlling = false, dialogue = false;
@@ -146,8 +148,14 @@ class SaveGame
         }
     };
 
-    static bool Transfer(Archive& a, State& s, int version = 6)
+    static void TransferNews(Archive& a, Population::News& news)
     {
+        a.Fields(news.serial, news.origin, news.created, news.safety, news.jobs, news.wages);
+    }
+
+    static bool Transfer(Archive& a, State& s, int version = 7)
+    {
+        s.formatVersion = version;
         auto& l = s.level;
         auto& c = s.chapter;
         a.Fields(s.seed, s.story);
@@ -383,7 +391,7 @@ class SaveGame
         if (version >= 6)
         {
             size_t residents = s.residents.size();
-            if (!a.Count(residents, 40))
+            if (!a.Count(residents, version >= 7 ? VillageLayout::ResidentCount : 40))
                 return false;
             if (a.reading)
                 s.residents.resize(residents);
@@ -402,12 +410,62 @@ class SaveGame
                 a.Point(person.position);
                 a.Point(person.home);
                 a.Point(person.workplace);
-                if (a.reading)
+                if (version >= 7)
+                {
+                    a.Fields(person.houseId,
+                             person.reservedHouse,
+                             person.migrationVillage,
+                             person.mailId,
+                             person.ambition,
+                             person.caution,
+                             person.sociability,
+                             person.migrationWait,
+                             person.migrations,
+                             person.action,
+                             person.nextAction,
+                             person.timer);
+                    a.Point(person.destination);
+                    for (auto& report : person.knowledge)
+                    {
+                        TransferNews(a, report);
+                    }
+                }
+                else if (a.reading)
                 {
                     person.destination = person.position;
                     person.action = Population::Resting;
                     person.timer = 1 + person.id % 6;
                 }
+            }
+        }
+        if (version >= 7)
+        {
+            auto& society = s.society;
+            a.Fields(society.clock,
+                     society.nextNews,
+                     society.nextLetter,
+                     society.delivered,
+                     society.migrations);
+            for (auto& board : society.boards)
+            {
+                for (auto& report : board)
+                {
+                    TransferNews(a, report);
+                }
+            }
+            size_t letters = society.letters.size();
+            if (!a.Count(letters, 128))
+            {
+                return false;
+            }
+            if (a.reading)
+            {
+                society.letters.resize(letters);
+            }
+            for (auto& letter : society.letters)
+            {
+                a.Fields(letter.id, letter.carrier, letter.from, letter.to, letter.delivered);
+                TransferNews(a, letter.news);
             }
         }
         return bool(a.stream);
@@ -429,20 +487,136 @@ class SaveGame
                key.second >= -2000000000LL && key.second <= 2000000000LL;
     }
 
+    static bool ValidateNews(const Population::News& news, const Population::Society& society)
+    {
+        if (!news.serial)
+        {
+            return news.origin == -1;
+        }
+        return news.serial < society.nextNews && Number(news.origin, 0, World::VillageCount - 1) &&
+               Number(news.created, 0, society.clock) && Number(news.safety, 0, 1) &&
+               Number(news.jobs, 0, 1) && Number(news.wages, 0, 2);
+    }
+
+    static bool ValidateSociety(const State& state)
+    {
+        const auto& society = state.society;
+        if (!Number(society.clock, 0, 1e12) || !Number(society.nextNews, 1, 1000000000) ||
+            !Number(society.nextLetter, 1, 1000000000) ||
+            !Number(society.delivered, 0, 1000000000) || !Number(society.migrations, 0, 1000000000))
+        {
+            return false;
+        }
+        std::array<bool, VillageLayout::HomeCount> occupied = {};
+        for (int i = 0; i < VillageLayout::StoryResidents; ++i)
+        {
+            occupied[i] = true;
+        }
+        for (const auto& person : state.residents)
+        {
+            const auto* home = VillageLayout::Home(person.houseId);
+            if (!home || occupied[person.houseId] || home->village != person.district ||
+                !Number(person.ambition, 0, 1) || !Number(person.caution, 0, 1) ||
+                !Number(person.sociability, 0, 1) || !Number(person.migrationWait, 0, 1000000) ||
+                !Number(person.migrations, 0, 1000000000) ||
+                !Number(person.action, 0, Population::MovingHome) ||
+                !Number(person.nextAction, 0, Population::MovingHome) ||
+                !Number(person.timer, -1000000, 1000000) || !Point(person.destination) ||
+                !Number(person.mailId, -1, 1000000000) ||
+                !Number(person.migrationVillage, -1, World::VillageCount - 1))
+            {
+                return false;
+            }
+            occupied[person.houseId] = true;
+            if (person.reservedHouse >= 0)
+            {
+                const auto* reserved = VillageLayout::Home(person.reservedHouse);
+                if (!reserved || occupied[person.reservedHouse] ||
+                    reserved->village != person.migrationVillage ||
+                    person.migrationVillage == person.district || person.mailId >= 0)
+                {
+                    return false;
+                }
+                occupied[person.reservedHouse] = true;
+            }
+            else if (person.reservedHouse != -1 || person.migrationVillage != -1)
+            {
+                return false;
+            }
+            for (int origin = 0; origin < World::VillageCount; ++origin)
+            {
+                const auto& report = person.knowledge[origin];
+                if (!ValidateNews(report, society) || (report.serial && report.origin != origin))
+                {
+                    return false;
+                }
+            }
+        }
+        for (const auto& board : society.boards)
+        {
+            for (int origin = 0; origin < World::VillageCount; ++origin)
+            {
+                if (!ValidateNews(board[origin], society) ||
+                    (board[origin].serial && board[origin].origin != origin))
+                {
+                    return false;
+                }
+            }
+        }
+        std::set<unsigned> letterIds;
+        for (const auto& letter : society.letters)
+        {
+            if (!letter.id || letter.id >= society.nextLetter ||
+                !letterIds.insert(letter.id).second ||
+                !Number(letter.carrier, 0, double(state.residents.size()) - 1) ||
+                !Number(letter.from, 0, World::VillageCount - 1) ||
+                !Number(letter.to, 0, World::VillageCount - 1) || letter.from == letter.to ||
+                !letter.news.serial || !ValidateNews(letter.news, society) ||
+                (!letter.delivered && state.residents[letter.carrier].mailId != int(letter.id)))
+            {
+                return false;
+            }
+        }
+        for (const auto& person : state.residents)
+        {
+            if (person.mailId < 0)
+            {
+                continue;
+            }
+            bool found = false;
+            for (const auto& letter : society.letters)
+            {
+                found = found || (!letter.delivered && letter.carrier == person.id &&
+                                  int(letter.id) == person.mailId);
+            }
+            if (!found)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static bool Validate(const State& s, const Chapter& authored)
     {
-        if (!s.residents.empty() && s.residents.size() != 40)
+        if (!s.residents.empty() &&
+            s.residents.size() !=
+                (s.formatVersion >= 7 ? size_t(VillageLayout::ResidentCount) : 40))
             return false;
         for (size_t i = 0; i < s.residents.size(); ++i)
         {
             const auto& person = s.residents[i];
             if (person.id != int(i) || !Number(person.role, 0, 3) ||
-                !Number(person.district, 0, 4) || !Number(person.gold, 0, 1000000000) ||
-                !Number(person.earned, 0, 1000000000) || !Number(person.kills, 0, 1000000000) ||
-                !Number(person.goods, 0, 1000000) || !Number(person.health, 0, 100) ||
-                !Number(person.stamina, 0, 100) || !Point(person.position) || !Point(person.home) ||
-                !Point(person.workplace))
+                !Number(person.district, 0, s.formatVersion >= 7 ? World::VillageCount - 1 : 4) ||
+                !Number(person.gold, 0, 1000000000) || !Number(person.earned, 0, 1000000000) ||
+                !Number(person.kills, 0, 1000000000) || !Number(person.goods, 0, 1000000) ||
+                !Number(person.health, 0, 100) || !Number(person.stamina, 0, 100) ||
+                !Point(person.position) || !Point(person.home) || !Point(person.workplace))
                 return false;
+        }
+        if (s.formatVersion >= 7 && !ValidateSociety(s))
+        {
+            return false;
         }
         for (const auto& set : s.skillTimers)
         {
@@ -591,7 +765,7 @@ class SaveGame
         std::uint64_t checksum = 0;
         if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" ||
             (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 &&
-             version != 6))
+             version != 6 && version != 7))
         {
             return false;
         }
@@ -677,7 +851,7 @@ class SaveGame
             return false;
         }
         const std::string payload = archive.stream.str();
-        const std::string bytes = "GSE_SAVE 6 " + std::to_string(Hash(payload)) + "\n" + payload;
+        const std::string bytes = "GSE_SAVE 7 " + std::to_string(Hash(payload)) + "\n" + payload;
         if (bytes.size() > MaximumBytes)
         {
             return false;

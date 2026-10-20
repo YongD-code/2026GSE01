@@ -25,38 +25,32 @@ void PublishMonitoring()
                        : (pauseMenu || journal || slotMode != SlotMode::Closed) ? "paused"
                        : (dialoguePending || chapter.choicePending)             ? "dialogue"
                                                                                 : "playing";
-    const char* regionIds[] = {"ash_village",
-                               "outskirts",
-                               "ruins",
-                               "chapel",
-                               "wilderness",
-                               "west_market",
-                               "south_logging",
-                               "north_fields",
-                               "east_hunters"};
-    const char* regionNames[] = {"잿빛 마을",
-                                 "마을 외곽·묘역",
-                                 "폐허·감금 시설",
-                                 "예배당",
-                                 "야외 탐험 구역",
-                                 "서쪽 장터",
-                                 "남쪽 벌목촌",
-                                 "북쪽 경작지",
-                                 "동쪽 사냥 거점"};
+    constexpr int RegionCount = World::VillageCount + 4;
+    std::array<const char*, RegionCount> regionIds, regionNames;
+    for (int village = 0; village < World::VillageCount; ++village)
+    {
+        regionIds[village] = World::VillageId(village);
+        regionNames[village] = World::VillageName(village);
+    }
+    const char* areaIds[] = {"outskirts", "ruins", "chapel", "wilderness"};
+    const char* areaNames[] = {"마을 외곽·묘역", "폐허·감금 시설", "예배당", "야외 탐험 구역"};
+    for (int area = 0; area < 4; ++area)
+    {
+        regionIds[World::VillageCount + area] = areaIds[area];
+        regionNames[World::VillageCount + area] = areaNames[area];
+    }
     auto regionOf = [](WorldPoint p)
     {
-        for (int i = 1; i < int(Population::Hubs().size()); ++i)
-            if (Distance(p, Population::Hubs()[i]) < 460)
-                return i + 4;
-        if (World::Village(p.x, p.y))
+        const int village = World::VillageAt(p);
+        if (village >= 0)
         {
-            return 0;
+            return village;
         }
         if (p.x >= 512 && p.x <= 3500 && p.y >= -450 && p.y <= 400)
         {
-            return p.x < 1500 ? 1 : p.x < 2800 ? 2 : 3;
+            return World::VillageCount + (p.x < 1500 ? 0 : p.x < 2800 ? 1 : 2);
         }
-        return 4;
+        return World::VillageCount + 3;
     };
     auto position = [](WorldPoint p)
     {
@@ -74,7 +68,8 @@ void PublishMonitoring()
         return std::isfinite(value) ? std::to_string(value) : std::string("null");
     };
     int activeNpc = 0, alive = 0, alerted = 0, weak = 0;
-    int regionNpc[9] = {}, regionMonsters[9] = {}, regionAlert[9] = {};
+    int regionNpc[RegionCount] = {}, regionMonsters[RegionCount] = {},
+        regionAlert[RegionCount] = {};
     int npcWorking = 0, npcHunting = 0, npcRecovering = 0, npcGold = 0, npcKills = 0;
     const auto* quest = chapter.Current();
     const auto* nearby = inWorld ? NearbyStory() : nullptr;
@@ -120,6 +115,9 @@ void PublishMonitoring()
              << ",\"name\":" << Monitoring::Quote(first ? first->name : "미등록 NPC")
              << ",\"status\":" << Monitoring::Quote(status)
              << ",\"active\":" << (active ? "true" : "false")
+             << ",\"home_region\":" << Monitoring::Quote(World::VillageId(0))
+             << ",\"home_id\":" << Monitoring::Quote("home-" + std::to_string(index))
+             << ",\"home_address\":" << Monitoring::Quote(VillageLayout::Address(index))
              << ",\"health\":null,\"quest_target\":" << (objective ? "true" : "false")
              << ",\"interactable\":"
              << (active && active == nearby && !controlling && ControlsActive() ? "true" : "false")
@@ -154,8 +152,7 @@ void PublishMonitoring()
              << ",\"kind\":\"autonomous\",\"role\":"
              << Monitoring::Quote(Population::RoleId(npc.role))
              << ",\"role_name\":" << Monitoring::Quote(Population::RoleName(npc.role))
-             << ",\"home_region\":"
-             << Monitoring::Quote(npc.district == 0 ? regionIds[0] : regionIds[npc.district + 4])
+             << ",\"home_region\":" << Monitoring::Quote(World::VillageId(npc.district))
              << ",\"status\":"
              << Monitoring::Quote(!inWorld   ? "waiting"
                                   : speaking ? "talking"
@@ -165,6 +162,18 @@ void PublishMonitoring()
              << ",\"maximum\":100,\"stamina\":" << number(npc.stamina) << ",\"gold\":" << npc.gold
              << ",\"earned\":" << npc.earned << ",\"kills\":" << npc.kills
              << ",\"goods\":" << npc.goods
+             << ",\"home_id\":" << Monitoring::Quote("home-" + std::to_string(npc.houseId))
+             << ",\"home_address\":" << Monitoring::Quote(VillageLayout::Address(npc.houseId))
+             << ",\"home_position\":" << position(npc.home)
+             << ",\"personality\":" << Monitoring::Quote(Population::Personality(npc))
+             << ",\"heard_news\":" << Monitoring::Quote(population.HeardNews(npc))
+             << ",\"migrations\":" << npc.migrations << ",\"migrating_to\":"
+             << (npc.migrationVillage >= 0
+                     ? Monitoring::Quote(World::VillageId(npc.migrationVillage))
+                     : "null")
+             << ",\"mail_id\":"
+             << (npc.mailId >= 0 ? Monitoring::Quote("letter-" + std::to_string(npc.mailId))
+                                 : "null")
              << ",\"quest_target\":" << (ResidentQuestTarget(npc.id) ? "true" : "false")
              << ",\"interactable\":" << (nearbyResident == &npc ? "true" : "false")
              << ",\"destination\":" << position(npc.destination)
@@ -237,7 +246,7 @@ void PublishMonitoring()
          << ",\"npc_kills\":" << npcKills << ",\"monsters_alive\":" << alive
          << ",\"monsters_combat\":" << alerted << ",\"monsters_weakened\":" << weak
          << "},\"regions\":[";
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < RegionCount; ++i)
     {
         if (i)
         {
@@ -245,7 +254,7 @@ void PublishMonitoring()
         }
         json << "{\"id\":" << Monitoring::Quote(regionIds[i])
              << ",\"name\":" << Monitoring::Quote(regionNames[i])
-             << ",\"kind\":" << Monitoring::Quote(i == 0 || i >= 5 ? "village" : "area")
+             << ",\"kind\":" << Monitoring::Quote(i < World::VillageCount ? "village" : "area")
              << ",\"status\":"
              << Monitoring::Quote(!inWorld            ? "waiting"
                                   : regionAlert[i]    ? "combat"
@@ -253,8 +262,104 @@ void PublishMonitoring()
                                                       : "no_observed_threat")
              << ",\"npc_active\":" << regionNpc[i] << ",\"monsters_alive\":" << regionMonsters[i]
              << ",\"monsters_combat\":" << regionAlert[i]
-             << ",\"coverage\":\"loaded_only\",\"npc_coverage\":\"complete\"}";
+             << ",\"coverage\":\"loaded_only\",\"npc_coverage\":\"complete\"";
+        if (i < World::VillageCount)
+        {
+            int residents = i == 0 ? VillageLayout::StoryResidents : 0;
+            int reserved = 0, vacant = 0, incoming = 0, known = 0;
+            for (const auto& npc : population.people)
+            {
+                residents += npc.district == i;
+                reserved += npc.migrationVillage == i;
+            }
+            for (const auto& house : VillageLayout::Houses())
+            {
+                vacant += house.village == i && population.HouseOwner(house.id) == -1;
+            }
+            for (const auto& report : population.society.boards[i])
+            {
+                known += report.serial > 0;
+            }
+            for (const auto& letter : population.society.letters)
+            {
+                incoming += !letter.delivered && letter.to == i;
+            }
+            json << ",\"residents\":" << residents
+                 << ",\"houses\":" << VillageLayout::HomesPerVillage
+                 << ",\"houses_occupied\":" << residents << ",\"houses_reserved\":" << reserved
+                 << ",\"houses_vacant\":" << vacant << ",\"mail_in_transit\":" << incoming
+                 << ",\"news_known\":" << known
+                 << ",\"position\":" << position(World::Settlements()[i])
+                 << ",\"post_office\":" << position(Population::PostOffice(i))
+                 << ",\"half_size\":" << World::VillageHalfSize;
+        }
+        json << '}';
     }
-    json << "],\"npcs\":[" << npcs.str() << "],\"monsters\":[" << monsters.str() << "]}";
+    json << "],\"npcs\":[" << npcs.str() << "],\"monsters\":[" << monsters.str()
+         << "],\"houses\":[";
+    bool comma = false;
+    for (const auto& house : VillageLayout::Houses())
+    {
+        if (comma)
+        {
+            json << ',';
+        }
+        comma = true;
+        const int owner = population.HouseOwner(house.id);
+        const bool reserved = owner >= 0 && population.people[owner].houseId != house.id;
+        json << "{\"id\":" << Monitoring::Quote("home-" + std::to_string(house.id))
+             << ",\"village\":" << Monitoring::Quote(World::VillageId(house.village))
+             << ",\"address\":" << Monitoring::Quote(VillageLayout::Address(house.id))
+             << ",\"position\":" << position(house.entrance) << ",\"owner\":";
+        if (owner == -2)
+        {
+            json << Monitoring::Quote(StoryLayout::NpcSprites()[house.id].id);
+        }
+        else if (owner >= 0)
+        {
+            json << Monitoring::Quote("resident-" + std::to_string(owner));
+        }
+        else
+        {
+            json << "null";
+        }
+        json << ",\"status\":"
+             << Monitoring::Quote(reserved      ? "reserved"
+                                  : owner == -1 ? "vacant"
+                                                : "occupied")
+             << '}';
+    }
+    json << "],\"letters\":[";
+    comma = false;
+    for (const auto& letter : population.society.letters)
+    {
+        if (comma)
+        {
+            json << ',';
+        }
+        comma = true;
+        json << "{\"id\":" << Monitoring::Quote("letter-" + std::to_string(letter.id))
+             << ",\"from\":" << Monitoring::Quote(World::VillageId(letter.from))
+             << ",\"to\":" << Monitoring::Quote(World::VillageId(letter.to))
+             << ",\"carrier\":" << Monitoring::Quote("resident-" + std::to_string(letter.carrier))
+             << ",\"delivered\":" << (letter.delivered ? "true" : "false")
+             << ",\"summary\":" << Monitoring::Quote(Population::NewsText(letter.news)) << '}';
+    }
+    json << "],\"roads\":[";
+    comma = false;
+    for (const auto& link : World::Connections())
+    {
+        if (comma)
+        {
+            json << ',';
+        }
+        comma = true;
+        json << "{\"from\":" << Monitoring::Quote(World::VillageId(link.first))
+             << ",\"to\":" << Monitoring::Quote(World::VillageId(link.second))
+             << ",\"travel_seconds\":" << World::RoadTravelSeconds << '}';
+    }
+    json << "],\"society\":{\"elapsed_seconds\":" << population.society.clock
+         << ",\"letters_delivered\":" << population.society.delivered
+         << ",\"migrations\":" << population.society.migrations << "}}";
     monitorPublisher.Submit(json.str());
 }

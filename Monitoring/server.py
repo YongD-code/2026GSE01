@@ -101,6 +101,81 @@ def validate_snapshot(data):
                 'region monster count mismatch')
         require(region['monsters_combat'] == sum(m['region'] == region['id'] and m['status'] == 'combat' for m in monsters),
                 'region combat count mismatch')
+    # Additive village-life fields: older games can keep sending the original v1 contract.
+    npc_ids = {npc['id'] for npc in npcs}
+    npc_by_id = {npc['id']: npc for npc in npcs}
+    for key in ('houses', 'letters', 'roads'):
+        if key in data:
+            require(isinstance(data[key], list) and len(data[key]) <= 4096, 'invalid ' + key)
+    if 'houses' in data:
+        houses = data['houses']
+        house_ids = set()
+        occupied_owners = set()
+        for house in houses:
+            require(isinstance(house, dict) and text(house.get('id')), 'invalid house')
+            require(house['id'] not in house_ids, 'duplicate house id')
+            house_ids.add(house['id'])
+            require(text(house.get('village')) and house['village'] in region_ids and position(house.get('position')),
+                    'invalid house village or position')
+            require(house.get('status') in ('occupied', 'vacant', 'reserved') and
+                    text(house.get('address')), 'invalid house state')
+            owner = house.get('owner')
+            require((owner is None) == (house['status'] == 'vacant'), 'invalid house owner')
+            if owner is not None:
+                require(text(owner) and owner in npc_ids, 'unknown house owner')
+            if house['status'] == 'occupied':
+                require(owner not in occupied_owners and npc_by_id[owner].get('home_id') == house['id'],
+                        'duplicate or inconsistent home ownership')
+                occupied_owners.add(owner)
+            elif house['status'] == 'reserved':
+                require(npc_by_id[owner].get('migrating_to') == house['village'],
+                        'invalid migration reservation')
+        for npc in npcs:
+            if 'home_id' in npc:
+                require(text(npc['home_id']) and npc['home_id'] in house_ids, 'unknown home id')
+        for region in regions:
+            if 'houses' not in region:
+                continue
+            for key in ('houses', 'houses_occupied', 'houses_reserved', 'houses_vacant',
+                        'residents', 'mail_in_transit', 'news_known'):
+                require(integer(region.get(key)), 'invalid village field ' + key)
+            local = [h for h in houses if h['village'] == region['id']]
+            require(region['houses'] == len(local), 'village house count mismatch')
+            for status, key in [('occupied', 'houses_occupied'), ('reserved', 'houses_reserved'),
+                                ('vacant', 'houses_vacant')]:
+                require(region[key] == sum(h['status'] == status for h in local),
+                        'village housing state mismatch')
+            require(region['residents'] == region['houses_occupied'], 'resident address count mismatch')
+    if 'letters' in data:
+        letter_ids = set()
+        for letter in data['letters']:
+            require(isinstance(letter, dict) and text(letter.get('id')), 'invalid letter')
+            require(letter['id'] not in letter_ids, 'duplicate letter id')
+            letter_ids.add(letter['id'])
+            require(text(letter.get('from')) and text(letter.get('to')) and
+                    letter['from'] in region_ids and letter['to'] in region_ids and
+                    letter['from'] != letter['to'], 'invalid letter route')
+            require(text(letter.get('carrier')) and letter['carrier'] in npc_ids and type(letter.get('delivered')) is bool and
+                    text(letter.get('summary')), 'invalid letter carrier or content')
+        for npc in npcs:
+            if npc.get('mail_id') is not None:
+                require(any(l['id'] == npc['mail_id'] and l['carrier'] == npc['id'] and
+                            not l['delivered'] for l in data['letters']), 'invalid carried letter')
+    for road in data.get('roads', []):
+        require(isinstance(road, dict) and text(road.get('from')) and text(road.get('to')) and
+                road['from'] in region_ids and road['to'] in region_ids and
+                road['from'] != road['to'], 'invalid road')
+        seconds = road.get('travel_seconds')
+        require(type(seconds) in (int, float) and math.isfinite(seconds) and seconds > 0,
+                'invalid road travel time')
+    if 'society' in data:
+        society = data['society']
+        require(isinstance(society, dict), 'invalid society')
+        for key in ('letters_delivered', 'migrations'):
+            require(integer(society.get(key)), 'invalid society count')
+        elapsed = society.get('elapsed_seconds')
+        require(type(elapsed) in (int, float) and math.isfinite(elapsed) and elapsed >= 0,
+                'invalid society time')
     return data
 
 

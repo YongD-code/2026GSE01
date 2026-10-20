@@ -171,6 +171,8 @@
     <ClInclude Include="SceneGraph.h" />
     <ClInclude Include="SpriteSheet.h" />
     <ClInclude Include="World.h" />
+    <ClInclude Include="VillageLayout.h" />
+    <ClInclude Include="VillageSociety.inl" />
     <ClInclude Include="LevelOne.h" />
     <ClInclude Include="SpiritCatalog.h" />
     <ClInclude Include="SaveGame.h" />

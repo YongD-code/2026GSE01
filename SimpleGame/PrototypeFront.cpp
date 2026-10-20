@@ -263,6 +263,7 @@ void Prototype::NewGame()
     levelOne = LevelOne();
     ResetControls();
     population.people.clear();
+    population.society = Population::Society();
     levelOne.captureRules.Load();
     levelOne.LoadCombat();
     chapter = Chapter();

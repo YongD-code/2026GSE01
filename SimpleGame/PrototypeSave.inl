@@ -52,6 +52,7 @@ bool SaveProgress(bool manual, int slot = 0)
     state.keeper = keeper;
     state.level = levelOne;
     state.residents = population.people;
+    state.society = population.society;
     for (const auto& result : levelOne.residentCombatants)
         if (result.id >= 0 && result.id < int(state.residents.size()))
             state.residents[result.id].health = result.health;
@@ -180,6 +181,29 @@ bool LoadProgress(bool startup = false, int slot = 0)
         }
         return false;
     };
+    if (state.formatVersion < 7)
+    {
+        state.player = Population::OpenPoint(state.player, blocked);
+        state.spirit = Population::OpenPoint(state.spirit, blocked);
+        for (auto& enemy : state.level.enemies)
+        {
+            if (enemy.weakened && blocked(enemy.position))
+            {
+                enemy.position = Population::OpenPoint(enemy.position, blocked);
+            }
+        }
+        // Previous outdoor camps can now lie in a residential block. Keep story encounters
+        // and capturable remnants; ordinary dormant camps are streamed again outside villages.
+        state.level.enemies.erase(std::remove_if(state.level.enemies.begin(),
+                                                 state.level.enemies.end(),
+                                                 [](const LevelOne::Enemy& enemy)
+                                                 {
+                                                     return enemy.boss == 0 && !enemy.weakened &&
+                                                            World::Settlement(enemy.position.x,
+                                                                              enemy.position.y);
+                                                 }),
+                                  state.level.enemies.end());
+    }
     if (blocked(state.player) || (!state.level.collection.empty() && blocked(state.spirit)))
     {
         automaticSaveAllowed = false;
@@ -192,6 +216,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     world = std::move(restoredWorld);
     levelOne = std::move(state.level);
     population.people = std::move(state.residents);
+    population.society = std::move(state.society);
     population.seed = world.seed;
     population.planningCursor = 0;
     population.RepairPlacement(

@@ -14,5 +14,7 @@
 .badge.fighting,.badge.fleeing{color:#f4a7b5;background:#3a2630;border-color:#66434c}
 .badge.hunting,.badge.walking{color:#aec9fa;background:#223248;border-color:#3d5576}
 .badge.resting,.badge.recovering{color:#c8b4e5;background:#30283f;border-color:#544566}
+.badge.delivering{color:#f0d18f;background:#3a3122;border-color:#756039}
+.badge.moving_home{color:#e4b9f2;background:#392644;border-color:#735280}
 @media(max-width:1000px){.activity-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.activity-metrics{gap:9px}.activity-metrics article{padding:14px}.activity-metrics strong{font-size:24px}.map-legend{gap:10px;padding-inline:16px}.npc-detail{padding-inline:16px}#world-map{min-height:0}}

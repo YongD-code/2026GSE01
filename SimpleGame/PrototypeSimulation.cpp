@@ -84,7 +84,8 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             const double y = moveRoute[routeIndex].y - actor.y;
             const double remaining = std::hypot((x - y) * .85, (x + y) * .43);
             const float pace = sprint ? 1.8f : 1.f;
-            float speed = (controlling ? 110.f : 90.f) * pace * (spiritHasteTime > 0 ? 1.5f : 1.f);
+            float speed = (controlling ? 110.f : World::PlayerMoveSpeed) * pace *
+                          (spiritHasteTime > 0 ? 1.5f : 1.f);
             if (!controlling && InsideDomain(player))
             {
                 speed *= 1.5f;

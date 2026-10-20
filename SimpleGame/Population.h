@@ -2,6 +2,7 @@
 #include "World.h"
 #include "SpriteSheet.h"
 #include "ClickNavigation.h"
+#include "VillageLayout.h"
 #include <array>
 #include <string>
 #include <vector>
@@ -28,7 +29,34 @@ class Population
         Returning,
         Resting,
         Recovering,
-        Fleeing
+        Fleeing,
+        Delivering,
+        MovingHome
+    };
+
+    struct News
+    {
+        unsigned serial = 0;
+        int origin = -1;
+        double created = 0;
+        float safety = .8f, jobs = .5f, wages = .5f;
+    };
+
+    struct Letter
+    {
+        unsigned id = 0;
+        int carrier = -1, from = 0, to = 0;
+        News news;
+        bool delivered = false;
+    };
+
+    struct Society
+    {
+        double clock = 0;
+        unsigned nextNews = 1, nextLetter = 1, delivered = 0, migrations = 0;
+        std::array<std::array<News, World::VillageCount>, World::VillageCount> boards = {};
+        std::vector<Letter> letters;
+        float dispatchWait = 6, reportWait = 0, contactWait = 0;
     };
 
     struct Person
@@ -46,22 +74,26 @@ class Population
         std::vector<WorldPoint> route;
         size_t waypoint = 0;
         SpriteAnimation animation;
+        int houseId = -1, reservedHouse = -1, migrationVillage = -1, mailId = -1;
+        float ambition = .5f, caution = .5f, sociability = .5f, migrationWait = 90;
+        unsigned migrations = 0;
+        bool questPinned = false;
+        std::array<News, World::VillageCount> knowledge = {};
     };
 
     std::vector<Person> people;
     std::uint64_t seed = 0;
     size_t planningCursor = 0;
+    Society society;
 
-    static const std::array<WorldPoint, 5>& Hubs()
+    static const std::array<WorldPoint, World::VillageCount>& Hubs()
     {
         return World::Settlements();
     }
 
     static const char* DistrictName(int district)
     {
-        static const char* names[] = {
-            "잿빛 마을", "서쪽 장터", "남쪽 벌목촌", "북쪽 경작지", "동쪽 사냥 거점"};
-        return names[district];
+        return World::VillageName(district);
     }
 
     static const char* RoleId(int role)
@@ -86,7 +118,9 @@ class Population
                                       "returning",
                                       "resting",
                                       "recovering",
-                                      "fleeing"};
+                                      "fleeing",
+                                      "delivering",
+                                      "moving_home"};
         return names[action];
     }
 
@@ -100,196 +134,73 @@ class Population
                                       "귀환 중",
                                       "휴식 중",
                                       "회복 중",
-                                      "대피 중"};
+                                      "대피 중",
+                                      "편지 운반",
+                                      "이사 중"};
         return names[action];
     }
 
     static std::string Name(int id)
     {
-        static const char* family[] = {"아사노", "미즈노", "하야시", "모리", "시마다"};
+        static const char* family[] = {
+            "아사노",   "미즈노",   "하야시",   "모리",     "시마다",   "나카무라", "타카하시",
+            "코바야시", "이노우에", "마츠다",   "후지타",   "오가와",   "미우라",   "이시다",
+            "후쿠다",   "오카다",   "아오키",   "사카모토", "하시모토", "요시다",   "야마구치",
+            "나카지마", "모리타",   "스기야마", "사이토",   "이시카와"};
         static const char* given[] = {"하루", "유이", "소타", "미오", "렌", "아키", "나오", "린"};
-        return std::string(family[id / 8]) + " " + given[id % 8];
+        return std::string(family[(id / 8) % 26]) + " " + given[id % 8];
     }
 
-    static std::vector<WorldObject> Buildings()
+    static WorldPoint PostOffice(int village)
     {
-        std::vector<WorldObject> result;
-        for (size_t i = 1; i < Hubs().size(); ++i)
-        {
-            const auto at = Hubs()[i];
-            result.push_back({0, at.x - 150, at.y - 170, 105, 80, 85});
-            result.push_back({0, at.x + 80, at.y - 150, 80, 65, 70});
-        }
-        return result;
+        const auto at = Hubs()[village];
+        return {at.x, at.y + 96};
     }
 
     static bool TownInterior(WorldPoint p)
     {
-        // Include a body-width margin so a person never straddles a town boundary.
-        if (std::abs(p.x) < 536 && std::abs(p.y) < 536)
-            return true;
-        for (const auto& hub : Hubs())
-            if (std::abs(p.x - hub.x) < 304 && std::abs(p.y - hub.y) < 324)
-                return true;
-        return false;
-    }
-
-    static WorldPoint OutsideTown(WorldPoint p)
-    {
-        auto exclude = [&](WorldPoint hub, double halfWidth, double halfDepth)
-        {
-            const double dx = p.x - hub.x, dy = p.y - hub.y;
-            if (std::abs(dx) >= halfWidth || std::abs(dy) >= halfDepth)
-                return;
-            if (halfWidth - std::abs(dx) < halfDepth - std::abs(dy))
-                p.x = hub.x + (dx < 0 ? -1 : 1) * (halfWidth + 8);
-            else
-                p.y = hub.y + (dy < 0 ? -1 : 1) * (halfDepth + 8);
-        };
-        exclude({0, 0}, 536, 536);
-        for (const auto& hub : Hubs())
-            exclude(hub, 304, 324);
-        return p;
+        return World::Settlement(p.x, p.y);
     }
 
     static WorldPoint CampAnchor(int district, int id, bool workplace = false)
     {
         const auto hub = Hubs()[district];
-        const double angle = (id % 8) * .7853981633974483 + (workplace ? .24 : 0.);
-        const double radius = (district == 0 ? 850. : 490.) + (workplace ? 110. : 0.);
-        return OutsideTown({hub.x + std::cos(angle) * radius, hub.y + std::sin(angle) * radius});
-    }
-
-    static bool CrossesTown(WorldPoint start, WorldPoint end, int district)
-    {
-        const auto hub = Hubs()[district];
-        const double halfWidth = district == 0 ? 536. : 304.;
-        const double halfDepth = district == 0 ? 536. : 324.;
-        double enter = 0, leave = 1;
-        auto slab = [&](double at, double change, double low, double high)
+        if (workplace)
         {
-            if (std::abs(change) < .00001)
-                return at > low && at < high;
-            double a = (low - at) / change, b = (high - at) / change;
-            if (a > b)
-                std::swap(a, b);
-            enter = (std::max)(enter, a);
-            leave = (std::min)(leave, b);
-            return enter < leave;
-        };
-        return slab(start.x, end.x - start.x, hub.x - halfWidth, hub.x + halfWidth) &&
-               slab(start.y, end.y - start.y, hub.y - halfDepth, hub.y + halfDepth);
+            return {hub.x - 350 + (id % 5) * 160., hub.y + 250 + (id % 3) * 35.};
+        }
+        return PostOffice(district);
     }
 
     static WorldPoint RoutingGoal(WorldPoint start, WorldPoint destination)
     {
-        // Give the small local pathfinder a reachable goal around a town-sized exclusion.
-        // Otherwise its 260-unit probe can land deep inside the forbidden rectangle.
-        auto clear = [&](WorldPoint goal)
-        {
-            for (int i = 0; i < int(Hubs().size()); ++i)
-                if (CrossesTown(start, goal, i))
-                    return false;
-            return true;
-        };
-        if (clear(destination))
-            return destination;
-        WorldPoint result = start;
-        double best = 1.e30;
-        for (int i = 0; i < int(Hubs().size()); ++i)
-        {
-            if (!CrossesTown(start, destination, i))
-                continue;
-            const auto hub = Hubs()[i];
-            const double x = i == 0 ? 568. : 336., y = i == 0 ? 568. : 356.;
-            for (int sx : {-1, 1})
-                for (int sy : {-1, 1})
-                {
-                    const WorldPoint corner = {hub.x + sx * x, hub.y + sy * y};
-                    const double reach = std::hypot(corner.x - start.x, corner.y - start.y);
-                    const double cost =
-                        reach + std::hypot(destination.x - corner.x, destination.y - corner.y);
-                    if (reach > 24 && cost < best && clear(corner))
-                    {
-                        result = corner;
-                        best = cost;
-                    }
-                }
-        }
-        return result;
+        return VillageLayout::RoutingGoal(start, destination);
     }
 
     template <class Collision> static WorldPoint OpenPoint(WorldPoint desired, Collision blocked)
     {
-        desired = OutsideTown(desired);
         if (!blocked(desired))
+        {
             return desired;
-        for (int ring = 1; ring <= 32; ++ring)
+        }
+        for (int ring = 1; ring <= 20; ++ring)
         {
             for (int i = 0; i < 16; ++i)
             {
-                const double angle = i * 6.2831853 / 16;
+                const double angle = i * 6.283185307179586 / 16;
                 WorldPoint p = {desired.x + std::cos(angle) * ring * 20,
                                 desired.y + std::sin(angle) * ring * 20};
-                if (!TownInterior(p) && !blocked(p))
+                if (!blocked(p))
+                {
                     return p;
+                }
             }
         }
         return desired;
     }
 
-    template <class Collision> void RepairPlacement(Collision blocked)
-    {
-        // Migrate old saves without losing identity, earnings, health or collected goods.
-        for (auto& p : people)
-        {
-            if (TownInterior(p.home) || blocked(p.home))
-                p.home = OpenPoint(CampAnchor(p.district, p.id), blocked);
-            if (TownInterior(p.workplace) || blocked(p.workplace))
-                p.workplace = OpenPoint(CampAnchor(p.district, p.id, true), blocked);
-            const bool relocate = TownInterior(p.position) || blocked(p.position);
-            if (relocate)
-                p.position = OpenPoint(p.home, blocked);
-            if (relocate || TownInterior(p.destination))
-            {
-                p.destination = p.home;
-                p.action = Returning;
-                p.nextAction = Resting;
-                p.route.clear();
-                p.waypoint = 0;
-                p.target = -1;
-                p.pathWait = p.simulationTime = 0;
-                p.visualVelocity = p.separation = {0, 0};
-                p.animation.moving = false;
-                p.stopTime = .1f;
-            }
-        }
-    }
-
-    template <class Collision> void Initialize(std::uint64_t worldSeed, Collision blocked)
-    {
-        seed = worldSeed;
-        planningCursor = 0;
-        people.clear();
-        for (int id = 0; id < 40; ++id)
-        {
-            Person p;
-            p.id = id;
-            p.district = id / 8;
-            p.role = id % 8 >= 5 ? Hunter : id % 3;
-            p.home = OpenPoint(CampAnchor(p.district, id), blocked);
-            p.workplace = OpenPoint(CampAnchor(p.district, id, true), blocked);
-            p.position = p.destination = p.home;
-            p.action = Resting;
-            p.timer = 1.f + id % 6;
-            p.decision = id * .037f;
-            people.push_back(p);
-        }
-    }
-
     void Travel(Person& p, WorldPoint goal, int arrival, int action = Walking)
     {
-        // Pursuit updates its destination without discarding a usable path every decision.
         const bool changed = p.action != action || p.nextAction != arrival ||
                              std::hypot(goal.x - p.destination.x, goal.y - p.destination.y) > 72;
         p.destination = goal;
@@ -301,6 +212,8 @@ class Population
             p.waypoint = 0;
         }
     }
+
+#include "VillageSociety.inl"
 
     static void UpdateLocomotion(Person& p, WorldPoint previous, float dt)
     {
@@ -361,31 +274,27 @@ class Population
             return;
         auto blocked = [&](WorldPoint p)
         {
-            return TownInterior(p) || worldBlocked(p);
+            return worldBlocked(p);
         };
-        int plans = 1;
+        UpdateSociety(dt, level, worldBlocked);
+        int plans = 2;
+        std::map<World::Key, std::vector<size_t>> neighbors;
+        for (size_t i = 0; i < people.size(); ++i)
+        {
+            const auto at = people[i].position;
+            neighbors[{World::Coordinate(std::floor(at.x / 64)),
+                       World::Coordinate(std::floor(at.y / 64))}]
+                .push_back(i);
+        }
         // Rotating traversal prevents a blocked early agent from taking every pathfinding slot.
         for (size_t n = 0; n < people.size(); ++n)
         {
             auto& p = people[(planningCursor + n) % people.size()];
-            if (TownInterior(p.position))
-            {
-                p.position = OpenPoint(p.home, blocked);
-                p.destination = p.position;
-                p.route.clear();
-                p.waypoint = 0;
-                p.target = -1;
-                p.action = Resting;
-                p.timer = 1;
-                p.visualVelocity = p.separation = {0, 0};
-                p.animation.moving = false;
-                p.stopTime = .1f;
-            }
             p.invulnerability = (std::max)(0.f, p.invulnerability - dt);
             // Keep visible movement continuous; distant jobs and hunts still advance in time.
             const double playerDistance = Level::Distance(p.position, player);
             p.simulationTime += dt;
-            if (playerDistance > fullRateRadius && p.simulationTime < .2f && p.health > 0)
+            if (playerDistance > fullRateRadius && p.simulationTime < .75f && p.health > 0)
             {
                 continue;
             }
@@ -397,8 +306,12 @@ class Population
             p.decision -= stepDt;
             p.timer -= stepDt;
             const bool resting = p.action == Resting || p.action == Recovering;
-            p.stamina =
-                (std::max)(0.f, (std::min)(100.f, p.stamina + stepDt * (resting ? 7.f : -.65f)));
+            const bool journey = p.action == Delivering || p.action == MovingHome;
+            p.stamina = (std::max)(0.f,
+                                   (std::min)(100.f,
+                                              p.stamina + stepDt * (resting   ? 7.f
+                                                                    : journey ? -.16f
+                                                                              : -.65f)));
             if (p.health <= 0)
             {
                 // Defeated residents recuperate at home rather than disappearing permanently.
@@ -414,7 +327,7 @@ class Population
                 p.health = (std::min)(100.f, p.health + stepDt * 6.f);
             if (p.decision <= 0)
             {
-                p.decision = playerDistance > 1400 ? 1.f : .3f;
+                p.decision = playerDistance > fullRateRadius ? 2.f : .4f;
                 int threat = -1, prey = -1;
                 double danger = 160, best = 390;
                 for (size_t i = 0; i < level.enemies.size(); ++i)
@@ -445,7 +358,7 @@ class Population
                     if (p.action != Fleeing && !resting)
                         Travel(p, p.home, Resting, Fleeing);
                 }
-                else if (prey >= 0 && !resting)
+                else if (prey >= 0 && !resting && p.mailId < 0 && p.migrationVillage < 0)
                 {
                     auto& enemy = level.enemies[prey];
                     p.target = prey;
@@ -488,11 +401,14 @@ class Population
                         p.timer = 3;
                     else if (p.action == Working)
                     {
-                        const int wage = p.role == Artisan ? 9 : 6;
+                        const int wage = int((p.role == Artisan ? 9 : 6) * WageScale(p.district));
                         p.gold += wage;
                         p.earned += wage;
                         ++p.goods;
-                        Travel(p, p.home, Resting, Returning);
+                        Travel(p,
+                               p.cycle % 2 ? PostOffice(p.district) : p.home,
+                               p.cycle % 2 ? Trading : Resting,
+                               Returning);
                     }
                     else if (p.action == Trading)
                     {
@@ -504,7 +420,8 @@ class Population
                     }
                     else if (p.role == Merchant)
                     {
-                        const int destination = (p.district + 1 + int(p.cycle % 2)) % 5;
+                        const int destination = VillageLayout::NextVillage(
+                            p.district, (p.district + 1 + int(p.cycle % 5)) % World::VillageCount);
                         if (p.goods == 0)
                         {
                             p.goods = (std::min)(2 + int(p.cycle % 3), p.gold / 2);
@@ -518,8 +435,8 @@ class Population
                         const auto hub = Hubs()[p.district];
                         Travel(
                             p,
-                            OpenPoint({hub.x + std::cos(angle) * (p.district == 0 ? 980. : 640.),
-                                       hub.y + std::sin(angle) * (p.district == 0 ? 980. : 640.)},
+                            OpenPoint({hub.x + std::cos(angle) * (World::VillageHalfSize + 260.),
+                                       hub.y + std::sin(angle) * (World::VillageHalfSize + 260.)},
                                       blocked),
                             Hunting);
                     }
@@ -528,10 +445,12 @@ class Population
                     ++p.cycle;
                 }
             }
-            if (p.action == Walking || p.action == Returning || p.action == Fleeing)
+            if (p.action == Walking || p.action == Returning || p.action == Fleeing ||
+                p.action == Delivering || p.action == MovingHome)
             {
                 if (Level::Distance(p.position, p.destination) < 14)
                 {
+                    FinishTravel(p, blocked);
                     p.action = p.nextAction;
                     p.timer = p.action == Resting ? 10.f + p.id % 7 : 5.f + p.id % 6;
                     p.route.clear();
@@ -575,15 +494,31 @@ class Population
                     if (p.waypoint < p.route.size())
                     {
                         WorldPoint separation = {0, 0};
-                        for (const auto& other : people)
+                        const World::Key cell = {World::Coordinate(std::floor(p.position.x / 64)),
+                                                 World::Coordinate(std::floor(p.position.y / 64))};
+                        for (int y = -1; y <= 1; ++y)
                         {
-                            const double distance = Level::Distance(p.position, other.position);
-                            if (other.id != p.id && distance > .01 && distance < 24)
+                            for (int x = -1; x <= 1; ++x)
                             {
-                                separation.x +=
-                                    (p.position.x - other.position.x) / distance * (24 - distance);
-                                separation.y +=
-                                    (p.position.y - other.position.y) / distance * (24 - distance);
+                                const auto found =
+                                    neighbors.find({cell.first + x, cell.second + y});
+                                if (found == neighbors.end())
+                                {
+                                    continue;
+                                }
+                                for (const auto index : found->second)
+                                {
+                                    const auto& other = people[index];
+                                    const double distance =
+                                        Level::Distance(p.position, other.position);
+                                    if (other.id != p.id && distance > .01 && distance < 24)
+                                    {
+                                        separation.x += (p.position.x - other.position.x) /
+                                                        distance * (24 - distance);
+                                        separation.y += (p.position.y - other.position.y) /
+                                                        distance * (24 - distance);
+                                    }
+                                }
                             }
                         }
                         const double spread = std::hypot(separation.x, separation.y);

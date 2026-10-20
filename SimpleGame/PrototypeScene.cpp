@@ -11,12 +11,12 @@ void Prototype::DrawTerrain(const World::Chunk& chunk, ActorPosition position)
     {
         return;
     }
-    const bool village = World::Village(position.x + 256, position.y + 256);
     const int variant =
         static_cast<int>(World::Hash(chunk.key.first, chunk.key.second, world.seed) % 4);
-    // Road topology repeats every chunk. Share four decorative variants per biome.
-    const std::string terrainKey = "terrain:shared-v4:" + std::to_string(chunk.biome) + ":" +
-                                   std::to_string(village) + ":" + std::to_string(variant);
+    // Share equal road/village tile masks; authored roads no longer repeat every chunk.
+    const std::string terrainKey =
+        "terrain:shared-v5:" + std::to_string(chunk.biome) + ":" + std::to_string(chunk.roadMask) +
+        ":" + std::to_string(chunk.villageMask) + ":" + std::to_string(variant);
     const double offsetX = position.x - double(chunk.key.first) * World::ChunkSize;
     const double offsetY = position.y - double(chunk.key.second) * World::ChunkSize;
     const Point terrainOrigin = Screen(position.x, position.y);
@@ -34,9 +34,9 @@ void Prototype::DrawTerrain(const World::Chunk& chunk, ActorPosition position)
                         ? Color(.095f + shade, .125f + shade, .13f + shade)
                         : (chunk.biome == 1 ? Color(.12f + shade, .145f + shade, .145f + shade)
                                             : Color(.15f + shade, .14f + shade, .14f + shade));
-                if (village)
+                if ((chunk.villageMask >> (y * 8 + x)) & 1)
                     color = Color(.11f + shade, .13f + shade, .13f + shade);
-                bool road = World::Road(tx, ty);
+                bool road = ((chunk.roadMask >> (y * 8 + x)) & 1) != 0;
                 if (road)
                     color = Color(.23f + shade, .23f + shade, .20f + shade);
                 Ground(wx + offsetX, wy + offsetY, 64, 64, color);
@@ -273,6 +273,8 @@ void Prototype::SynchronizeScene()
         World::Chunk terrain;
         terrain.key = chunk.key;
         terrain.biome = chunk.biome;
+        terrain.roadMask = chunk.roadMask;
+        terrain.villageMask = chunk.villageMask;
         auto& ground = scene.Ensure(id + "/terrain", id);
         ground.layer = ActorLayer::Terrain;
         ground.draw = [this, terrain](const Actor& node)
@@ -283,34 +285,100 @@ void Prototype::SynchronizeScene()
             object(id + "/object/" + std::to_string(i), id, chunk.objects[i]);
     }
 
-    bind("village/square",
-         "village",
-         {-165, -145},
-         ActorLayer::Terrain,
-         [this](const Actor& node)
-         {
-             const auto p = node.WorldPosition();
-             const Point origin = Screen(p.x, p.y);
-             const std::string key = "village:square:environment-v3";
-             if (r.BeginCachedMesh(key, origin))
+    for (int village = 0; village < World::VillageCount; ++village)
+    {
+        const auto hub = World::Settlements()[village];
+        if (!inView(hub, 520, 500, 300))
+        {
+            continue;
+        }
+        bind("village/square/" + std::to_string(village),
+             "village",
+             {hub.x - 165, hub.y - 145},
+             ActorLayer::Terrain,
+             [this](const Actor& node)
              {
-                 Ground(p.x, p.y, 330, 290, Color(.17f, .20f, .18f));
-                 for (int row = 0; row < 10; ++row)
+                 const auto p = node.WorldPosition();
+                 const Point origin = Screen(p.x, p.y);
+                 const std::string key = "village:square:environment-v3";
+                 if (r.BeginCachedMesh(key, origin))
                  {
-                     for (int col = 0; col < 11; ++col)
+                     Ground(p.x, p.y, 330, 290, Color(.17f, .20f, .18f));
+                     for (int row = 0; row < 10; ++row)
                      {
-                         const double sx = p.x + col * 30 + 1;
-                         const double sy = p.y + row * 29 + 1;
-                         const float tone = float((row * 7 + col * 3) % 5) * .012f;
-                         Ground(sx, sy, 28, 27, Color(.29f + tone, .31f + tone, .28f + tone));
-                         r.Line(Screen(sx, sy), Screen(sx + 28, sy), 1, Color(.39f, .41f, .36f));
+                         for (int col = 0; col < 11; ++col)
+                         {
+                             const double sx = p.x + col * 30 + 1;
+                             const double sy = p.y + row * 29 + 1;
+                             const float tone = float((row * 7 + col * 3) % 5) * .012f;
+                             Ground(sx, sy, 28, 27, Color(.29f + tone, .31f + tone, .28f + tone));
+                             r.Line(
+                                 Screen(sx, sy), Screen(sx + 28, sy), 1, Color(.39f, .41f, .36f));
+                         }
                      }
+                     r.EndCachedMesh();
                  }
-                 r.EndCachedMesh();
-             }
-             r.DrawCachedMesh(key, origin);
-         })
-        .depthOffset = 1.e12;
+                 r.DrawCachedMesh(key, origin);
+             })
+            .depthOffset = 1.e12;
+
+        const auto office = Population::PostOffice(village);
+        const std::string post = "village/post/" + std::to_string(village);
+        bind(post,
+             "village",
+             office,
+             ActorLayer::World,
+             [this](const Actor& node)
+             {
+                 const auto at = node.WorldPosition();
+                 Box(at.x + 28,
+                     at.y,
+                     20,
+                     16,
+                     44,
+                     Color(.35f, .14f, .10f),
+                     Color(.22f, .09f, .07f),
+                     Color(.16f, .08f, .06f));
+                 r.Line(Screen(at.x + 32, at.y + 16, 32),
+                        Screen(at.x + 44, at.y + 16, 32),
+                        2,
+                        Color(.04f, .04f, .05f));
+             });
+        bind(post + "/label",
+             post,
+             office,
+             ActorLayer::WorldLabel,
+             [this, village](const Actor& node)
+             {
+                 const auto at = node.WorldPosition();
+                 if (Distance(player, {at.x, at.y}) < 300)
+                 {
+                     DrawWorldLabel({at.x, at.y},
+                                    62,
+                                    std::string(World::VillageName(village)) + " · 편지함",
+                                    Color(.7f, .85f, 1.f));
+                 }
+             });
+    }
+    for (const auto& house : VillageLayout::Houses())
+    {
+        if (Distance(player, house.entrance) > 115 || !objectInView(house.building))
+        {
+            continue;
+        }
+        const auto* parentHouse = &house;
+        bind("village/home-label/" + std::to_string(house.id),
+             "village/object/" +
+                 std::to_string(VillageLayout::AuthoredBuildings().size() + house.id),
+             house.entrance,
+             ActorLayer::WorldLabel,
+             [this, parentHouse](const Actor& node)
+             {
+                 const auto at = node.WorldPosition();
+                 DrawWorldLabel(
+                     {at.x, at.y}, 38, HomeOccupant(*parentHouse), Color(.85f, .8f, .66f));
+             });
+    }
 
     bind("village/hearth",
          "village",

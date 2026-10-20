@@ -51,6 +51,7 @@ class Prototype
     float autoSaveTime = 0, saveStatusTime = 0;
     std::string saveStatus = "자동 저장 대기";
     std::vector<Object> villageObjects;
+    std::map<World::Key, std::vector<size_t>> villageCollision;
     Renderer& r;
     SpriteSheet protagonistSheet, domainPortrait, spiritPortraits[4], ghostFace, ghostScreamPoses,
         ghostVariants[3], spiritSpellArt[3], spiritRealms[4];
@@ -174,8 +175,14 @@ class Prototype
     {
         if (world.Blocked(p))
             return true;
-        for (const Object& o : villageObjects)
+        const auto nearby = villageCollision.find({World::Index(p.x), World::Index(p.y)});
+        if (nearby == villageCollision.end())
         {
+            return false;
+        }
+        for (const auto index : nearby->second)
+        {
+            const auto& o = villageObjects[index];
             if (p.x > o.x - 12 && p.x < o.x + o.w + 12 && p.y > o.y - 12 && p.y < o.y + o.d + 12)
                 return true;
         }
@@ -537,23 +544,21 @@ class Prototype
   public:
     explicit Prototype(Renderer& renderer) : r(renderer)
     {
-        villageObjects = {{0, -300, -210, 140, 110, 92},
-                          {0, -70, -360, 155, 115, 115},
-                          {0, -440, 90, 130, 100, 85},
-                          {0, 270, -250, 145, 110, 98},
-                          {2, 330, 240, 65, 35, 30},
-                          {2, 390, 270, 30, 35, 52},
-                          {2, 280, 280, 25, 25, 24}};
-        // Temporary authored landmarks; keep the y=0 quest route clear.
-        for (const auto& building : StoryLayout::Buildings())
+        villageObjects = VillageLayout::Buildings();
+        for (size_t index = 0; index < villageObjects.size(); ++index)
         {
-            villageObjects.push_back(building);
+            const auto& object = villageObjects[index];
+            for (auto y = World::Index(object.y - 12); y <= World::Index(object.y + object.d + 12);
+                 ++y)
+            {
+                for (auto x = World::Index(object.x - 12);
+                     x <= World::Index(object.x + object.w + 12);
+                     ++x)
+                {
+                    villageCollision[{x, y}].push_back(index);
+                }
+            }
         }
-        for (int i = 0; i < 6; ++i)
-            villageObjects.push_back({2, 1080. + i * 45, -90, 18, 16, 38});
-        villageObjects.push_back({0, 2930, -250, 210, 110, 140});
-        villageObjects.push_back({2, 3180, -100, 25, 25, 90});
-        villageObjects.push_back({2, 3260, -100, 25, 25, 90});
         SpriteLayout eightDirections;
         eightDirections.rows = 8;
         eightDirections.directionRows = {{0, 1, 2, 3, 4, 5, 6, 7}};
@@ -587,8 +592,6 @@ class Prototype
         storyLayout.walkFrames = 1;
         storyLayout.anchorAtFeet = true;
         const auto& npcSprites = StoryLayout::NpcSprites();
-        const auto outposts = Population::Buildings();
-        villageObjects.insert(villageObjects.end(), outposts.begin(), outposts.end());
         const wchar_t* residentWalkFiles[] = {L"Assets/Characters/Townsfolk/farmer_walk.png",
                                               L"Assets/Characters/Townsfolk/merchant_walk.png",
                                               L"Assets/Characters/Townsfolk/artisan_walk.png",
@@ -1020,6 +1023,7 @@ class Prototype
         if (key == 'r' && levelOne.Dead())
         {
             population.people.clear();
+            population.society = Population::Society();
             levelOne = LevelOne();
             ResetControls();
             levelOne.captureRules.Load();

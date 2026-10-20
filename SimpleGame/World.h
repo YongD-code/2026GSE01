@@ -25,6 +25,14 @@ class World
 {
   public:
     static constexpr int ChunkSize = 512;
+    static constexpr int VillageCount = 7;
+    static constexpr double VillageHalfSize = 800.;
+    static constexpr float PlayerMoveSpeed = 90.f;
+    // Movement is measured after the isometric projection, including on axial roads.
+    static constexpr double RoadTravelSeconds = 20.;
+    static constexpr double AxisProjection = .952575456;
+    static constexpr double SettlementSpacing =
+        VillageHalfSize * 2 + PlayerMoveSpeed * RoadTravelSeconds / AxisProjection;
     using Coordinate = std::int64_t;
     using Key = std::pair<Coordinate, Coordinate>;
 
@@ -32,6 +40,7 @@ class World
     {
         Key key;
         int biome;
+        std::uint64_t roadMask = 0, villageMask = 0;
         std::vector<WorldObject> objects;
     };
 
@@ -59,32 +68,93 @@ class World
 
     static bool Road(Coordinate tileX, Coordinate tileY)
     {
-        auto lane = [](Coordinate v)
-        {
-            Coordinate m = (v % 8 + 8) % 8;
-            return m == 0 || m == 7;
-        };
-        return lane(tileX) || lane(tileY);
+        return RoadPoint({double(tileX) * 64 + 32, double(tileY) * 64 + 32}, 68);
     }
 
     static bool Village(double x, double y)
     {
-        return std::abs(x) < 512 && std::abs(y) < 512;
+        return std::abs(x) < VillageHalfSize && std::abs(y) < VillageHalfSize;
     }
 
-    static const std::array<WorldPoint, 5>& Settlements()
+    static const std::array<WorldPoint, VillageCount>& Settlements()
     {
-        static const std::array<WorldPoint, 5> hubs = {
-            {{0, 0}, {-1280, 0}, {0, 1280}, {0, -1280}, {2560, 768}}};
+        const double d = SettlementSpacing;
+        static const std::array<WorldPoint, VillageCount> hubs = {
+            {{0, 0}, {-d, 0}, {d, 0}, {0, -d}, {0, d}, {-d, -d}, {d, d}}};
         return hubs;
+    }
+
+    static const char* VillageName(int id)
+    {
+        static const char* names[] = {"벨른 마을",
+                                      "솔바람 마을",
+                                      "붉은등 마을",
+                                      "안개샘 마을",
+                                      "푸른벌 마을",
+                                      "산울림 마을",
+                                      "달여울 마을"};
+        return names[id >= 0 && id < VillageCount ? id : 0];
+    }
+
+    static const char* VillageId(int id)
+    {
+        static const char* ids[] = {"ash_village",
+                                    "pine_village",
+                                    "lantern_village",
+                                    "spring_village",
+                                    "field_village",
+                                    "mountain_village",
+                                    "moon_village"};
+        return ids[id >= 0 && id < VillageCount ? id : 0];
+    }
+
+    static const std::array<std::pair<int, int>, 8>& Connections()
+    {
+        static const std::array<std::pair<int, int>, 8> links = {
+            {{0, 1}, {0, 2}, {0, 3}, {0, 4}, {3, 5}, {1, 5}, {4, 6}, {2, 6}}};
+        return links;
+    }
+
+    static int VillageAt(WorldPoint p)
+    {
+        for (int i = 0; i < VillageCount; ++i)
+        {
+            const auto at = Settlements()[i];
+            if (std::abs(p.x - at.x) < VillageHalfSize && std::abs(p.y - at.y) < VillageHalfSize)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static bool RoadPoint(WorldPoint p, double width = 48)
+    {
+        for (const auto& hub : Settlements())
+        {
+            if ((std::abs(p.x - hub.x) < width && std::abs(p.y - hub.y) <= VillageHalfSize) ||
+                (std::abs(p.y - hub.y) < width && std::abs(p.x - hub.x) <= VillageHalfSize))
+            {
+                return true;
+            }
+        }
+        for (const auto& link : Connections())
+        {
+            const auto a = Settlements()[link.first], b = Settlements()[link.second];
+            if ((a.x == b.x && std::abs(p.x - a.x) < width && p.y >= (std::min)(a.y, b.y) &&
+                 p.y <= (std::max)(a.y, b.y)) ||
+                (a.y == b.y && std::abs(p.y - a.y) < width && p.x >= (std::min)(a.x, b.x) &&
+                 p.x <= (std::max)(a.x, b.x)))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     static bool Settlement(double x, double y)
     {
-        for (const auto& hub : Settlements())
-            if (std::abs(x - hub.x) < 280 && std::abs(y - hub.y) < 300)
-                return true;
-        return false;
+        return VillageAt({x, y}) >= 0;
     }
 
     Chunk& Ensure(Coordinate x, Coordinate y)
@@ -99,6 +169,23 @@ class World
         Coordinate rx = static_cast<Coordinate>(std::floor(double(x) / 4));
         Coordinate ry = static_cast<Coordinate>(std::floor(double(y) / 4));
         c.biome = static_cast<int>(Hash(rx, ry, 9 + seed) % 3);
+        for (int row = 0; row < 8; ++row)
+        {
+            for (int col = 0; col < 8; ++col)
+            {
+                const WorldPoint tile = {double(x) * ChunkSize + col * 64 + 32,
+                                         double(y) * ChunkSize + row * 64 + 32};
+                const auto bit = std::uint64_t(1) << (row * 8 + col);
+                if (RoadPoint(tile, 68))
+                {
+                    c.roadMask |= bit;
+                }
+                if (Settlement(tile.x, tile.y))
+                {
+                    c.villageMask |= bit;
+                }
+            }
+        }
         for (int row = 0; row < 3; ++row)
             for (int col = 0; col < 3; ++col)
             {
@@ -109,7 +196,7 @@ class World
                 // at least 30 units between cells and never enter the boundary road network.
                 double px = double(x) * ChunkSize + 85 + col * 112 + double((h >> 8) % 12);
                 double py = double(y) * ChunkSize + 85 + row * 112 + double((h >> 16) % 12);
-                if (Village(px, py) || Settlement(px, py) ||
+                if (Settlement(px, py) || RoadPoint({px, py}, 100) ||
                     (px >= 500 && px <= 3500 && py >= -450 && py <= 400))
                     continue;
                 int kind = c.biome == 2 ? 2 : 1;
@@ -143,7 +230,12 @@ class World
         anchors.reserve(residents.size() + 1);
         anchors.push_back({Index(actor.x), Index(actor.y)});
         for (const auto& resident : residents)
-            anchors.push_back({Index(resident.x), Index(resident.y)});
+        {
+            if (std::hypot(resident.x - camera.x, resident.y - camera.y) < reach + 512)
+            {
+                anchors.push_back({Index(resident.x), Index(resident.y)});
+            }
+        }
         std::sort(anchors.begin(), anchors.end());
         anchors.erase(std::unique(anchors.begin(), anchors.end()), anchors.end());
         // Movement within the same chunks does not change residency. Periodically trim chunks
@@ -178,6 +270,10 @@ class World
 
     bool Blocked(WorldPoint p)
     {
+        if (Settlement(p.x, p.y) || RoadPoint(p))
+        {
+            return false;
+        }
         Coordinate cx = Index(p.x), cy = Index(p.y);
         // Ensure() places every procedural footprint, including its 12-unit collision margin,
         // strictly inside its own chunk. Authored buildings are checked separately by the host.
@@ -189,8 +285,9 @@ class World
 
     const char* Region(WorldPoint p)
     {
-        if (Village(p.x, p.y))
-            return "잿빛 마을";
+        const int village = VillageAt(p);
+        if (village >= 0)
+            return VillageName(village);
         switch (Ensure(Index(p.x), Index(p.y)).biome)
         {
         case 0:

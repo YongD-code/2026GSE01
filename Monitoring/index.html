@@ -22,17 +22,19 @@
       <article><span>전투 중인 몬스터</span><strong id="combat-count">—</strong><small id="combat-note">적대 상태인 개체</small></article>
     </section>
     <section class="activity-metrics" aria-label="자율 NPC 활동">
-      <article><span>생활·사냥 NPC</span><strong id="resident-count">—</strong><small>고유 인물이 거점을 오가며 활동</small></article>
+      <article><span>생활·사냥 NPC</span><strong id="resident-count">—</strong><small>각자 집을 가진 주민들이 마을을 오가며 활동</small></article>
       <article><span>경제 활동 / 사냥 중</span><strong id="activity-count">—</strong><small id="recovery-count">회복 중 —명</small></article>
       <article><span>NPC 소지금 합계</span><strong id="resident-gold">—</strong><small>플레이어 재화와 별도</small></article>
       <article><span>NPC 누적 사냥</span><strong id="resident-kills">—</strong><small>일반 주령 사냥 실적</small></article>
     </section>
     <section class="panel world-panel"><div class="panel-head"><div><p class="eyebrow">LIVING WORLD</p><h2>NPC 활동 지도</h2></div><span class="muted">NPC 점을 선택하면 목적지와 상태를 확인할 수 있습니다.</span></div>
-      <div class="map-legend"><span class="farmer">● 채집꾼</span><span class="merchant">● 행상인</span><span class="artisan">● 장인</span><span class="hunter">● 사냥꾼</span><span class="monster">● 주령</span><span>◇ 플레이어</span></div>
+      <div class="map-legend"><span class="farmer">● 채집꾼</span><span class="merchant">● 행상인</span><span class="artisan">● 장인</span><span class="hunter">● 사냥꾼</span><span class="monster">● 주령</span><span>◇ 플레이어</span><span>■ 금색: 거주 / 회색: 빈집 / 보라: 이사 예약</span></div>
       <canvas id="world-map" width="1280" height="450" tabindex="0" aria-label="수신된 NPC와 주령 위치 지도. 상세 정보는 아래 NPC 표에서도 확인 가능합니다."></canvas>
       <div id="npc-detail" class="npc-detail" aria-live="polite">지도의 점 또는 NPC 표의 상세 버튼을 선택하세요.</div>
     </section>
-    <section><div class="section-title"><div><p class="eyebrow">AREA OVERVIEW</p><h2>마을과 탐험 구역</h2></div><span class="muted">NPC는 전체 인원 · 주령은 불러온 구역 기준입니다.</span></div><div id="regions" class="regions"></div></section>
+    <section><div class="section-title"><div><p class="eyebrow">AREA OVERVIEW</p><h2>마을과 탐험 구역</h2></div><span class="muted">거주 인구는 주소 기준 · 현재 NPC는 실제 위치 기준 · 주령은 불러온 구역 기준입니다.</span></div><div id="regions" class="regions"></div></section>
+    <section class="activity-metrics" aria-label="마을 교류"><article><span>운반 중인 편지</span><strong id="postal-count">—</strong><small>NPC가 목적지에 도착하면 전달</small></article><article><span>이사 완료</span><strong id="migration-count">—</strong><small>들은 소식과 성향을 비교해 빈집으로 이동</small></article></section>
+    <details class="panel"><summary>마을 간 편지와 소식</summary><p class="footnote">운반 중인 편지와 최근 보관 기록입니다. 완료 기록은 순차적으로 정리됩니다.</p><div class="table-scroll"><table><thead><tr><th>게임 / 실행 인스턴스</th><th>보낸 마을</th><th>받는 마을</th><th>운반 NPC</th><th>상태</th><th>소식</th></tr></thead><tbody id="letters"></tbody></table></div></details>
     <section class="panel"><div class="panel-head"><div><p class="eyebrow">CHARACTERS</p><h2>NPC 상태</h2></div><div class="filters"><input type="search" id="search" aria-label="NPC 이름 검색" placeholder="이름·직업 검색"><select id="role-filter" aria-label="NPC 직업 필터"><option value="">모든 NPC</option><option value="story">이야기 NPC</option><option value="farmer">채집꾼</option><option value="merchant">행상인</option><option value="artisan">장인</option><option value="hunter">주령 사냥꾼</option></select><label><input type="checkbox" id="active-only"> 배치된 NPC만</label></div></div>
       <div class="table-scroll"><table><thead><tr><th>NPC / 직업</th><th>게임 / 실행 인스턴스</th><th>행동</th><th>현재 구역</th><th>체력 / 기력</th><th>소지금 / 수입</th><th>사냥 / 물품</th><th>상호작용</th><th>좌표 / 목적지</th></tr></thead><tbody id="npcs"></tbody></table></div>
       <p class="footnote">자율 NPC는 고유 ID로 추적합니다. 이야기 NPC의 체력은 표시하지 않습니다. 수입은 누적 수입이며 소지금과 다릅니다. 최신 JSON은 수집기의 snapshots 폴더에도 저장됩니다.</p>

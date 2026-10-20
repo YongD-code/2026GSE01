@@ -79,13 +79,28 @@ void TalkResident(int id)
         "마을을 돌며 물건을 나르고 있소. 낯선 종소리가 들리는 길은 피하는 게 좋겠소.",
         "일감을 마치면 공방으로 돌아갈 거예요. 장비를 손보려면 광장의 대장장이를 찾아가세요.",
         "주령의 흔적을 살피는 중이오. 혼자 깊은 숲에 들어가지는 마시오."};
-    const std::string line =
+    std::string line =
         objective ? quest->dialogue
         : person.action == Population::Returning
             ? "오늘 일은 마쳤어요. 이제 집으로 돌아가는 길이에요."
         : person.action == Population::Resting ? "잠깐 쉬는 중이에요. 당신도 무리하지 마세요."
         : person.action == Population::Working ? "손이 조금 바쁘네요. 일을 마치고 다시 이야기해요."
                                                : greetings[person.role];
+    if (!objective)
+    {
+        line += "\n제 집은 " + VillageLayout::Address(person.houseId) + "이에요. " +
+                population.HeardNews(person);
+        if (person.migrationVillage >= 0)
+        {
+            line += "\n들은 소식을 믿고 " +
+                    std::string(World::VillageName(person.migrationVillage)) +
+                    "로 이사하는 중이에요.";
+        }
+        else if (person.mailId >= 0)
+        {
+            line += "\n다른 마을에 전할 편지를 맡고 있어요.";
+        }
+    }
     Say(Population::Name(person.id), line);
     talkingResident = person.id;
     dialoguePending = true;
@@ -153,6 +168,15 @@ void UpdatePopulation(float dt)
             p.invulnerability = result.invulnerability;
         }
     }
+    for (auto& person : population.people)
+    {
+        person.questPinned = ResidentQuestTarget(person.id) || talkingResident == person.id;
+        if (person.questPinned && person.migrationVillage >= 0)
+        {
+            person.reservedHouse = person.migrationVillage = -1;
+            population.Travel(person, person.home, Population::Resting, Population::Returning);
+        }
+    }
     population.Update(
         dt,
         controlling ? spirit : player,
@@ -166,9 +190,16 @@ void UpdatePopulation(float dt)
     levelOne.encounterObservers.clear();
     for (const auto& p : population.people)
     {
+        if (Distance(p.position, controlling ? spirit : player) > SimulationRadius() + 600)
+        {
+            continue;
+        }
         levelOne.residentCombatants.push_back({p.id, p.position, p.health, p.invulnerability});
-        if (p.role == Population::Hunter)
+        if (p.role == Population::Hunter &&
+            Distance(p.position, controlling ? spirit : player) < SimulationRadius() + 300)
+        {
             levelOne.encounterObservers.push_back(p.position);
+        }
     }
 }
 
@@ -180,6 +211,29 @@ void SyncPopulationHealth()
             population.people[result.id].health = result.health;
             population.people[result.id].invulnerability = result.invulnerability;
         }
+}
+
+std::string HomeOccupant(const VillageLayout::House& house) const
+{
+    const std::string address =
+        std::to_string(house.id % VillageLayout::HomesPerVillage + 1) + "번집 · ";
+    const int owner = population.HouseOwner(house.id);
+    if (owner == -2)
+    {
+        for (const auto& site : StoryLayout::Sites())
+        {
+            if (site.spriteIndex == house.id && site.kind != StoryLayout::Kind::Evidence)
+            {
+                return address + site.name;
+            }
+        }
+    }
+    if (owner >= 0)
+    {
+        return address + Population::Name(owner) +
+               (population.people[owner].houseId == house.id ? "의 집" : " 이사 예약");
+    }
+    return address + "빈집";
 }
 
 void DrawResident(const Population::Person& person)

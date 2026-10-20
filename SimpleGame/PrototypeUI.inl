@@ -101,8 +101,7 @@ std::vector<std::string> JournalEntries()
                 std::to_string(int(std::ceil(skillTimers[SkillSet()][i]))) + "초");
             add(SkillDescription(SkillSet(), i));
         }
-        add("지역 · " +
-            std::string(World::Village(player.x, player.y) ? "벨른 마을" : world.Region(player)));
+        add("지역 · " + std::string(world.Region(player)));
     }
     else if (menuTab == 1)
     {
@@ -459,6 +458,18 @@ void DrawMinimap()
             r.Rect(p.x - 3, p.y - 3, 6, 6, Color(.65f, .59f, .43f));
         }
     }
+    for (const auto& person : population.people)
+    {
+        const auto at = project(person.position);
+        if (inside(at))
+        {
+            r.Ellipse(at.x,
+                      at.y,
+                      1.5f,
+                      1.5f,
+                      person.mailId >= 0 ? Color(1.f, .76f, .3f) : Color(.5f, .7f, .8f));
+        }
+    }
     for (const auto& site : StoryLayout::Sites())
     {
         const Point p = project(site.position);
@@ -504,7 +515,7 @@ void DrawMinimap()
         }
     }
     r.Triangle({cx, cy - 5}, {cx - 4, cy + 4}, {cx + 4, cy + 4}, Color(1, 1, 1));
-    r.Text(box.x + 10, box.y + 20, "주변 지도", Color(.85f, .83f, .72f));
+    r.Text(box.x + 10, box.y + 20, world.Region(player), Color(.85f, .83f, .72f));
     r.Text(box.x + 8, box.y + box.h - 5, "초록: 목표", Color(.2f, 1.f, .36f));
 }
 

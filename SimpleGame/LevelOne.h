@@ -833,6 +833,10 @@ class LevelOne
                     const int quadrant = (slot + int((hash >> 8) % 4)) % 4;
                     home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
                             baseY + 60 + (quadrant / 2) * 256 + double((placement >> 16) % 120)};
+                    if (World::Settlement(home.x, home.y))
+                    {
+                        continue;
+                    }
                     const WorldPoint exits[] = {{baseX + 24, home.y},
                                                 {baseX + 488, home.y},
                                                 {home.x, baseY + 24},
@@ -1062,7 +1066,21 @@ class LevelOne
     template <class Collision>
     int ResidentTarget(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
     {
-        const int previous = enemy.residentTargetIndex;
+        int previous = enemy.residentTargetIndex;
+        if (enemy.npcTarget >= 0 && (previous < 0 || previous >= int(residentCombatants.size()) ||
+                                     residentCombatants[previous].id != enemy.npcTarget))
+        {
+            previous = -1;
+            for (size_t i = 0; i < residentCombatants.size(); ++i)
+            {
+                if (residentCombatants[i].id == enemy.npcTarget)
+                {
+                    previous = int(i);
+                    break;
+                }
+            }
+            enemy.residentTargetIndex = previous;
+        }
         const bool valid = previous >= 0 && previous < int(residentCombatants.size()) &&
                            residentCombatants[previous].id == enemy.npcTarget &&
                            residentCombatants[previous].health > 0 &&

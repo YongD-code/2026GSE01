@@ -7,7 +7,7 @@ const roleColors = {farmer:'#80c89a',merchant:'#7eaff8',artisan:'#e4ad72',hunter
 const names = {title:'타이틀',opening:'오프닝 감상 중',playing:'플레이 중',paused:'일시 정지',dialogue:'대화·선택 중',dead:'플레이어 사망',
   present:'배치됨',talking:'대화 중',waiting:'대기',inactive:'현재 미등장',missing:'실종',combat:'전투 중',
   monsters_present:'몬스터 관측',no_observed_threat:'관측된 위협 없음',weakened:'약화',remnant:'포획 잔영',returning:'복귀 중',idle:'대기',offline:'수신 중단',
-  walking:'이동 중',working:'일하는 중',trading:'거래 중',hunting:'주령 수색',fighting:'사냥 중',resting:'휴식 중',recovering:'회복 중',fleeing:'대피 중'};
+  walking:'이동 중',working:'일하는 중',trading:'거래 중',hunting:'주령 수색',fighting:'사냥 중',resting:'휴식 중',recovering:'회복 중',fleeing:'대피 중',delivering:'편지 운반',moving_home:'이사 중'};
 const keyOf = s => JSON.stringify([s.game_id,s.source_id]);
 function element(tag,text,className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function badge(status,label){return element('span',label || names[status] || status,'badge '+(Object.hasOwn(names,status)?status:'waiting'));}
@@ -42,6 +42,10 @@ function renderMap(all){
     for(const npc of s.npcs)if(npc.active&&npc.position&&npcVisible(npc))points.push({p:npc.position,npc,s,record});
     for(const mob of s.monsters)if(mob.position)points.push({p:mob.position,mob,s,record});
     if(!['title','opening'].includes(s.mode)&&s.player?.position)points.push({p:s.player.position,player:true,s,record});
+    for(const village of s.regions.filter(r=>r.kind==='village'&&r.position)){
+      const size=Number.isFinite(village.half_size)?village.half_size:800;
+      for(const side of [-1,1])points.push({p:{x:village.position.x+side*size,y:village.position.y+side*size},markerOnly:true,s,record});
+    }
   }
   ctx.fillStyle='#0e1b25';ctx.fillRect(0,0,w,h);
   if(!points.length){ctx.fillStyle='#8da6b5';ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('게임에서 위치 메시지를 기다리고 있습니다.',w/2,h/2);$('npc-detail').textContent='현재 표시할 위치 정보가 없습니다.';return;}
@@ -53,7 +57,28 @@ function renderMap(all){
   ctx.strokeStyle='#203340';ctx.lineWidth=1;
   for(let x=0;x<w;x+=64){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
   for(let y=0;y<h;y+=64){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+  for(const record of all){
+    const s=record.snapshot,villages=new Map(s.regions.filter(r=>r.kind==='village'&&r.position).map(r=>[r.id,r]));
+    ctx.globalAlpha=live(record)?1:.3;
+    ctx.strokeStyle='#698583';ctx.lineWidth=3;
+    for(const road of s.roads||[]){
+      const a=villages.get(road.from),b=villages.get(road.to);if(!a||!b)continue;
+      const start=project(a.position),end=project(b.position);ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.lineTo(end.x,end.y);ctx.stroke();
+    }
+    for(const village of villages.values()){
+      const size=village.half_size||800,corner=project({x:village.position.x-size,y:village.position.y-size});
+      ctx.fillStyle='#233c3b';ctx.fillRect(corner.x,corner.y,size*2*scale,size*2*scale);
+      ctx.strokeStyle='#80a49d';ctx.lineWidth=1;ctx.strokeRect(corner.x,corner.y,size*2*scale,size*2*scale);
+      ctx.fillStyle='#cce3d4';ctx.font='12px sans-serif';ctx.textAlign='left';ctx.fillText(`${village.name} · ${village.residents??'—'}명`,corner.x,corner.y-6);
+    }
+    for(const house of s.houses||[]){
+      if(!house.position)continue;const at=project(house.position);
+      ctx.fillStyle=house.status==='vacant'?'#6e7c81':house.status==='reserved'?'#d3a3eb':'#c6a66f';ctx.fillRect(at.x-2,at.y-2,4,4);
+      if(house.owner&&npcKey(s,{id:house.owner})===selectedNpc){ctx.strokeStyle='#fff';ctx.strokeRect(at.x-5,at.y-5,10,10);}
+    }
+  }
   for(const object of points){
+    if(object.markerOnly)continue;
     const at=project(object.p),active=live(object.record);ctx.globalAlpha=active?1:.3;
     if(object.npc){
       const npc=object.npc,key=npcKey(object.s,npc),picked=key===selectedNpc;
@@ -74,6 +99,10 @@ function renderMap(all){
   detail.append(element('strong',`${n.name} · ${n.role_name||'이야기 NPC'}`),badge(live(match.record)?n.status:'offline'));
   detail.append(element('p',`${sourceLabel(match.s)} · 현재 ${coordinates(n.position)} → 목적지 ${coordinates(n.destination)}`));
   if(n.kind==='autonomous')detail.append(element('p',`체력 ${Math.ceil(n.health)}/${n.maximum} · 기력 ${Math.round(n.stamina)} · 소지금 ${n.gold} · 누적 수입 ${n.earned} · 사냥 ${n.kills} · 물품 ${n.goods}`));
+  if(n.home_address)detail.append(element('p',`거주지 · ${n.home_address}${n.personality?' / '+n.personality:''}`));
+  if(n.heard_news)detail.append(element('p',`들은 소식 · ${n.heard_news}`));
+  if(n.migrating_to)detail.append(element('p','이사 목적지 · '+(match.s.regions.find(r=>r.id===n.migrating_to)?.name||n.migrating_to)));
+  if(n.mail_id)detail.append(element('p','운반 중인 편지 · '+n.mail_id));
 }
 function render(){
   const all=selected(), fresh=all.filter(live), stale=all.length-fresh.length;
@@ -101,6 +130,9 @@ function render(){
   const npcRows=$('npcs');npcRows.replaceChildren();
   const mobRows=$('monsters');mobRows.replaceChildren();
   const sources=$('sources');sources.replaceChildren();
+  const letterRows=$('letters');letterRows.replaceChildren();let letterCount=0;
+  $('postal-count').textContent=fresh.length?fresh.reduce((total,r)=>total+(r.snapshot.letters||[]).filter(l=>!l.delivered).length,0):'—';
+  $('migration-count').textContent=fresh.length?fresh.reduce((total,r)=>total+(r.snapshot.society?.migrations||0),0):'—';
   let npcMatches=0,mobCount=0;
   for(const record of all){
     const s=record.snapshot, isLive=live(record), regionNames=new Map(s.regions.map(r=>[r.id,r.name]));
@@ -114,12 +146,14 @@ function render(){
         const item=element('span',label);item.append(element('strong',value));stats.append(item);
       }
       card.append(stats,element('p',region.npc_coverage==='complete'?'NPC 전체 집계 · 주령은 활성 구역만 관측':region.coverage==='complete'?'전체 개체 집계':'현재 불러온 개체 기준 · 미관측 구역 제외','region-note'));regions.append(card);
+      if(Number.isFinite(region.houses))card.append(element('p',`거주 ${region.residents}명 · 주택 ${region.houses}채 / 빈집 ${region.houses_vacant}채 / 이사 예약 ${region.houses_reserved}채`,'region-note'),element('p',`오는 편지 ${region.mail_in_transit}통 · 알고 있는 마을 소식 ${region.news_known}곳`,'region-note'));
     }
     for(const npc of s.npcs){
       if(!npcVisible(npc))continue;
       npcMatches++;
       const row=element('tr',undefined,isLive?'':'stale');
       const nameCell=cell(row,npc.name);nameCell.append(element('small',npc.role_name||'이야기 NPC'),element('small',npc.id));
+      if(npc.home_address)nameCell.append(element('small',npc.home_address));
       const button=element('button','상세','npc-select');button.addEventListener('click',()=>{selectedNpc=npcKey(s,npc);renderMap(all);});nameCell.append(button);
       cell(row,sourceLabel(s));
       cell(row).append(badge(npc.status));cell(row,regionNames.get(npc.region)||'—');
@@ -136,6 +170,13 @@ function render(){
       cell(row).append(badge(mob.status));cell(row,`${Math.ceil(mob.health)} / ${Math.ceil(mob.maximum)}`);mobRows.append(row);
     }
     const source=element('div',undefined,'source-row'), info=element('div');
+    const residents=new Map(s.npcs.map(n=>[n.id,n.name]));
+    for(const letter of s.letters||[]){
+      letterCount++;
+      const row=element('tr',undefined,isLive?'':'stale');
+      cell(row,sourceLabel(s));cell(row,regionNames.get(letter.from)||letter.from);cell(row,regionNames.get(letter.to)||letter.to);
+      cell(row,residents.get(letter.carrier)||letter.carrier);cell(row,letter.delivered?'전달 완료':'운반 중');cell(row,letter.summary);letterRows.append(row);
+    }
     info.append(element('strong',sourceLabel(s)),element('small',`게임 ID ${s.game_id} · 순번 ${s.sequence} · ${Math.floor(ageOf(record)/1000)}초 전 수신`));
     info.append(element('p',s.quest?`현재 목표 · ${s.quest.title}`:'현재 목표 없음'));
     source.append(info,badge(isLive?s.mode:'offline'));sources.append(source);
@@ -143,6 +184,7 @@ function render(){
   if(!all.length){empty(regions,'아직 수신된 구역이 없습니다.');empty(sources,'연결된 게임의 메시지를 기다리고 있습니다.');}
   if(!npcMatches)empty(npcRows,'표시할 NPC가 없습니다.',9);
   if(!mobCount)empty(mobRows,'수신 범위에 살아 있는 몬스터가 없습니다.',5);
+  if(!letterCount)empty(letterRows,'아직 수신된 편지가 없습니다.',6);
   $('monster-detail-count').textContent=`· ${mobCount}개 (마지막 관측 포함)`;
   renderMap(all);
 }
