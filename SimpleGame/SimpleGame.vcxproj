@@ -157,6 +157,9 @@
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="CharacterModel.h" />
+    <ClInclude Include="ModelActor.h" />
+    <ClInclude Include="NpcAppearance.h" />
+    <ClInclude Include="ModelIntegrationReview.h" />
     <ClInclude Include="ForgottenAppearance.h" />
     <ClInclude Include="SpiritAppearance.h" />
     <ClInclude Include="EnvironmentGeometry.h" />

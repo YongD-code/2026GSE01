@@ -3,6 +3,7 @@
 #include "World.h"
 #include "SpriteSheet.h"
 #include "CharacterModel.h"
+#include "ModelActor.h"
 #include "SpiritAppearance.h"
 #include "LevelOne.h"
 #include "SaveGame.h"
@@ -21,6 +22,7 @@
 // Authored starting village surrounded by deterministic streamed chunks.
 class Prototype
 {
+    friend struct ModelIntegrationReview;
     using Object = WorldObject;
     World world;
     LevelOne levelOne;
@@ -58,6 +60,7 @@ class Prototype
     SpriteSheet storyNpcSheets[StoryLayout::NpcCount];
     SpriteAnimation protagonistAnimation;
     CharacterModel protagonistModel;
+    CharacterModel npcModel;
     bool useProtagonistModel = false;
     float protagonistYaw = 2.35619449f, protagonistGait = 0;
     float protagonistModelTime = 0, protagonistCastAge = 1;
@@ -68,6 +71,7 @@ class Prototype
     bool blenderProtagonist = false, protagonistSprinting = false;
     SpriteSheet spiritSheets[SpiritCatalog::Count];
     SpriteSheet spiritModelSheets[SpiritCatalog::Count];
+    CharacterModel spiritMeshes[SpiritCatalog::Count];
     bool useSpiritModels = true;
     SpriteSheet storyEnemySheets[StoryEncounter::SpriteCount];
     SpriteSheet lootSheets[5];
@@ -89,7 +93,7 @@ class Prototype
     bool UsingSpiritModel(int species) const
     {
         return useSpiritModels && species >= 0 && species < SpiritCatalog::Count &&
-               spiritModelSheets[species].Ready();
+               (spiritMeshes[species].Ready() || spiritModelSheets[species].Ready());
     }
 
     bool UsingSpiritModels() const
@@ -469,18 +473,31 @@ class Prototype
     void DrawPlayer(WorldPoint pos);
     void StoryProp(const StoryLayout::Site& site, WorldPoint at);
     void StoryFacade(const Object& building);
-    void StoryPerson(const StoryLayout::Site& site, WorldPoint position);
+    void StoryPerson(const StoryLayout::Site& site,
+                     WorldPoint position,
+                     CharacterModel::State* state);
     bool CharacterInView(WorldPoint position, float bodyHeight) const;
     bool StoryPersonVisible(const StoryLayout::Site& site, WorldPoint position) const;
     void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
-    void Wisp(int type, WorldPoint position);
+    void Wisp(int type, WorldPoint position, CharacterModel::State* state);
     bool DrawSpiritModel(int species,
                          Point feet,
                          float size,
                          SpriteAnimation animation,
                          Color tint,
                          float motionClock,
-                         float castProgress = -1.f);
+                         float castProgress = -1.f,
+                         CharacterModel::State* state = nullptr,
+                         bool running = false);
+    bool DrawKeyedModel(CharacterModel& model,
+                        Point feet,
+                        float size,
+                        SpriteAnimation animation,
+                        Color tint,
+                        CharacterModel::Motion motion,
+                        float phase,
+                        CharacterModel::State* state,
+                        const CharacterModel::Parts* parts = nullptr);
 
     struct EnemyVisual
     {
@@ -493,9 +510,10 @@ class Prototype
         float remnantTime = -2;
         int type = 0, boss = 0;
         bool alerted = false, weakened = false;
+        bool running = false;
     };
 
-    void DrawEnemy(const EnemyVisual& enemy);
+    void DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state);
     void DrawCombatWarnings();
     void Hearth(WorldPoint position);
 
@@ -583,6 +601,10 @@ class Prototype
         }
         if (!protagonistModel.Load(L"Assets/Characters/Runtime/protagonist.meshbin"))
             std::cerr << "주인공 입체 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
+        if (!npcModel.Load(L"Assets/Characters/Runtime/npc_parts.meshbin"))
+        {
+            std::cerr << "NPC 조합형 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
+        }
         SpriteLayout storyLayout;
         storyLayout.columns = 2;
         storyLayout.rows = 2;
@@ -675,6 +697,16 @@ class Prototype
         for (int i = 0; i < SpiritCatalog::Count; ++i)
         {
             SpriteLayout speciesLayout = spiritLayout;
+            if (i >= SpiritCatalog::Eater)
+            {
+                speciesLayout = SpriteLayout();
+                speciesLayout.columns = speciesLayout.rows = 1;
+                speciesLayout.directionRows.fill(0);
+                speciesLayout.directionIdleColumns.fill(0);
+                speciesLayout.firstWalkFrame = 0;
+                speciesLayout.walkFrames = 1;
+                speciesLayout.anchorAtFeet = true;
+            }
             if (i == SpiritCatalog::Saint)
             {
                 // The saint glides. Alternate illustration poses are not aligned walk frames.
@@ -687,6 +719,14 @@ class Prototype
         }
         for (int species = 0; species < SpiritCatalog::Count; ++species)
         {
+            if (!spiritMeshes[species].Load(SpiritCatalog::Get(species).model))
+            {
+                std::cerr << "주령 스킨 모델 로드 실패: " << SpiritName(species) << std::endl;
+            }
+            if (species >= SpiritCatalog::Eater)
+            {
+                continue;
+            }
             const auto& appearance = SpiritAppearance::Get(species);
             SpriteLayout modelLayout;
             modelLayout.columns = SpiritAppearance::Columns;

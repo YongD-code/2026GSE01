@@ -190,9 +190,9 @@ void CharacterModel::Release()
     meshProgram = compositeProgram = 0;
     vertexCount = 0;
     joints.clear();
-    pose.clear();
-    transitionFrom.clear();
-    skin.clear();
+    defaultState = State();
+    parts.clear();
+    framing = 1;
     for (auto& clip : clips)
         clip = {};
 }
@@ -200,7 +200,7 @@ void CharacterModel::Release()
 bool CharacterModel::Ready() const
 {
     return vao && buffer && meshProgram && compositeProgram && framebuffer && resolveFramebuffer &&
-           image && vertexCount > 0 && !skin.empty();
+           image && vertexCount > 0 && !joints.empty();
 }
 
 bool CharacterModel::Load(const wchar_t* path)
@@ -211,11 +211,39 @@ bool CharacterModel::Load(const wchar_t* path)
     char magic[8] = {};
     std::uint32_t version = 0, vertices = 0, boneCount = 0, clipCount = 0;
     if (!reader.Open(path) || !reader.Read(magic, sizeof(magic)) ||
-        std::memcmp(magic, "CHAR3D01", 8) || !reader.Value(version) || version != 1 ||
-        !reader.Value(vertices) || vertices < 3 || vertices > 600000 || vertices % 3 ||
-        !reader.Value(boneCount) || !boneCount || boneCount > 32 || !reader.Value(clipCount) ||
-        clipCount != clips.size())
+        std::memcmp(magic, "CHAR3D01", 8) || !reader.Value(version) ||
+        (version != 1 && version != 2) || !reader.Value(vertices) || vertices < 3 ||
+        vertices > 600000 || vertices % 3 || !reader.Value(boneCount) || !boneCount ||
+        boneCount > 32 || !reader.Value(clipCount) ||
+        clipCount != (version == 1 ? 4u : static_cast<unsigned>(clips.size())))
         return false;
+    std::vector<MeshPart> loadedParts;
+    if (version == 2)
+    {
+        unsigned count = 0, covered = 0;
+        if (!reader.Value(framing) || !std::isfinite(framing) || framing < .05f || framing > 1 ||
+            !reader.Value(count) || !count || count > 64)
+        {
+            return false;
+        }
+        for (unsigned i = 0; i < count; ++i)
+        {
+            MeshPart part;
+            if (!reader.Value(part.slot) || !reader.Value(part.index) ||
+                !reader.Value(part.first) || !reader.Value(part.count) || part.slot < -1 ||
+                part.slot > 3 || part.index < 0 || part.index > 63 || part.first != covered ||
+                !part.count || part.count % 3 || part.count > vertices - covered)
+            {
+                return false;
+            }
+            covered += part.count;
+            loadedParts.push_back(part);
+        }
+        if (covered != vertices)
+        {
+            return false;
+        }
+    }
     std::vector<Joint> loadedJoints(boneCount);
     for (size_t i = 0; i < loadedJoints.size(); ++i)
     {
@@ -247,9 +275,10 @@ bool CharacterModel::Load(const wchar_t* path)
         if (std::abs(total - 1) > .001f)
             return false;
     }
-    std::array<Clip, 4> loadedClips;
-    const char* names[] = {"idle", "walk", "run", "cast"};
-    for (size_t i = 0; i < loadedClips.size(); ++i)
+    std::array<Clip, static_cast<size_t>(Motion::Count)> loadedClips;
+    const char* names[] = {
+        "idle", "walk", "run", "cast", "jump", "turn_left", "turn_right", "attack"};
+    for (size_t i = 0; i < clipCount; ++i)
     {
         char name[16] = {};
         auto& clip = loadedClips[i];
@@ -272,6 +301,10 @@ bool CharacterModel::Load(const wchar_t* path)
                 return false;
         }
     }
+    for (size_t i = clipCount; i < loadedClips.size(); ++i)
+    {
+        loadedClips[i] = loadedClips[i == static_cast<size_t>(Motion::Attack) ? 3 : 0];
+    }
     if (reader.offset != reader.bytes.size())
         return false;
     GraphicsState state;
@@ -289,6 +322,9 @@ bool CharacterModel::Load(const wchar_t* path)
     feetUniform = glGetUniformLocation(compositeProgram, "feet");
     tintUniform = glGetUniformLocation(compositeProgram, "tint");
     linearUniform = glGetUniformLocation(compositeProgram, "linearScene");
+    framingUniform = glGetUniformLocation(meshProgram, "modelScale");
+    drawScaleUniform = glGetUniformLocation(compositeProgram, "drawScale");
+    styleUniform = glGetUniformLocation(meshProgram, "fourBand");
     glUseProgram(compositeProgram);
     glUniform1i(glGetUniformLocation(compositeProgram, "characterImage"), 0);
     glGenVertexArrays(1, &vao);
@@ -314,6 +350,7 @@ bool CharacterModel::Load(const wchar_t* path)
     }
     joints = std::move(loadedJoints);
     clips = std::move(loadedClips);
+    parts = std::move(loadedParts);
     vertexCount = static_cast<GLsizei>(vertices);
     Reset();
     FrameProfiler::Upload(loadedVertices.size() * sizeof(MeshVertex));
@@ -429,7 +466,7 @@ CharacterModel::Pose CharacterModel::Blend(const Pose& a, const Pose& b, float w
 CharacterModel::Pose CharacterModel::Sample(Motion kind, size_t bone, float phase) const
 {
     const auto& clip = clips[static_cast<size_t>(kind)];
-    const bool once = kind == Motion::Cast;
+    const bool once = kind != Motion::Idle && kind != Motion::Walk && kind != Motion::Run;
     const float sample = once ? (std::max)(0.f, (std::min)(1.f, phase)) * (clip.frames - 1)
                               : (phase - std::floor(phase)) * clip.frames;
     const unsigned first = static_cast<unsigned>(sample);
@@ -439,56 +476,99 @@ CharacterModel::Pose CharacterModel::Sample(Motion kind, size_t bone, float phas
                  sample - first);
 }
 
-void CharacterModel::UpdateSkin()
+void CharacterModel::UpdateSkin(State& state) const
 {
     std::array<Matrix, 32> global;
-    skin.resize(joints.size());
+    state.skin.resize(joints.size());
     for (size_t i = 0; i < joints.size(); ++i)
     {
-        const Matrix local = Transform(pose[i]);
+        const Matrix local = Transform(state.pose[i]);
         global[i] = joints[i].parent < 0 ? local : Multiply(global[joints[i].parent], local);
-        skin[i] = Multiply(global[i], joints[i].inverseBind);
+        state.skin[i] = Multiply(global[i], joints[i].inverseBind);
     }
 }
 
 void CharacterModel::Reset(float facing)
 {
-    yaw = facing;
-    motion = Motion::Idle;
-    transition = 1;
+    Reset(defaultState, facing);
+}
+
+void CharacterModel::Reset(State& state, float facing)
+{
+    state = State();
+    state.owner = this;
+    state.yaw = facing;
     if (joints.empty())
         return;
-    pose.resize(joints.size());
-    for (size_t i = 0; i < pose.size(); ++i)
-        pose[i] = Sample(Motion::Idle, i, 0);
-    transitionFrom = pose;
-    UpdateSkin();
+    state.pose.resize(joints.size());
+    for (size_t i = 0; i < state.pose.size(); ++i)
+        state.pose[i] = Sample(Motion::Idle, i, 0);
+    state.transitionFrom = state.pose;
+    UpdateSkin(state);
 }
 
 void CharacterModel::Animate(float dt, Motion kind, float phase, float facing)
 {
+    Animate(defaultState, dt, kind, phase, facing);
+}
+
+void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, float facing)
+{
+    if (state.owner != this || state.pose.size() != joints.size())
+    {
+        Reset(state, facing);
+    }
     if (!Ready() || dt <= 0)
         return;
     dt = (std::min)(dt, .05f);
-    if (kind != motion)
+    const float difference = std::atan2(std::sin(facing - state.yaw), std::cos(facing - state.yaw));
+    if (kind == Motion::Idle)
     {
-        transitionFrom = pose;
-        transition = 0;
-        motion = kind;
+        if (std::abs(difference) > .5f && state.turnAge >= .35f)
+        {
+            state.turnAge = 0;
+            state.turn = difference > 0 ? Motion::TurnLeft : Motion::TurnRight;
+        }
+        if (state.turnAge < .35f)
+        {
+            state.turnAge += dt;
+            kind = state.turn;
+            phase = (std::min)(1.f, state.turnAge / .35f);
+        }
     }
-    transition = (std::min)(1.f, transition + dt / (kind == Motion::Cast ? .07f : .12f));
-    const float blend = transition * transition * (3 - 2 * transition);
-    const float difference = std::atan2(std::sin(facing - yaw), std::cos(facing - yaw));
-    yaw += difference * (1 - std::exp(-24.f * dt));
-    yaw = std::atan2(std::sin(yaw), std::cos(yaw));
-    for (size_t i = 0; i < pose.size(); ++i)
-        pose[i] = Blend(transitionFrom[i], Sample(kind, i, phase), blend);
-    UpdateSkin();
+    else
+    {
+        state.turnAge = 1;
+    }
+    if (kind != state.motion)
+    {
+        state.transitionFrom = state.pose;
+        state.transition = 0;
+        state.motion = kind;
+    }
+    state.transition =
+        (std::min)(1.f, state.transition + dt / (kind == Motion::Cast ? .07f : .12f));
+    const float blend = state.transition * state.transition * (3 - 2 * state.transition);
+    state.yaw += difference * (1 - std::exp(-24.f * dt));
+    state.yaw = std::atan2(std::sin(state.yaw), std::cos(state.yaw));
+    for (size_t i = 0; i < state.pose.size(); ++i)
+        state.pose[i] = Blend(state.transitionFrom[i], Sample(kind, i, phase), blend);
+    UpdateSkin(state);
 }
 
 bool CharacterModel::Draw(Renderer& renderer, Point feet, Color tint)
 {
-    if (!Ready())
+    return Draw(renderer, feet, tint, defaultState, 90);
+}
+
+bool CharacterModel::Draw(Renderer& renderer,
+                          Point feet,
+                          Color tint,
+                          const State& animation,
+                          float height,
+                          const Parts* selection)
+{
+    if (!Ready() || animation.skin.size() != joints.size() || !std::isfinite(height) || height <= 0)
         return false;
     renderer.Flush();
     FrameProfiler::Scope timing(FrameProfiler::Stage::CharacterDraw);
@@ -510,11 +590,29 @@ bool CharacterModel::Draw(Renderer& renderer, Point feet, Color tint)
     glClearDepth(1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(meshProgram);
-    glUniformMatrix4fv(bonesUniform, static_cast<GLsizei>(skin.size()), GL_FALSE, skin[0].data());
-    FrameProfiler::Upload(skin.size() * sizeof(Matrix));
-    glUniform2f(yawUniform, std::cos(yaw), std::sin(yaw));
+    glUniformMatrix4fv(bonesUniform,
+                       static_cast<GLsizei>(animation.skin.size()),
+                       GL_FALSE,
+                       animation.skin[0].data());
+    FrameProfiler::Upload(animation.skin.size() * sizeof(Matrix));
+    glUniform2f(yawUniform, std::cos(animation.yaw), std::sin(animation.yaw));
+    glUniform1f(framingUniform, framing);
+    glUniform1i(styleUniform, !parts.empty());
     glBindVertexArray(vao);
-    FrameProfiler::DrawArrays(GL_TRIANGLES, 0, vertexCount);
+    if (parts.empty())
+    {
+        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, vertexCount);
+    }
+    else
+    {
+        for (const auto& part : parts)
+        {
+            if (part.slot < 0 || !selection || (*selection)[part.slot] == part.index)
+            {
+                FrameProfiler::DrawArrays(GL_TRIANGLES, part.first, part.count);
+            }
+        }
+    }
     glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFramebuffer);
     glBlitFramebuffer(0, 0, 256, 320, 0, 0, 256, 320, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -529,6 +627,7 @@ bool CharacterModel::Draw(Renderer& renderer, Point feet, Color tint)
     glUseProgram(compositeProgram);
     glUniform2f(viewportUniform, float(state.viewport[2]), float(state.viewport[3]));
     glUniform2f(feetUniform, feet.x, feet.y);
+    glUniform1f(drawScaleUniform, height / (90.f * framing));
     glUniform4f(tintUniform, tint.r, tint.g, tint.b, tint.a);
     glUniform1i(linearUniform, renderer.IsHDRScene());
     glActiveTexture(GL_TEXTURE0);

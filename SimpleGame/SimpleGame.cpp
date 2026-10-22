@@ -11,6 +11,7 @@ but WITHOUT ANY WARRANTY.
 #include "Renderer.h"
 #include "Prototype.h"
 #include "FrameProfiler.h"
+#include "ModelIntegrationReview.h"
 #include <iostream>
 #include <memory>
 #include <windows.h>
@@ -156,6 +157,11 @@ void Close()
 
 int main(int argc, char** argv)
 {
+    const bool verifyModels = argc > 1 && std::strcmp(argv[1], "--verify-models") == 0;
+    if (verifyModels)
+    {
+        argc = 1;
+    }
     SetConsoleOutputCP(CP_UTF8);
     glutInit(&argc, argv);
     glutInitContextVersion(3, 3);
@@ -163,6 +169,10 @@ int main(int argc, char** argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(1280, 800);
     glutCreateWindow("2026GSE01");
+    if (verifyModels)
+    {
+        glutHideWindow();
+    }
     SetWindowTextW(WindowFromDC(wglGetCurrentDC()), L"주흔 — 잊힌 이름 | 2026GSE01 시제품");
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
     glewExperimental = GL_TRUE;
@@ -179,6 +189,13 @@ int main(int argc, char** argv)
         return 1;
     }
     game.reset(new Prototype(*renderer));
+    if (verifyModels)
+    {
+        const int result = ModelIntegrationReview::Run(*game);
+        game.reset();
+        renderer.reset();
+        return result;
+    }
     glutIgnoreKeyRepeat(1);
     glutDisplayFunc(Display);
     glutReshapeFunc(Reshape);

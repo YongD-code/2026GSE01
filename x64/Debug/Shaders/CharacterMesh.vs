@@ -6,6 +6,7 @@ layout(location = 3) in vec4 jointIndices;
 layout(location = 4) in vec4 weights;
 uniform mat4 bones[32];
 uniform vec2 heading;
+uniform float modelScale;
 out vec3 surfaceNormal;
 out vec4 baseColor;
 out vec3 worldPosition;
@@ -25,8 +26,8 @@ void main()
     vec2 screen =
         vec2(128, 280) + vec2(.85 * (worldPosition.x - worldPosition.y),
                               .43 * (worldPosition.x + worldPosition.y) - worldPosition.z) *
-                             2.0;
-    float depth = -dot(worldPosition, vec3(.603, .603, .519)) / 180.0;
+                             2.0 * modelScale;
+    float depth = -dot(worldPosition, vec3(.603, .603, .519)) * modelScale / 180.0;
     gl_Position = vec4(screen.x / 128.0 - 1, 1 - screen.y / 160.0, depth, 1);
     surfaceNormal = n;
     baseColor = color;

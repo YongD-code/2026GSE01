@@ -45,6 +45,7 @@ template <class Collision> Person NewPerson(int id, Collision blocked)
     person.id = id;
     person.district = InitialVillage(id);
     person.role = id % 10 >= 7 ? Hunter : id % 3;
+    person.appearance = NpcAppearance::Resident(person.id, person.role);
     const auto hash = World::Hash(id, person.district, seed);
     person.ambition = float(hash % 101) / 100;
     person.caution = float((hash >> 10) % 101) / 100;
@@ -98,6 +99,7 @@ template <class Collision> void RepairPlacement(Collision blocked)
     }
     for (auto& person : people)
     {
+        person.appearance = NpcAppearance::Resident(person.id, person.role);
         const auto* home = VillageLayout::Home(person.houseId);
         if (home)
         {

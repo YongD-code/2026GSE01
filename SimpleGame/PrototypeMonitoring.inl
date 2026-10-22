@@ -67,6 +67,13 @@ void PublishMonitoring()
     {
         return std::isfinite(value) ? std::to_string(value) : std::string("null");
     };
+    auto partIndices = [](const NpcAppearance::Definition& appearance)
+    {
+        const auto& p = appearance.partIndices;
+        return "{\"body\":" + std::to_string(p[0]) + ",\"hair\":" + std::to_string(p[1]) +
+               ",\"outfit\":" + std::to_string(p[2]) + ",\"accessory\":" + std::to_string(p[3]) +
+               "}";
+    };
     int activeNpc = 0, alive = 0, alerted = 0, weak = 0;
     int regionNpc[RegionCount] = {}, regionMonsters[RegionCount] = {},
         regionAlert[RegionCount] = {};
@@ -113,6 +120,7 @@ void PublishMonitoring()
                                                                                      : "inactive";
         npcs << "{\"id\":" << Monitoring::Quote(StoryLayout::NpcSprites()[index].id)
              << ",\"name\":" << Monitoring::Quote(first ? first->name : "미등록 NPC")
+             << ",\"part_indices\":" << partIndices(NpcAppearance::Story(index))
              << ",\"status\":" << Monitoring::Quote(status)
              << ",\"active\":" << (active ? "true" : "false")
              << ",\"home_region\":" << Monitoring::Quote(World::VillageId(0))
@@ -149,6 +157,7 @@ void PublishMonitoring()
         }
         npcs << "{\"id\":" << Monitoring::Quote("resident-" + std::to_string(npc.id))
              << ",\"name\":" << Monitoring::Quote(Population::Name(npc.id))
+             << ",\"part_indices\":" << partIndices(npc.appearance)
              << ",\"kind\":\"autonomous\",\"role\":"
              << Monitoring::Quote(Population::RoleId(npc.role))
              << ",\"role_name\":" << Monitoring::Quote(Population::RoleName(npc.role))
@@ -203,6 +212,12 @@ void PublishMonitoring()
                                                     std::to_string(enemy.camp.second) + "-" +
                                                     std::to_string(enemy.slot);
             monsters << "{\"id\":" << Monitoring::Quote(id) << ",\"type\":" << enemy.type
+                     << ",\"disposition\":"
+                     << Monitoring::Quote(SpiritCatalog::Get(enemy.type).disposition)
+                     << ",\"gait\":"
+                     << Monitoring::Quote(SpiritCatalog::Get(enemy.type).gait == 2   ? "quadruped"
+                                          : SpiritCatalog::Get(enemy.type).gait == 1 ? "biped"
+                                                                                     : "hover")
                      << ",\"boss\":" << enemy.boss << ",\"species_name\":"
                      << Monitoring::Quote(enemy.boss ? StoryEncounter::Get(enemy.boss).name
                                                      : SpiritName(enemy.type))

@@ -422,11 +422,13 @@ bool Prototype::StoryPersonVisible(const StoryLayout::Site& site, WorldPoint pos
 {
     return site.kind != StoryLayout::Kind::Evidence && StoryLayout::Visible(site, chapter) &&
            site.spriteIndex >= 0 && site.spriteIndex < StoryLayout::NpcCount &&
-           storyNpcSheets[site.spriteIndex].Ready() &&
+           (npcModel.Ready() || storyNpcSheets[site.spriteIndex].Ready()) &&
            CharacterInView(position, StoryLayout::PersonHeight(site));
 }
 
-void Prototype::StoryPerson(const StoryLayout::Site& site, WorldPoint position)
+void Prototype::StoryPerson(const StoryLayout::Site& site,
+                            WorldPoint position,
+                            CharacterModel::State* state)
 {
     const int index = site.spriteIndex;
 
@@ -446,6 +448,18 @@ void Prototype::StoryPerson(const StoryLayout::Site& site, WorldPoint position)
 
     const bool childPortrait = site.kind == StoryLayout::Kind::Child;
     r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
+    if (DrawKeyedModel(npcModel,
+                       p,
+                       78 * site.appearance.scale,
+                       animation,
+                       Color(1, 1, 1),
+                       CharacterModel::Motion::Idle,
+                       time * .75f + index * .11f,
+                       state,
+                       &site.appearance.partIndices))
+    {
+        return;
+    }
     storyNpcSheets[index].Draw(
         r, p, StoryLayout::PersonHeight(site), animation, Color(1, 1, 1), width, height);
 }
@@ -531,19 +545,60 @@ void Prototype::DrawWorldLabel(WorldPoint position,
     r.Text(box.x + 6, box.y + 17, text, color);
 }
 
+bool Prototype::DrawKeyedModel(CharacterModel& model,
+                               Point feet,
+                               float size,
+                               SpriteAnimation animation,
+                               Color tint,
+                               CharacterModel::Motion motion,
+                               float phase,
+                               CharacterModel::State* state,
+                               const CharacterModel::Parts* parts)
+{
+    if (!model.Ready())
+    {
+        return false;
+    }
+    CharacterModel::State preview;
+    auto& pose = state ? *state : preview;
+    const float facing = CharacterFacing(animation.facing);
+    if (pose.owner != &model)
+    {
+        model.Reset(pose, facing);
+    }
+    const float dt = pose.clock < 0 ? .05f : (std::max)(0.f, (std::min)(.05f, time - pose.clock));
+    pose.clock = time;
+    model.Animate(pose, pauseMenu || journal ? 0 : dt, motion, phase, facing);
+    return model.Draw(r, feet, tint, pose, size, parts);
+}
+
 bool Prototype::DrawSpiritModel(int species,
                                 Point feet,
                                 float size,
                                 SpriteAnimation animation,
                                 Color tint,
                                 float motionClock,
-                                float castProgress)
+                                float castProgress,
+                                CharacterModel::State* state,
+                                bool running)
 {
     if (!UsingSpiritModel(species))
     {
         return false;
     }
     const bool casting = castProgress >= 0;
+    if (spiritMeshes[species].Ready())
+    {
+        const auto motion = casting             ? CharacterModel::Motion::Cast
+                            : !animation.moving ? CharacterModel::Motion::Idle
+                            : running           ? CharacterModel::Motion::Run
+                                                : CharacterModel::Motion::Walk;
+        const float phase = casting            ? castProgress
+                            : animation.moving ? animation.phase * .25f
+                                               : motionClock * .75f;
+        return DrawKeyedModel(
+            spiritMeshes[species], feet, size, animation, tint, motion, phase, state);
+    }
     const int first = casting            ? SpiritAppearance::CastFirst
                       : animation.moving ? SpiritAppearance::GlideFirst
                                          : SpiritAppearance::IdleFirst;
@@ -569,7 +624,7 @@ bool Prototype::DrawSpiritModel(int species,
     return true;
 }
 
-void Prototype::Wisp(int type, WorldPoint position)
+void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state)
 {
     Point p = Screen(position.x, position.y);
     if (p.x < -100 || p.x > width + 100 || p.y < -50 || p.y > height + 130)
@@ -592,8 +647,15 @@ void Prototype::Wisp(int type, WorldPoint position)
         castProgress =
             controlling && PreparingSkill() ? .45f : 1.f - (std::min)(1.f, spiritCastPose / .55f);
     }
-    if (DrawSpiritModel(
-            type, p, SpiritCatalog::Get(type).size, animation, Color(1, 1, 1), time, castProgress))
+    if (DrawSpiritModel(type,
+                        p,
+                        SpiritCatalog::Get(type).size,
+                        animation,
+                        Color(1, 1, 1),
+                        time,
+                        castProgress,
+                        state,
+                        controlling && requestedSprint))
     {
         return;
     }
@@ -620,7 +682,7 @@ void Prototype::Wisp(int type, WorldPoint position)
         r.Ellipse(p.x, p.y - 25, 12, 18, Color(.4f, .7f, .8f));
 }
 
-void Prototype::DrawEnemy(const EnemyVisual& enemy)
+void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state)
 {
     Point p = Screen(enemy.position.x, enemy.position.y);
     if (!enemy.weakened && enemy.flash > 0)
@@ -643,8 +705,14 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
         r.Ellipse(p.x, p.y, 20, 7, Color(.3f, .8f, .75f, .18f * fade));
         SpriteAnimation remnant = enemy.animation;
         remnant.moving = false;
-        if (DrawSpiritModel(
-                enemy.type, {p.x, p.y - 8}, 55, remnant, Color(.65f, 1, .9f, .6f * fade), time))
+        if (DrawSpiritModel(enemy.type,
+                            {p.x, p.y - 8},
+                            55,
+                            remnant,
+                            Color(.65f, 1, .9f, .6f * fade),
+                            time,
+                            -1,
+                            state))
         {
             return;
         }
@@ -675,7 +743,9 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy)
                              enemy.animation,
                              Color(1, 1, 1),
                              time + float(enemy.position.x * .01),
-                             enemy.castPose > 0 ? .25f + .5f * enemy.castPose : -1.f))
+                             enemy.castPose > 0 ? .25f + .5f * enemy.castPose : -1.f,
+                             state,
+                             enemy.running))
     {
         // Health bars and alerts below still belong to the existing enemy Actor.
     }

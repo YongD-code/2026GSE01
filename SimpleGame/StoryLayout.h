@@ -1,5 +1,6 @@
 #pragma once
 #include "Chapter.h"
+#include "NpcAppearance.h"
 #include <array>
 
 namespace StoryLayout
@@ -55,6 +56,7 @@ struct Site
     WorldPoint position;
     std::string from, until;
     int spriteIndex = NpcSpriteIndex(id);
+    NpcAppearance::Definition appearance = NpcAppearance::Story(spriteIndex);
 };
 
 inline const std::vector<Site>& Sites()
@@ -92,7 +94,7 @@ inline bool Visible(const Site& site, const Chapter& chapter)
 
 inline float PersonHeight(const Site& site)
 {
-    return site.kind == Kind::Child ? 55.f : 78.f;
+    return 78.f * site.appearance.scale;
 }
 
 inline const std::vector<WorldObject>& Buildings()

@@ -16,8 +16,8 @@ void ToggleGathererStudy()
     FrameProfiler::Event("gatherer_render_mode", useGathererStudy ? "volume_atlas" : "original", 0);
     Say("채집꾼 외형",
         useGathererStudy
-            ? "1차 보행 후보로 전환했습니다. 정교화 후보는 아직 게임에 적용하지 않았습니다."
-            : "기존 채집꾼 외형으로 전환했습니다. 게임 중 N으로 비교할 수 있습니다.");
+            ? "이전 채집꾼 보행 원화로 전환했습니다. N으로 조합형 모델과 비교할 수 있습니다."
+            : "조합형 NPC 입체 모델로 전환했습니다. 게임 중 N으로 비교할 수 있습니다.");
 }
 
 bool ResidentQuestTarget(int id) const
@@ -39,7 +39,8 @@ bool ResidentVisible(const Population::Person& person) const
     {
         return false;
     }
-    return (useGathererStudy && person.role == Population::Farmer && gathererSheet.Ready()) ||
+    return npcModel.Ready() ||
+           (useGathererStudy && person.role == Population::Farmer && gathererSheet.Ready()) ||
            (person.animation.moving && populationWalkSheets[person.role].Ready()) ||
            populationSheets[person.role].Ready();
 }
@@ -236,7 +237,7 @@ std::string HomeOccupant(const VillageLayout::House& house) const
     return address + "빈집";
 }
 
-void DrawResident(const Population::Person& person)
+void DrawResident(const Population::Person& person, CharacterModel::State* state)
 {
     if (!ResidentVisible(person))
     {
@@ -257,8 +258,24 @@ void DrawResident(const Population::Person& person)
         // Population's distance-driven cycle has eight phases; this atlas has 32 poses.
         animation.phase *= float(gathererSheet.WalkFrameCount()) / 8.f;
     }
-    sheet.Draw(
-        r, p, 67, animation, Color(shade, 1.f, .94f + (person.id % 3) * .02f), width, height);
+    const bool running = person.action == Population::Fleeing;
+    const auto motion = !animation.moving ? CharacterModel::Motion::Idle
+                        : running         ? CharacterModel::Motion::Run
+                                          : CharacterModel::Motion::Walk;
+    const Color tint(shade, 1.f, .94f + (person.id % 3) * .02f);
+    if (study || !DrawKeyedModel(npcModel,
+                                 p,
+                                 67 * person.appearance.scale,
+                                 animation,
+                                 tint,
+                                 motion,
+                                 animation.moving ? person.animation.phase / 8.f
+                                                  : time * .75f + person.id * .17f,
+                                 state,
+                                 &person.appearance.partIndices))
+    {
+        sheet.Draw(r, p, 67, animation, tint, width, height);
+    }
     if (person.action == Population::Fighting && person.attackWait > .85f)
     {
         const float glow = (person.attackWait - .85f) / .25f;

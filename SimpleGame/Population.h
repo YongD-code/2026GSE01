@@ -3,6 +3,8 @@
 #include "SpriteSheet.h"
 #include "ClickNavigation.h"
 #include "VillageLayout.h"
+#include "NpcAppearance.h"
+#include "SpiritCatalog.h"
 #include <array>
 #include <string>
 #include <vector>
@@ -74,6 +76,7 @@ class Population
         std::vector<WorldPoint> route;
         size_t waypoint = 0;
         SpriteAnimation animation;
+        NpcAppearance::Definition appearance;
         int houseId = -1, reservedHouse = -1, migrationVillage = -1, mailId = -1;
         float ambition = .5f, caution = .5f, sociability = .5f, migrationWait = 90;
         unsigned migrations = 0;
@@ -334,7 +337,7 @@ class Population
                 {
                     const auto& enemy = level.enemies[i];
                     if (enemy.boss != 0 || enemy.weakened || enemy.returning || enemy.health <= 0 ||
-                        TownInterior(enemy.position))
+                        TownInterior(enemy.position) || enemy.type == SpiritCatalog::Stag)
                         continue;
                     const double d = Level::Distance(p.position, enemy.position);
                     if (d < danger)

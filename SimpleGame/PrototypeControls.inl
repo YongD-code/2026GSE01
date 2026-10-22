@@ -276,7 +276,7 @@ void ToggleSpiritModels()
     bool ready = false;
     for (int species = 0; species < SpiritCatalog::Count; ++species)
     {
-        ready = ready || spiritModelSheets[species].Ready();
+        ready = ready || spiritMeshes[species].Ready() || spiritModelSheets[species].Ready();
     }
     if (!ready)
     {
@@ -333,9 +333,7 @@ bool ControlsActive() const
 
 int SkillSet() const
 {
-    return captured && controlling
-               ? 1 + (std::max)(0, (std::min)(int(SpiritCatalog::Count) - 1, capturedSpirit))
-               : 0;
+    return captured && controlling ? 1 + SpiritCatalog::Get(capturedSpirit).skillSpecies : 0;
 }
 
 const char* SkillName(int set, int slot) const

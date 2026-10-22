@@ -50,11 +50,15 @@ def influences(obj, co):
     if 'HAIR_' in name or 'RIBBON_' in name:
         return {'head': 1.0}
     if 'ACCESSORY_' in name:
-        if any(t in name for t in ('BOW_', 'HAMMER_', 'STAFF_')):
+        if 'BOW_' in name:
+            return {'spine': 1.0} if x < .1 else {'hand.R': 1.0}
+        if any(t in name for t in ('HAMMER_', 'STAFF_')):
             return {'hand.R': 1.0}
         if 'LEDGER_' in name:
             return {'hand.L': 1.0}
         if 'SCARF_' in name or 'SEAL_' in name:
+            return {'spine': 1.0}
+        if 'SATCHEL_' in name and z > 1.15:
             return {'spine': 1.0}
         return {'hips': 1.0}
     if z > 1.73:

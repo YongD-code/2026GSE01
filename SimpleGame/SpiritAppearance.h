@@ -28,6 +28,6 @@ inline const Definition& Get(int species)
         {L"Assets/Spirits/Models/hands.png", 0.937500000f, 0.609375000f, 1.600000000f},
         {L"Assets/Spirits/Models/saint.png", 0.906250000f, 0.789062500f, 2.000000000f},
     }};
-    return definitions[species >= 0 && species < SpiritCatalog::Count ? species : 0];
+    return definitions[species >= 0 && species < SpiritCatalog::Eater ? species : 0];
 }
 } // namespace SpiritAppearance

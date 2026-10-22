@@ -234,6 +234,18 @@ void Prototype::SynchronizeScene()
         actor.depthOffset = data.w + data.d;
     };
 
+    auto modelBind = [this](const std::string& id,
+                            const std::string& parent,
+                            WorldPoint position,
+                            std::function<void(const Actor&)> draw) -> ModelActor&
+    {
+        auto& actor = scene.Ensure<ModelActor>(id, parent);
+        actor.SetWorldPosition({position.x, position.y, 0});
+        actor.layer = ActorLayer::Character;
+        actor.draw = std::move(draw);
+        return actor;
+    };
+
     for (size_t i = 0; i < villageObjects.size(); ++i)
         object("village/object/" + std::to_string(i), "village", villageObjects[i]);
     for (const auto& building : StoryLayout::Buildings())
@@ -426,23 +438,31 @@ void Prototype::SynchronizeScene()
         {
             continue;
         }
-        bind(bodyId,
-             "story",
-             site.position,
-             site.kind == StoryLayout::Kind::Evidence ? ActorLayer::World : ActorLayer::Character,
-             [this, site](const Actor& node)
-             {
-                 const auto pos = node.WorldPosition();
-                 const WorldPoint at = {pos.x, pos.y};
-                 if (site.kind != StoryLayout::Kind::Evidence)
+        if (site.kind == StoryLayout::Kind::Evidence)
+        {
+            bind(bodyId,
+                 "story",
+                 site.position,
+                 ActorLayer::World,
+                 [this, site](const Actor& node)
                  {
-                     StoryPerson(site, at);
-                 }
-                 else
-                 {
-                     StoryProp(site, at);
-                 }
-             });
+                     const auto pos = node.WorldPosition();
+                     StoryProp(site, {pos.x, pos.y});
+                 });
+        }
+        else
+        {
+            modelBind(bodyId,
+                      "story",
+                      site.position,
+                      [this, site](const Actor& node)
+                      {
+                          const auto pos = node.WorldPosition();
+                          StoryPerson(site,
+                                      {pos.x, pos.y},
+                                      &static_cast<const ModelActor&>(node).modelState);
+                      });
+        }
         bind(
             "story-label/" + site.id,
             bodyId,
@@ -470,14 +490,14 @@ void Prototype::SynchronizeScene()
         if (!ResidentVisible(person))
             continue;
         const std::string id = "residents/" + std::to_string(person.id);
-        bind(id,
-             "residents",
-             person.position,
-             ActorLayer::Character,
-             [this, i](const Actor&)
-             {
-                 DrawResident(population.people[i]);
-             });
+        modelBind(id,
+                  "residents",
+                  person.position,
+                  [this, i](const Actor& node)
+                  {
+                      DrawResident(population.people[i],
+                                   &static_cast<const ModelActor&>(node).modelState);
+                  });
         if (ResidentNameVisible(person))
             bind(id + "/label",
                  id,
@@ -495,15 +515,15 @@ void Prototype::SynchronizeScene()
                  });
     }
     if (captured)
-        bind("characters/companion",
-             "characters",
-             spirit,
-             ActorLayer::Character,
-             [this](const Actor& node)
-             {
-                 const auto p = node.WorldPosition();
-                 Wisp(capturedSpirit, {p.x, p.y});
-             });
+        modelBind(
+            "characters/companion",
+            "characters",
+            spirit,
+            [this](const Actor& node)
+            {
+                const auto p = node.WorldPosition();
+                Wisp(capturedSpirit, {p.x, p.y}, &static_cast<const ModelActor&>(node).modelState);
+            });
 
     for (const auto& enemy : levelOne.enemies)
     {
@@ -532,16 +552,16 @@ void Prototype::SynchronizeScene()
         visual.alerted = enemy.alerted;
         visual.weakened = enemy.weakened;
         visual.remnantTime = enemy.remnantTime;
-        bind(id,
-             "enemies",
-             enemy.position,
-             ActorLayer::Character,
-             [this, visual](const Actor& node) mutable
-             {
-                 const auto p = node.WorldPosition();
-                 visual.position = {p.x, p.y};
-                 DrawEnemy(visual);
-             });
+        visual.running = enemy.running;
+        modelBind(id,
+                  "enemies",
+                  enemy.position,
+                  [this, visual](const Actor& node) mutable
+                  {
+                      const auto p = node.WorldPosition();
+                      visual.position = {p.x, p.y};
+                      DrawEnemy(visual, &static_cast<const ModelActor&>(node).modelState);
+                  });
         if (enemy.boss > 0)
         {
             const auto& encounter = StoryEncounter::Get(enemy.boss);

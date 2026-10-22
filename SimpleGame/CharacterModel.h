@@ -12,7 +12,28 @@ class CharacterModel
         Idle,
         Walk,
         Run,
-        Cast
+        Cast,
+        Jump,
+        TurnLeft,
+        TurnRight,
+        Attack,
+        Count
+    };
+
+    using Matrix = std::array<float, 16>;
+    using Pose = std::array<float, 10>;
+    using Parts = std::array<int, 4>;
+
+    // Only pose data belongs to an Actor. Geometry, shaders and targets are shared.
+    struct State
+    {
+        const CharacterModel* owner = nullptr;
+        std::vector<Pose> pose, transitionFrom;
+        std::vector<Matrix> skin;
+        Motion motion = Motion::Idle;
+        float yaw = 2.35619449f, transition = 1, clock = -1;
+        float turnAge = 1;
+        Motion turn = Motion::TurnLeft;
     };
 
     CharacterModel() = default;
@@ -25,11 +46,16 @@ class CharacterModel
     void Reset(float facing = 2.35619449f);
     void Animate(float dt, Motion motion, float phase, float facing);
     bool Draw(Renderer& renderer, Point feet, Color tint);
+    void Reset(State& state, float facing);
+    void Animate(State& state, float dt, Motion motion, float phase, float facing);
+    bool Draw(Renderer& renderer,
+              Point feet,
+              Color tint,
+              const State& state,
+              float height,
+              const Parts* parts = nullptr);
 
   private:
-    using Matrix = std::array<float, 16>;
-    using Pose = std::array<float, 10>;
-
     struct Joint
     {
         int parent = -1;
@@ -43,17 +69,25 @@ class CharacterModel
     };
 
     std::vector<Joint> joints;
-    std::array<Clip, 4> clips;
-    std::vector<Pose> pose, transitionFrom;
-    std::vector<Matrix> skin;
-    Motion motion = Motion::Idle;
-    float yaw = 2.35619449f, transition = 1;
+
+    struct MeshPart
+    {
+        int slot = -1, index = 0;
+        unsigned first = 0, count = 0;
+    };
+
+    std::array<Clip, static_cast<size_t>(Motion::Count)> clips;
+    std::vector<MeshPart> parts;
+    State defaultState;
+    float framing = 1;
     GLsizei vertexCount = 0;
     GLuint vao = 0, buffer = 0, meshProgram = 0, compositeProgram = 0;
     GLuint framebuffer = 0, colorBuffer = 0, depthBuffer = 0;
     GLuint resolveFramebuffer = 0, image = 0;
     GLint bonesUniform = -1, yawUniform = -1, viewportUniform = -1;
     GLint feetUniform = -1, tintUniform = -1, linearUniform = -1;
+    GLint framingUniform = -1, drawScaleUniform = -1;
+    GLint styleUniform = -1;
 
     bool CreateTargets();
     void Release();
@@ -61,5 +95,5 @@ class CharacterModel
     static Pose Blend(const Pose& a, const Pose& b, float weight);
     static Matrix Transform(const Pose& pose);
     static Matrix Multiply(const Matrix& a, const Matrix& b);
-    void UpdateSkin();
+    void UpdateSkin(State& state) const;
 };

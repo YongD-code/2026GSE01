@@ -25,6 +25,7 @@ class LevelOne
         World::Key camp = {0, 0};
         int slot = 0;
         bool alerted = false, returning = false;
+        bool running = false;
         std::vector<WorldPoint> trail;
         bool weakened = false;
         float remnantTime = -2;
@@ -864,8 +865,16 @@ class LevelOne
                 {
                     enemy.type = SpiritCatalog::Saint;
                 }
+                else if (std::hypot(home.x, home.y) > 800 && ((hash >> (slot * 8 + 2)) % 4) == 0)
+                {
+                    const int added[] = {
+                        SpiritCatalog::Eater, SpiritCatalog::Stag, SpiritCatalog::Hound};
+                    enemy.type = added[(hash >> (slot * 8 + 16)) % 3];
+                }
                 enemy.maximum = SpiritCatalog::Get(enemy.type).health;
-                enemy.health = record.health[slot] < 0 ? enemy.maximum : record.health[slot];
+                enemy.health = record.health[slot] < 0
+                                   ? enemy.maximum
+                                   : (std::min)(enemy.maximum, record.health[slot]);
                 enemy.weakened = false;
                 enemies.push_back(enemy);
             }
@@ -875,13 +884,14 @@ class LevelOne
     template <class Collision>
     void AttackEnemy(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
     {
+        const int attackType = SpiritCatalog::Get(enemy.type).combatType;
         enemy.stagger = (std::max)(0.f, enemy.stagger - dt);
         enemy.staggerGuard = (std::max)(0.f, enemy.staggerGuard - dt);
         if (enemy.stagger > 0)
             return;
         enemy.phaseTime -= dt;
         const double distance = Distance(enemy.position, player);
-        if (enemy.type == SpiritCatalog::Saint)
+        if (attackType == 3)
         {
             if (enemy.phase == 3)
             {
@@ -955,7 +965,7 @@ class LevelOne
         }
         if (enemy.phase == 3)
         {
-            if (enemy.type == 2 && distance > 1)
+            if (attackType == 2 && distance > 1)
             {
                 const double dx = (player.x - enemy.position.x) / distance,
                              dy = (player.y - enemy.position.y) / distance;
@@ -1008,13 +1018,13 @@ class LevelOne
         {
             if (enemy.phaseTime > 0)
                 return;
-            if (enemy.type == 1)
+            if (attackType == 1)
             {
                 enemy.phase = 2;
                 enemy.phaseTime = .48f;
                 return;
             }
-            if (enemy.type == 0)
+            if (attackType == 0)
             {
                 const double dx = player.x - enemy.position.x, dy = player.y - enemy.position.y;
                 if (distance < 85 && (dx * enemy.aim.x + dy * enemy.aim.y) >= distance * .35 &&
@@ -1036,19 +1046,19 @@ class LevelOne
                 }
             }
             enemy.phase = 3;
-            enemy.phaseTime = enemy.type == 0 ? .65f : 1.35f;
+            enemy.phaseTime = attackType == 0 ? .65f : 1.35f;
             return;
         }
-        const double range = enemy.type == 0 ? 72 : (enemy.type == 1 ? 290 : 380);
+        const double range = attackType == 0 ? 72 : (attackType == 1 ? 290 : 380);
         if (distance < range && ClearLine(enemy.position, player, blocked))
         {
             const double length = (std::max)(.001, distance);
             enemy.aim = {(player.x - enemy.position.x) / length,
                          (player.y - enemy.position.y) / length};
             enemy.phase = 1;
-            enemy.phaseTime = enemy.type == 0
+            enemy.phaseTime = attackType == 0
                                   ? combat.meleeWindup
-                                  : (enemy.type == 1 ? combat.chargeWindup : combat.rangedWindup);
+                                  : (attackType == 1 ? combat.chargeWindup : combat.rangedWindup);
             return;
         }
         if (distance > 62)
@@ -1212,6 +1222,37 @@ class LevelOne
             const float enemyDt = enemy.simulationTime;
             enemy.simulationTime = 0;
             const WorldPoint previous = enemy.position;
+            if (enemy.boss == 0 && SpiritCatalog::Get(enemy.type).passive)
+            {
+                enemy.alerted = enemy.returning = false;
+                enemy.phase = 0;
+                enemy.npcTarget = enemy.residentTargetIndex = -1;
+                enemy.phaseTime = std::fmod((std::max)(0.f, enemy.phaseTime) + enemyDt, 24.f);
+                const double angle = enemy.phaseTime * 6.283185307 / 24 + enemy.slot * 1.7;
+                WorldPoint goal = {enemy.home.x + std::cos(angle) * 70,
+                                   enemy.home.y + std::sin(angle) * 70};
+                const double nearby = Distance(enemy.position, combatTarget);
+                enemy.running = nearby < 100;
+                if (enemy.running && nearby > .01 && Distance(enemy.position, enemy.home) < 180)
+                {
+                    goal = {enemy.position.x + (enemy.position.x - combatTarget.x) / nearby * 80,
+                            enemy.position.y + (enemy.position.y - combatTarget.y) / nearby * 80};
+                }
+                const double travel = Distance(enemy.position, goal);
+                if (travel > 1)
+                {
+                    const double step =
+                        (std::min)(travel, double(enemy.running ? 95 : 38) * enemyDt);
+                    Move(enemy.position,
+                         {(goal.x - enemy.position.x) / travel * step,
+                          (goal.y - enemy.position.y) / travel * step},
+                         blocked);
+                }
+                const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
+                enemy.animation.Update(
+                    (ax - ay) * .85, (ax + ay) * .43, enemyDt, enemy.running, 9.f);
+                continue;
+            }
             WorldPoint enemyTarget = combatTarget;
             damageResident = ResidentTarget(enemy, combatTarget, enemyDt, blocked);
             if (damageResident >= 0)
@@ -1270,6 +1311,7 @@ class LevelOne
                 for (size_t i = previousProjectiles; i < projectiles.size(); ++i)
                     projectiles[i].residentBattle = true;
             const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
+            enemy.running = std::hypot(ax, ay) > 75 * enemyDt;
             const float authoredStride = StoryEncounter::Get(enemy.boss).walkFrameDistance;
             enemy.animation.Update((ax - ay) * .85,
                                    (ax + ay) * .43,
