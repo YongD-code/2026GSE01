@@ -6,9 +6,13 @@ Run with Blender 5.2:
 
 import json
 import math
+import sys
 from pathlib import Path
 
 import bpy
+
+sys.modules.setdefault('create_collection', sys.modules[__name__])
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 OUT = Path(__file__).resolve().parent
@@ -31,7 +35,8 @@ COLORS = {
     "gold": (.64, .48, .23, 1), "paper": (.82, .75, .58, 1),
     "leaf": (.24, .34, .24, 1), "leaf_light": (.37, .45, .29, 1),
     "leaf_dead": (.42, .35, .24, 1), "grass": (.33, .43, .24, 1),
-    "shadow": (.11, .11, .12, 1),
+    "shadow": (.012, .014, .019, 1),
+    "eye_white": (.72, .68, .58, 1), "skin_shadow": (.25, .105, .07, 1),
 }
 
 
@@ -44,7 +49,12 @@ def material(key):
     mat.use_nodes = True
     node = mat.node_tree.nodes.get("Principled BSDF")
     node.inputs["Base Color"].default_value = COLORS[key]
-    node.inputs["Roughness"].default_value = .82
+    metal = key in ('iron', 'gold')
+    node.inputs["Roughness"].default_value = .38 if metal else .60 if 'hair' in key else .78
+    node.inputs["Metallic"].default_value = .72 if metal else 0
+    if key in ('tear_blue', 'stag_glow', 'hound_red'):
+        node.inputs['Emission Color'].default_value = COLORS[key]
+        node.inputs['Emission Strength'].default_value = .35
     return mat
 
 
@@ -136,90 +146,30 @@ def start_collection(name):
     bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_collection.children[col.name]
 
 
-def body(name, female, index):
-    skin = "skin_light" if female else "skin"
-    # Three-head proportion: 2.4 m total, with a 0.78 m head.
-    ico((0, 0, 1.96), (.33 if female else .35, .29, .39), skin, 2)
-    ico((0, 0, 1.42), (.23 if female else .27, .17, .31), skin)
-    cylinder((0, 0, 1.62), .10, .15, skin)
-    for sign in (-1, 1):
-        ico((sign * .43, 0, 1.28), (.10, .10, .31), skin)
-        ico((sign * .43, -.015, .96), (.095, .09, .11), skin)
-        ico((sign * .15, 0, .55), (.11, .12, .43), skin)
-        ico((sign * .15, -.07, .15), (.13, .19, .12), "leather")
-        ico((sign * .115, -.279, 2.00), (.034, .019, .026), "eye")
-        ico((sign * .32, 0, 1.96), (.07, .07, .11), skin)
-    ico((0, -.293, 1.89), (.045, .035, .035), skin)
-    finish(name, "body", index, PARTS)
-
-
-def hair(name, kind, color, index):
-    # Open-front cap preserves the large, readable face.
-    ico((0, .045, 2.245), (.35, .31, .20), color, 1)
-    for x, z in ((-.23, 2.24), (-.09, 2.31), (.08, 2.29), (.23, 2.22)):
-        ico((x, -.235, z), (.115, .095, .10), color)
-    if kind in ("short", "tousled"):
-        for x, y, z in ((-.27, .0, 2.34), (.02, .1, 2.39), (.24, .1, 2.32)):
-            cone((x, y, z), .085, 0, .22, color, 5)
-    if kind in ("bob", "long", "braid", "bun"):
-        for s in (-1, 1):
-            ico((s * .30, .025, 2.00), (.10, .17, .26 if kind == "bob" else .38), color)
-    if kind in ("long", "braid"):
-        ico((0, .20, 1.74), (.24, .115, .42), color)
-    if kind == "braid":
-        for z, r in ((1.85, .105), (1.70, .09), (1.55, .07)):
-            ico((.19, .30, z), (r, r, .105), color)
-        cone((.19, .30, 1.46), .065, 0, .18, color, 5)
-    if kind == "bun":
-        ico((0, .30, 2.15), (.18, .16, .17), color)
-    finish(name, "hair", index, PARTS)
-
-
-def clothing(name, kind, base, trim, index):
-    # Garments use the same attachment coordinates on both body meshes.
-    ico((0, 0, 1.34), (.32, .235, .39), base, 1)
-    for s in (-1, 1):
-        ico((s * .42, 0, 1.34), (.145, .14, .27), base)
-        ico((s * .15, 0, .60), (.15, .15, .36), base)
-        ico((s * .15, -.065, .20), (.16, .20, .16), "leather")
-    cylinder((0, 0, 1.00), .30, .12, trim)
-    if kind in ("tunic", "traveller", "ragged"):
-        cone((0, 0, .98), .37, .25, .43, base)
-    if kind == "apron":
-        cube((0, -.248, 1.08), (.40, .035, .83), "leather")
-        cube((0, -.27, 1.43), (.30, .035, .11), trim)
-    if kind == "armor":
-        ico((0, -.18, 1.38), (.285, .12, .30), "iron")
-        for s in (-1, 1):
-            ico((s * .36, 0, 1.56), (.18, .20, .115), "iron")
-            cube((s * .24, -.29, 1.35), (.075, .035, .25), "gold")
-    if kind == "archer":
-        cube((.16, -.29, 1.36), (.10, .035, .65), "leather", -.18)
-        ico((-.34, .13, 1.41), (.13, .18, .30), trim)
-    if kind == "ritual":
-        cone((0, 0, 1.02), .47, .29, .72, base, 10)
-        cube((0, -.305, 1.39), (.16, .03, .43), "paper")
-        cube((0, -.33, 1.43), (.025, .035, .27), trim)
-    if kind == "traveller":
-        ico((0, .24, 1.36), (.31, .17, .37), "leather")
-        cube((0, -.26, 1.59), (.50, .04, .10), trim)
-    if kind == "ragged":
-        for s in (-1, 1):
-            cube((s * .21, -.20, .78), (.17, .035, .39), "cloth_dark", s * .12)
-    finish(name, "outfit", index, PARTS)
+from character_shapes import body, hair, clothing
+import surface_forms as forms
 
 
 def accessory(name, kind, index):
     if kind == "satchel":
         cube((.38, .08, .91), (.25, .17, .30), "leather")
-        beam((-.23, -.25, 1.57), (.39, .07, 1.05), .025, "ochre")
+        forms.panel('bag_flap', [(.25, -.015, 1.08), (.51, -.015, 1.08),
+                                (.48, -.02, .97), (.28, -.02, .97)], 'wood_light')
+        cube((.38, -.03, .98), (.035, .018, .06), 'gold')
+        forms.ribbon('shoulder_strap', [(-.23, -.20, 1.57), (0, -.24, 1.31),
+                                        (.22, -.21, 1.11), (.39, -.03, 1.05)],
+                     [.045]*4, 'leather')
     elif kind == "bow":
-        beam((.47, .02, .80), (.63, .02, 1.70), .025, "wood")
-        beam((.47, .02, .80), (.57, -.03, 1.30), .009, "linen")
-        beam((.57, -.03, 1.30), (.63, .02, 1.70), .009, "linen")
+        forms.sweep('bow_limb', [(.50, .015, .77), (.65, .015, .90),
+                                (.73, .015, 1.15), (.73, .015, 1.38),
+                                (.65, .015, 1.63), (.50, .015, 1.77)],
+                    [.012, .018, .025, .025, .018, .012], 'wood', 8)
+        forms.line('bow_string', [(.50, .015, .77), (.50, .015, 1.77)], .003, 'linen')
         cylinder((-.35, .16, 1.42), .11, .46, "leather")
         for x in (-.40, -.35, -.30):
             beam((x, .16, 1.22), (x, .16, 1.85), .01, "wood")
+            forms.panel('arrow_feather', [(x, .16, 1.73), (x-.025, .16, 1.77),
+                                          (x-.025, .16, 1.84), (x, .16, 1.81)], 'linen', .003)
     elif kind == "hammer":
         beam((.48, -.01, .80), (.48, -.01, 1.61), .03, "wood")
         cube((.48, -.01, 1.58), (.39, .15, .14), "iron")
@@ -231,11 +181,15 @@ def accessory(name, kind, index):
         cube((-.43, -.12, 1.00), (.23, .06, .30), "leather")
         cube((-.43, -.155, 1.01), (.15, .013, .23), "paper")
     elif kind == "ribbon":
-        ico((.24, .27, 2.18), (.11, .035, .065), "red")
-        cube((.29, .28, 2.06), (.035, .02, .22), "red", -.13)
+        for s in (-1, 1):
+            forms.panel('ribbon_bow', [(.24, .31, 2.18), (.24+s*.12, .30, 2.25),
+                                       (.24+s*.11, .30, 2.12)], 'red', .008)
+        forms.ribbon('ribbon_tail', [(.24, .31, 2.18), (.28, .32, 2.05),
+                                    (.29, .31, 1.93)], [.045, .05, .025], 'red')
     elif kind == "scarf":
-        cylinder((0, 0, 1.61), .28, .11, "red")
-        cube((.21, -.23, 1.42), (.15, .04, .43), "red")
+        forms.loft('scarf_wrap', [(1.57, .16, .135), (1.64, .16, .13)], 'red', 16)
+        forms.ribbon('scarf_tail', [(.10, -.13, 1.62), (.19, -.22, 1.42),
+                                    (.22, -.24, 1.18)], [.13, .14, .12], 'red')
     elif kind == "tools":
         for x in (-.34, -.23):
             beam((x, -.15, .75), (x, -.14, 1.12), .018, "iron")
@@ -372,9 +326,10 @@ def nature_small(name, kind, index):
 
 def export_current(filepath):
     bpy.ops.object.select_all(action='SELECT')
-    bpy.ops.export_scene.gltf(filepath=str(filepath), export_format='GLB',
-                              use_selection=True, export_apply=True,
-                              export_extras=True)
+    with forms.export_materials():
+        bpy.ops.export_scene.gltf(filepath=str(filepath), export_format='GLB',
+                                  use_selection=True, export_apply=True,
+                                  export_extras=True)
 
 
 def write_catalog():
@@ -400,7 +355,9 @@ def write_catalog():
         "sceneryFile": "world_props.glb",
         "parts": {slot: [p for p in PARTS if p["slot"] == slot]
                   for slot in ("body", "hair", "outfit", "accessory")},
-        "scenery": SCENERY,
+        "scenery": SCENERY or json.loads((OUT / 'catalog.json').read_text(encoding='utf-8'))['scenery'],
+        "visualStyle": "authored low-poly silhouettes, smooth face planes, swept hair, tailored layers",
+        "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
         "npcs": [{"id": n, "label": label, "partIndices":
                   {"body": b, "hair": h, "outfit": o, "accessory": a},
                   "scale": scale, "storyRole": "story" if n not in
@@ -434,8 +391,13 @@ def main():
     for i, kind in enumerate(("satchel", "bow", "hammer", "seal", "ledger",
                               "ribbon", "scarf", "tools", "staff")):
         accessory(f"NPC_ACCESSORY_{kind.upper()}_{i:02d}", kind, i)
+    forms.stylize_scene()
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT / "npc_parts.blend"))
     export_current(OUT / "npc_parts.glb")
+
+    if '--npc-only' in sys.argv:
+        write_catalog()
+        return
 
     start_collection("WORLD_PROPS")
     for i, kind in enumerate(("home", "smithy", "shop")):

@@ -47,7 +47,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 52520
     },
     {
       "id": 1,
@@ -94,7 +96,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 32250
     },
     {
       "id": 2,
@@ -141,7 +145,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 21148
     },
     {
       "id": 3,
@@ -188,7 +194,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 52608
     },
     {
       "id": 4,
@@ -201,7 +209,7 @@
       "rig": "MOB_EATER_RIG",
       "source": null,
       "sourceSha256": null,
-      "meshCount": 11,
+      "meshCount": 12,
       "boneCount": 12,
       "clips": {
         "idle": {
@@ -240,7 +248,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 7748
     },
     {
       "id": 5,
@@ -292,7 +302,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 5300
     },
     {
       "id": 6,
@@ -344,7 +356,9 @@
           "loop": false
         }
       },
-      "turnStepDegrees": 45
+      "turnStepDegrees": 45,
+      "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
+      "triangles": 4660
     }
   ]
 }

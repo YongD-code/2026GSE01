@@ -15,6 +15,7 @@ import bpy
 
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(ROOT / 'Art/Blender/ModularCollection'))
 import create_collection as geom
@@ -39,14 +40,18 @@ bpy.context.preferences.filepaths.save_version = 0
 source_hash = hashlib.sha256(source.read_bytes()).hexdigest() if source else None
 
 PALETTE = {
-    'eater_skin': (.16, .17, .20, 1), 'eater_cloth': (.12, .14, .20, 1),
-    'tear_blue': (.08, .55, .67, 1), 'eater_bone': (.62, .64, .60, 1),
-    'stag_fur': (.35, .42, .34, 1), 'stag_light': (.59, .65, .47, 1),
-    'stag_horn': (.55, .43, .25, 1), 'stag_glow': (.44, .79, .69, 1),
-    'hound_hide': (.14, .13, .14, 1), 'hound_ash': (.30, .28, .28, 1),
-    'hound_red': (.62, .11, .08, 1), 'hound_teeth': (.76, .68, .54, 1),
+    'eater_skin': (.075, .09, .11, 1), 'eater_cloth': (.025, .037, .065, 1),
+    'eater_edge': (.12, .15, .18, 1),
+    'tear_blue': (.015, .36, .47, 1), 'eater_bone': (.59, .53, .42, 1),
+    'stag_fur': (.15, .205, .18, 1), 'stag_light': (.46, .45, .34, 1),
+    'stag_horn': (.19, .13, .075, 1), 'stag_glow': (.12, .49, .38, 1),
+    'stag_cloth': (.035, .11, .10, 1),
+    'hound_hide': (.027, .025, .030, 1), 'hound_ash': (.12, .105, .115, 1),
+    'hound_red': (.50, .055, .018, 1), 'hound_teeth': (.48, .40, .28, 1),
 }
 geom.COLORS.update(PALETTE)
+import spirit_shapes
+import surface_forms
 
 
 def add_bone(arm, name, head, tail, parent=None):
@@ -102,90 +107,11 @@ def bind(name, bone):
 
 
 def body_biped():
-    geom.ico((0, 0, 1.62), (.38, .27, .53), 'eater_skin', 2)
-    geom.cone((0, .03, 1.19), .48, .33, .82, 'eater_cloth', 9)
-    for x in (-.26, .26):
-        geom.beam((x, -.27, 1.92), (0, -.29, 1.29), .025, 'tear_blue')
-    bind('TORSO', 'body')
-    geom.ico((0, -.09, 2.22), (.34, .32, .39), 'eater_bone', 2)
-    geom.ico((0, -.38, 2.18), (.23, .045, .22), 'shadow')
-    for x in (-.13, .13):
-        geom.ico((x, -.405, 2.26), (.053, .025, .068), 'tear_blue')
-        geom.beam((x, -.410, 2.22), (x*.85, -.417, 2.00), .016, 'tear_blue')
-    for s in (-1, 1):
-        geom.cone((s*.29, -.02, 2.56), .09, 0, .32, 'eater_bone', 5)
-    bind('MASK_AND_TEARS', 'head')
-    for side, s in (('L', -1), ('R', 1)):
-        geom.ico((s*.49, -.02, 1.64), (.17, .17, .40), 'eater_cloth')
-        bind('SLEEVE_'+side, 'arm.'+side)
-        geom.beam((s*.60, -.10, 1.38), (s*.75, -.25, 1.00), .095, 'eater_skin')
-        for k in range(3):
-            geom.cone((s*(.68+k*.06), -.28, .95), .031, 0, .18, 'eater_bone', 5,
-                      (math.pi/2, 0, 0))
-        bind('CLAW_'+side, 'hand.'+side)
-        geom.ico((s*.20, 0, .82), (.18, .18, .39), 'eater_cloth')
-        bind('THIGH_'+side, 'leg.'+side)
-        geom.ico((s*.22, -.05, .35), (.14, .16, .34), 'eater_skin')
-        geom.ico((s*.22, -.19, .12), (.18, .25, .12), 'eater_bone')
-        bind('SHIN_'+side, 'foot.'+side)
-    for s in (-1, 1):
-        geom.mesh('torn_cloth', [(s*.11, .20, 1.84), (s*.41, .20, 1.80),
-                                 (s*.50, .27, .40), (s*.20, .29, .79)],
-                  [(0, 1, 2, 3)], 'eater_cloth')
-    bind('TORN_CLOAK', 'cloak')
+    spirit_shapes.eater(bind)
 
 
 def body_quad():
-    gentle = species == 'stag'
-    hide = 'stag_fur' if gentle else 'hound_hide'
-    light = 'stag_light' if gentle else 'hound_ash'
-    glow = 'stag_glow' if gentle else 'hound_red'
-    geom.ico((0, 0, 1.18), (.57, .90, .47), hide, 2)
-    geom.ico((0, -.55, 1.24), (.48, .38, .42), light)
-    if not gentle:
-        for x, y, z in ((-.28, .18, 1.56), (.25, -.38, 1.57),
-                        (-.25, -.57, 1.52), (.20, .60, 1.50)):
-            geom.cone((x, y, z), .16, 0, .35, light, 5)
-    else:
-        for x in (-.27, .27):
-            geom.beam((x, -.35, 1.46), (x*.7, -.72, 1.20), .022, glow)
-    bind('BODY', 'body')
-    geom.ico((0, -1.00, 1.52), (.36, .39, .35), hide, 2)
-    geom.ico((0, -1.30, 1.37), (.24, .30, .18), light)
-    for x in (-.17, .17):
-        geom.ico((x, -1.32, 1.60), (.045, .027, .048), glow)
-    if gentle:
-        geom.ico((0, -1.18, 1.45), (.085, .05, .07), 'stag_glow')
-        for s in (-1, 1):
-            geom.beam((s*.17, -.99, 1.78), (s*.36, -.95, 2.38), .045, 'stag_horn')
-            geom.beam((s*.31, -.96, 2.12), (s*.58, -.96, 2.28), .030, 'stag_horn')
-            geom.ico((s*.35, -.96, 2.37), (.08, .08, .08), 'stag_glow')
-        geom.cube((0, -1.39, 1.15), (.13, .05, .25), 'paper')
-    else:
-        geom.ico((0, -1.50, 1.36), (.27, .15, .12), 'shadow')
-        for x in (-.17, -.08, 0, .08, .17):
-            geom.cone((x, -1.55, 1.35), .035, 0, .12, 'hound_teeth', 5,
-                      (math.pi/2, 0, 0))
-        geom.beam((-.20, -1.31, 1.49), (.20, -1.31, 1.49), .019, 'hound_red')
-    bind('HEAD', 'head')
-    for side, s in (('L', -1), ('R', 1)):
-        geom.ico((s*.30, -1.01, 1.87), (.13, .16, .25), hide)
-        bind('EAR_'+side, 'ear.'+side)
-        for which, y in (('front', -.62), ('back', .58)):
-            geom.ico((s*.39, y, .75), (.17, .19, .39), hide)
-            bind(which.upper()+'_LEG_'+side, which+'.'+side)
-            geom.ico((s*.39, y-.08, .31), (.13, .14, .29), light)
-            geom.ico((s*.39, y-.19, .13), (.17, .23, .12),
-                     'stag_horn' if gentle else 'hound_hide')
-            bind(which.upper()+'_PAW_'+side, 'paw.'+which+'.'+side)
-    if gentle:
-        geom.cone((0, 1.10, 1.45), .16, 0, .72, light, 7,
-                  (math.pi/3, 0, 0))
-    else:
-        for x in (-.17, .0, .17):
-            geom.cone((x, 1.14, 1.38), .14, 0, .65, hide, 5,
-                      (math.pi/3, 0, 0))
-    bind('TAIL', 'tail')
+    spirit_shapes.quadruped(species, bind)
 
 
 parts = []
@@ -340,11 +266,27 @@ clips = {'idle': 32, 'walk': 24, 'run': 16, 'jump': 24,
          'turn_left': 12, 'turn_right': 12}
 if source is None:
     clips['attack'] = 18
+feet = [o for o in bpy.context.scene.objects if o.type == 'MESH'
+        and ('_SHIN_' in o.name or '_PAW_' in o.name)] if source is None else []
+
+
+def keep_feet_above_floor():
+    if not feet:
+        return
+    bpy.context.view_layer.update()
+    graph = bpy.context.evaluated_depsgraph_get()
+    lowest = min((evaluated.matrix_world @ v.co).z for obj in feet
+                 for evaluated in [obj.evaluated_get(graph)] for v in evaluated.data.vertices)
+    if lowest < .01:
+        rig.pose.bones['root'].location.y += .01-lowest
+
+
 for kind, end in clips.items():
     rig.animation_data_create()
     rig.animation_data.action = None
     for frame in range(1, end+2):
         pose(kind, (frame-1)/end)
+        keep_feet_above_floor()
         for bone in rig.pose.bones:
             bone.keyframe_insert('location', frame=frame, group=bone.name)
             bone.keyframe_insert('rotation_euler', frame=frame, group=bone.name)
@@ -357,16 +299,18 @@ for kind, end in clips.items():
 rig.animation_data.action = None
 clear_pose()
 
+surface_forms.stylize_scene()
 bpy.ops.wm.save_as_mainfile(filepath=str(destination/'model.blend'))
 bpy.ops.object.select_all(action='DESELECT')
 rig.select_set(True)
 for obj in bpy.context.scene.objects:
     if obj.type == 'MESH':
         obj.select_set(True)
-bpy.ops.export_scene.gltf(filepath=str(destination/'model.glb'),
-                          export_format='GLB', use_selection=True,
-                          export_animations=True, export_animation_mode='ACTIONS',
-                          export_extras=True)
+with surface_forms.export_materials():
+    bpy.ops.export_scene.gltf(filepath=str(destination/'model.glb'),
+                              export_format='GLB', use_selection=True,
+                              export_animations=True, export_animation_mode='ACTIONS',
+                              export_extras=True)
 if source and hashlib.sha256(source.read_bytes()).hexdigest() != source_hash:
     raise RuntimeError('Protected source model changed')
 catalog_path = HERE/'mob_catalog.json'
@@ -380,7 +324,9 @@ entry = {'id': species_id, 'key': species, 'name': label, 'disposition': disposi
          'clips': {name: {'firstFrame': 1, 'lastFrame': end+1,
                           'loop': name in ('idle', 'walk', 'run')}
                    for name, end in clips.items()},
-         'turnStepDegrees': 45}
+         'turnStepDegrees': 45,
+         'materialExport': 'PBR base colors; four-band lighting is authored in the blend source',
+         'triangles': sum(len(p.vertices)-2 for o in bpy.context.scene.objects if o.type == 'MESH' for p in o.data.polygons)}
 catalog['species'] = [e for e in catalog['species'] if e['id'] != species_id] + [entry]
 catalog['species'].sort(key=lambda e: e['id'])
 catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

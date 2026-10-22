@@ -2,6 +2,7 @@
 
 import json
 import math
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -42,13 +43,13 @@ for entry in mob_catalog['species']:
     mob_items.append((entry['key'], entry['name'],
                       terms[entry['disposition']]+' · '+gaits[entry['gait']]))
 board(mob_items, HERE/'Previews', HERE/'spirit_overview.png',
-      '주령 7종 · 3D 모델 미리보기', '기존 4종과 신규 3종 / 리그 원본의 대기 자세')
+      '주령 7종 · 3D 모델 미리보기', '가면 · 의례 장식 · 해진 천 / 같은 화면 여백으로 비교')
 
 npc_items = []
 for entry in npc_catalog['npcs']:
     npc_items.append((entry['id'], entry['label'], '조합형 NPC · 파츠 인덱스 보유'))
 board(npc_items, NPC/'Previews', NPC/'npc_overview.png',
-      '벨른 NPC 조합 미리보기', '남녀 몸 · 머리 · 의상 · 소품의 공용 파츠 조합')
+      '벨른 NPC 조합 미리보기', '3등신 · 25개 공용 파츠 / 얼굴 · 헤어 흐름 · 재단선 수정')
 
 prop_labels = {
     'BUILDING_HOME_00': '마을 집', 'BUILDING_SMITHY_01': '대장간',
@@ -64,3 +65,50 @@ prop_items = [(entry['mesh'].lower(), prop_labels[entry['mesh']],
               for entry in npc_catalog['scenery']]
 board(prop_items, NPC/'Previews', NPC/'environment_overview.png',
       '벨른 환경 3D 모델 미리보기', '건물 6종 · 자연물 8종')
+
+
+if '--before-dir' in sys.argv:
+    before = Path(sys.argv[sys.argv.index('--before-dir')+1])
+    # Historical renders are comparison inputs only; all after images are actual 3D renders.
+    def comparison(keys, labels, source, target, title):
+        width = 440*len(keys)
+        canvas = Image.new('RGBA', (width, 1260), (24, 34, 44, 255))
+        draw = ImageDraw.Draw(canvas)
+        draw.text((24, 16), title, font=title_font, fill='#f5ebd6')
+        for row, folder in enumerate((before, source)):
+            y = 100+row*580
+            for col, (key, label) in enumerate(zip(keys, labels)):
+                x = col*440
+                draw.rounded_rectangle((x+7, y+6, x+433, y+572), 17, fill='#23303a')
+                canvas.alpha_composite(Image.open(folder/(key+'.png')).convert('RGBA'), (x, y+14))
+                draw.text((x+20, y+475), label, font=label_font, fill='white')
+                draw.text((x+20, y+518), '수정 전' if row == 0 else '수정 후',
+                          font=small_font, fill='#bfd0d2')
+        canvas.convert('RGB').save(target)
+    comparison(['eater', 'stag', 'hound'], ['울음 먹는 자', '길지기 사슴', '재 먹는 들개'],
+               HERE/'Previews', HERE/'spirit_shape_comparison.png', '신규 주령 3종 · 형태 수정 전후')
+    # NPC uses a horizontal layout for a direct face / clothing comparison.
+    canvas = Image.new('RGBA', (880, 680), (24, 34, 44, 255))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((24, 17), '조합형 NPC · 형태 수정 전후', font=title_font, fill='#f5ebd6')
+    for col, folder in enumerate((before, NPC/'Previews')):
+        x = col*440
+        draw.rounded_rectangle((x+7, 106, x+433, 672), 17, fill='#23303a')
+        canvas.alpha_composite(Image.open(folder/'hunter.png').convert('RGBA'), (x, 114))
+        draw.text((x+20, 604), '수정 전' if col == 0 else '수정 후', font=label_font, fill='white')
+    canvas.convert('RGB').save(NPC/'npc_shape_comparison.png')
+
+
+if '--motion-dir' in sys.argv:
+    folder = Path(sys.argv[sys.argv.index('--motion-dir')+1])
+    for key in ('hunter_walk', 'eater_run', 'stag_walk', 'hound_run'):
+        frames = []
+        for path in sorted((folder/key).glob('*.png')):
+            rgba = Image.open(path).convert('RGBA')
+            background = Image.new('RGBA', rgba.size, '#23303a')
+            background.alpha_composite(rgba)
+            frames.append(background.convert('RGB'))
+        if frames:
+            target = NPC if key == 'hunter_walk' else HERE
+            frames[0].save(target/(key+'.gif'), save_all=True, append_images=frames[1:],
+                           duration=83, loop=0, optimize=False, disposal=2)

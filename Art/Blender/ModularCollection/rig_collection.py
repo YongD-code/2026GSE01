@@ -2,12 +2,15 @@
 
 import json
 import math
+import sys
 from pathlib import Path
 
 import bpy
 
 
 OUT = Path(__file__).resolve().parent
+sys.path.insert(0, str(OUT))
+import surface_forms
 bpy.context.preferences.filepaths.save_version = 0
 bpy.ops.wm.open_mainfile(filepath=str(OUT / "npc_parts.blend"))
 scene = bpy.context.scene
@@ -56,16 +59,17 @@ def influences(obj, co):
         return {'hips': 1.0}
     if z > 1.73:
         return {'head': 1.0}
+    if 1.61 < z <= 1.73 and abs(x) < .19:
+        w = (z-1.61)/.12
+        return {'head': w, 'spine': 1-w}
     if abs(x) > .32 and .91 < z < 1.63:
         side = 'L' if x < 0 else 'R'
-        if z < 1.10:
-            return {f'hand.{side}': 1.0}
-        return {f'arm.{side}': 1.0}
+        w = max(0, min(1, (1.18-z)/.14))
+        return {f'hand.{side}': w, f'arm.{side}': 1-w}
     if z < .93 and abs(x) > .02:
         side = 'L' if x < 0 else 'R'
-        if z < .52:
-            return {f'shin.{side}': 1.0}
-        return {f'thigh.{side}': 1.0}
+        w = max(0, min(1, (.64-z)/.18))
+        return {f'shin.{side}': w, f'thigh.{side}': 1-w}
     if z < 1.12:
         return {'hips': 1.0}
     return {'spine': 1.0}
@@ -136,12 +140,27 @@ def pose(kind, t):
 
 clips = {'idle': 32, 'walk': 24, 'run': 16, 'jump': 24,
          'turn_left': 12, 'turn_right': 12}
+foot_mesh = next(o for o in meshes if 'OUTFIT_TUNIC_' in o.name)
+foot_indices = [v.index for v in foot_mesh.data.vertices if v.co.z < .45]
+
+
+def keep_boots_above_floor():
+    # Check actual toe geometry, not only the ankle bone. Long boot toes sweep lower
+    # than the bone endpoint during a stride.
+    bpy.context.view_layer.update()
+    evaluated = foot_mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    lowest = min((evaluated.matrix_world @ evaluated.data.vertices[i].co).z for i in foot_indices)
+    if lowest < .012:
+        rig.pose.bones['root'].location.y += .012-lowest
+
+
 for kind, end in clips.items():
     rig.animation_data_create()
     rig.animation_data.action = None
     for frame in range(1, end+2):
         t = (frame-1)/end
         pose(kind, t)
+        keep_boots_above_floor()
         for bone in rig.pose.bones:
             bone.keyframe_insert('location', frame=frame, group=bone.name)
             bone.keyframe_insert('rotation_euler', frame=frame, group=bone.name)
@@ -156,9 +175,10 @@ reset_pose()
 
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT / 'npc_rigged.blend'))
 bpy.ops.object.select_all(action='SELECT')
-bpy.ops.export_scene.gltf(filepath=str(OUT / 'npc_rigged.glb'), export_format='GLB',
-                          use_selection=True, export_animations=True,
-                          export_animation_mode='ACTIONS', export_extras=True)
+with surface_forms.export_materials():
+    bpy.ops.export_scene.gltf(filepath=str(OUT / 'npc_rigged.glb'), export_format='GLB',
+                              use_selection=True, export_animations=True,
+                              export_animation_mode='ACTIONS', export_extras=True)
 catalog_path = OUT / 'catalog.json'
 catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
 catalog['riggedPartFile'] = 'npc_rigged.glb'

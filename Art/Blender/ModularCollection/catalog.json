@@ -11,15 +11,15 @@
         "index": 0,
         "mesh": "NPC_BODY_M_00",
         "slot": "body",
-        "vertices": 226,
-        "triangles": 388
+        "vertices": 1303,
+        "triangles": 2504
       },
       {
         "index": 1,
         "mesh": "NPC_BODY_F_01",
         "slot": "body",
-        "vertices": 226,
-        "triangles": 388
+        "vertices": 1303,
+        "triangles": 2504
       }
     ],
     "hair": [
@@ -27,50 +27,50 @@
         "index": 0,
         "mesh": "NPC_HAIR_SHORT_00",
         "slot": "hair",
-        "vertices": 78,
-        "triangles": 124
+        "vertices": 256,
+        "triangles": 458
       },
       {
         "index": 1,
         "mesh": "NPC_HAIR_TOUSLED_01",
         "slot": "hair",
-        "vertices": 78,
-        "triangles": 124
+        "vertices": 280,
+        "triangles": 498
       },
       {
         "index": 2,
         "mesh": "NPC_HAIR_BOB_02",
         "slot": "hair",
-        "vertices": 84,
-        "triangles": 140
+        "vertices": 368,
+        "triangles": 654
       },
       {
         "index": 3,
         "mesh": "NPC_HAIR_LONG_03",
         "slot": "hair",
-        "vertices": 96,
-        "triangles": 160
+        "vertices": 368,
+        "triangles": 654
       },
       {
         "index": 4,
         "mesh": "NPC_HAIR_BUN_04",
         "slot": "hair",
-        "vertices": 96,
-        "triangles": 160
+        "vertices": 534,
+        "triangles": 970
       },
       {
         "index": 5,
         "mesh": "NPC_HAIR_BOB_05",
         "slot": "hair",
-        "vertices": 84,
-        "triangles": 140
+        "vertices": 368,
+        "triangles": 654
       },
       {
         "index": 6,
         "mesh": "NPC_HAIR_BRAID_06",
         "slot": "hair",
-        "vertices": 138,
-        "triangles": 228
+        "vertices": 520,
+        "triangles": 930
       }
     ],
     "outfit": [
@@ -78,50 +78,50 @@
         "index": 0,
         "mesh": "NPC_OUTFIT_TUNIC_00",
         "slot": "outfit",
-        "vertices": 116,
-        "triangles": 196
+        "vertices": 724,
+        "triangles": 1340
       },
       {
         "index": 1,
         "mesh": "NPC_OUTFIT_TRAVELLER_01",
         "slot": "outfit",
-        "vertices": 136,
-        "triangles": 228
+        "vertices": 820,
+        "triangles": 1524
       },
       {
         "index": 2,
         "mesh": "NPC_OUTFIT_APRON_02",
         "slot": "outfit",
-        "vertices": 116,
-        "triangles": 192
+        "vertices": 718,
+        "triangles": 1320
       },
       {
         "index": 3,
         "mesh": "NPC_OUTFIT_ARMOR_03",
         "slot": "outfit",
-        "vertices": 152,
-        "triangles": 252
+        "vertices": 774,
+        "triangles": 1420
       },
       {
         "index": 4,
         "mesh": "NPC_OUTFIT_ARCHER_04",
         "slot": "outfit",
-        "vertices": 120,
-        "triangles": 200
+        "vertices": 746,
+        "triangles": 1376
       },
       {
         "index": 5,
         "mesh": "NPC_OUTFIT_RITUAL_05",
         "slot": "outfit",
-        "vertices": 136,
-        "triangles": 228
+        "vertices": 1020,
+        "triangles": 1904
       },
       {
         "index": 6,
         "mesh": "NPC_OUTFIT_RAGGED_06",
         "slot": "outfit",
-        "vertices": 132,
-        "triangles": 220
+        "vertices": 812,
+        "triangles": 1484
       }
     ],
     "accessory": [
@@ -129,15 +129,15 @@
         "index": 0,
         "mesh": "NPC_ACCESSORY_SATCHEL_00",
         "slot": "accessory",
-        "vertices": 20,
-        "triangles": 32
+        "vertices": 40,
+        "triangles": 64
       },
       {
         "index": 1,
         "mesh": "NPC_ACCESSORY_BOW_01",
         "slot": "accessory",
-        "vertices": 88,
-        "triangles": 148
+        "vertices": 136,
+        "triangles": 236
       },
       {
         "index": 2,
@@ -164,15 +164,15 @@
         "index": 5,
         "mesh": "NPC_ACCESSORY_RIBBON_05",
         "slot": "accessory",
-        "vertices": 20,
-        "triangles": 32
+        "vertices": 24,
+        "triangles": 36
       },
       {
         "index": 6,
         "mesh": "NPC_ACCESSORY_SCARF_06",
         "slot": "accessory",
-        "vertices": 24,
-        "triangles": 40
+        "vertices": 44,
+        "triangles": 80
       },
       {
         "index": 7,
@@ -290,6 +290,7 @@
       "triangles": 48
     }
   ],
+  "visualStyle": "authored low-poly silhouettes, smooth face planes, swept hair, tailored layers",
   "npcs": [
     {
       "id": "travelling_merchant",
@@ -464,5 +465,6 @@
       "lastFrame": 13,
       "loop": false
     }
-  }
+  },
+  "materialExport": "PBR base colors; four-band lighting is authored in the blend source"
 }
