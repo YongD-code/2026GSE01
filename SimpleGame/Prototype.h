@@ -4,6 +4,7 @@
 #include "SpriteSheet.h"
 #include "CharacterModel.h"
 #include "ModelActor.h"
+#include "ModelLibrary.h"
 #include "SpiritAppearance.h"
 #include "LevelOne.h"
 #include "SaveGame.h"
@@ -61,6 +62,7 @@ class Prototype
     SpriteAnimation protagonistAnimation;
     CharacterModel protagonistModel;
     CharacterModel npcModel;
+    ModelLibrary models;
     bool useProtagonistModel = false;
     float protagonistYaw = 2.35619449f, protagonistGait = 0;
     float protagonistModelTime = 0, protagonistCastAge = 1;
@@ -601,7 +603,12 @@ class Prototype
         }
         if (!protagonistModel.Load(L"Assets/Characters/Runtime/protagonist.meshbin"))
             std::cerr << "주인공 입체 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
-        if (!npcModel.Load(L"Assets/Characters/Runtime/npc_parts.meshbin"))
+        models.Load();
+        models.npcDirect =
+            models.npcCatalogReady && npcModel.LoadGltf(models.catalog.npc.path.c_str(),
+                                                        &models.catalog,
+                                                        &models.catalog.npc.clips);
+        if (!models.npcDirect && !npcModel.Load(L"Assets/Characters/Runtime/npc_parts.meshbin"))
         {
             std::cerr << "NPC 조합형 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
         }
@@ -719,7 +726,14 @@ class Prototype
         }
         for (int species = 0; species < SpiritCatalog::Count; ++species)
         {
-            if (!spiritMeshes[species].Load(SpiritCatalog::Get(species).model))
+            const auto definition = models.catalog.spirits.find(species);
+            const bool direct = models.spiritCatalogReady &&
+                                definition != models.catalog.spirits.end() &&
+                                spiritMeshes[species].LoadGltf(definition->second.path.c_str(),
+                                                               nullptr,
+                                                               &definition->second.clips,
+                                                               &definition->second.ambientClips);
+            if (!direct && !spiritMeshes[species].Load(SpiritCatalog::Get(species).model))
             {
                 std::cerr << "주령 스킨 모델 로드 실패: " << SpiritName(species) << std::endl;
             }

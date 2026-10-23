@@ -195,6 +195,16 @@ struct ModelIntegrationReview
                         }
                     }
                 }
+                for (const auto& matrix : state.imported.global)
+                {
+                    for (float value : matrix)
+                    {
+                        if (!std::isfinite(value))
+                        {
+                            return 6;
+                        }
+                    }
+                }
             }
             model.Reset(state, game.CharacterFacing(animation.facing));
             if (!model.Draw(game.r, feet, Color(1, 1, 1), state, 165))
@@ -226,9 +236,12 @@ struct ModelIntegrationReview
         CharacterModel::State independentA, independentB;
         game.npcModel.Reset(independentA, 0);
         const auto preserved = independentA.pose;
+        const auto importedPreserved = independentA.imported.pose;
+        const auto morphPreserved = independentA.imported.morph;
         game.npcModel.Reset(independentB, 1);
         game.npcModel.Animate(independentB, .05f, CharacterModel::Motion::Run, .25f, 1);
-        if (preserved != independentA.pose)
+        if (preserved != independentA.pose || importedPreserved != independentA.imported.pose ||
+            morphPreserved != independentA.imported.morph)
         {
             return 9;
         }

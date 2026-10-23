@@ -1,5 +1,13 @@
 #include "stdafx.h"
 #include "CharacterModel.h"
+#include "ModelCatalog.h"
+#include "AssetFiles.h"
+#include <wincodec.h>
+#include <wrl/client.h>
+#include <tuple>
+#include <numeric>
+#pragma comment(lib, "windowscodecs.lib")
+#pragma comment(lib, "ole32.lib")
 #include "FrameProfiler.h"
 #include "ShaderFiles.h"
 #include <algorithm>
@@ -17,6 +25,8 @@ struct MeshVertex
 };
 
 static_assert(sizeof(MeshVertex) == 72, "Character vertex format must remain packed float32");
+static_assert(sizeof(ModelAssets::Vertex) == 176,
+              "Imported vertex attributes must match GLSL locations 0..13");
 
 struct Reader
 {
@@ -81,6 +91,7 @@ struct GraphicsState
 {
     GLint draw = 0, read = 0, viewport[4] = {}, program = 0, vao = 0, array = 0;
     GLint active = 0, texture = 0, renderbuffer = 0, depthFunction = 0;
+    GLint uniformBuffer = 0, jointBuffer = 0;
     GLint sourceRGB = 0, destinationRGB = 0, sourceAlpha = 0, destinationAlpha = 0;
     GLint equationRGB = 0, equationAlpha = 0;
     GLboolean blend = false, depth = false, cull = false, scissor = false, stencil = false;
@@ -101,6 +112,8 @@ struct GraphicsState
         glActiveTexture(GL_TEXTURE0);
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture);
         glGetIntegerv(GL_DEPTH_FUNC, &depthFunction);
+        glGetIntegerv(GL_UNIFORM_BUFFER_BINDING, &uniformBuffer);
+        glGetIntegeri_v(GL_UNIFORM_BUFFER_BINDING, 5, &jointBuffer);
         glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWrite);
         glGetBooleanv(GL_COLOR_WRITEMASK, colorWrite);
         glGetDoublev(GL_DEPTH_RANGE, depthRange);
@@ -138,6 +151,8 @@ struct GraphicsState
         glUseProgram(program);
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, array);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 5, jointBuffer);
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformBuffer);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
         glActiveTexture(active);
@@ -176,6 +191,16 @@ CharacterModel::~CharacterModel()
 void CharacterModel::Release()
 {
     glDeleteBuffers(1, &buffer);
+    glDeleteBuffers(1, &paletteBuffer);
+    if (!textures.empty())
+    {
+        glDeleteTextures(static_cast<GLsizei>(textures.size()), textures.data());
+    }
+    paletteBuffer = 0;
+    textures.clear();
+    imported.reset();
+    importedDraws.clear();
+    importedAmbient.clear();
     glDeleteVertexArrays(1, &vao);
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteFramebuffers(1, &resolveFramebuffer);
@@ -200,7 +225,7 @@ void CharacterModel::Release()
 bool CharacterModel::Ready() const
 {
     return vao && buffer && meshProgram && compositeProgram && framebuffer && resolveFramebuffer &&
-           image && vertexCount > 0 && !joints.empty();
+           image && vertexCount > 0 && (imported ? paletteBuffer != 0 : !joints.empty());
 }
 
 bool CharacterModel::Load(const wchar_t* path)
@@ -308,25 +333,11 @@ bool CharacterModel::Load(const wchar_t* path)
     if (reader.offset != reader.bytes.size())
         return false;
     GraphicsState state;
-    meshProgram = ShaderFiles::Program(L"Shaders/CharacterMesh.vs", L"Shaders/CharacterMesh.fs");
-    compositeProgram =
-        ShaderFiles::Program(L"Shaders/CharacterComposite.vs", L"Shaders/CharacterComposite.fs");
-    if (!meshProgram || !compositeProgram || !CreateTargets())
+    if (!CreatePrograms(false))
     {
         Release();
         return false;
     }
-    bonesUniform = glGetUniformLocation(meshProgram, "bones[0]");
-    yawUniform = glGetUniformLocation(meshProgram, "heading");
-    viewportUniform = glGetUniformLocation(compositeProgram, "viewport");
-    feetUniform = glGetUniformLocation(compositeProgram, "feet");
-    tintUniform = glGetUniformLocation(compositeProgram, "tint");
-    linearUniform = glGetUniformLocation(compositeProgram, "linearScene");
-    framingUniform = glGetUniformLocation(meshProgram, "modelScale");
-    drawScaleUniform = glGetUniformLocation(compositeProgram, "drawScale");
-    styleUniform = glGetUniformLocation(meshProgram, "fourBand");
-    glUseProgram(compositeProgram);
-    glUniform1i(glGetUniformLocation(compositeProgram, "characterImage"), 0);
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &buffer);
     glBindVertexArray(vao);
@@ -359,6 +370,424 @@ bool CharacterModel::Load(const wchar_t* path)
                          reader.bytes.size(),
                          FrameProfiler::Milliseconds(start));
     return Ready();
+}
+
+bool CharacterModel::CreatePrograms(bool gltf)
+{
+    meshProgram =
+        ShaderFiles::Program(gltf ? L"Shaders/ImportedMesh.vs" : L"Shaders/CharacterMesh.vs",
+                             gltf ? L"Shaders/ImportedMesh.fs" : L"Shaders/CharacterMesh.fs");
+    compositeProgram =
+        ShaderFiles::Program(L"Shaders/CharacterComposite.vs", L"Shaders/CharacterComposite.fs");
+    if (!meshProgram || !compositeProgram || !CreateTargets())
+    {
+        return false;
+    }
+    bonesUniform = glGetUniformLocation(meshProgram, "bones[0]");
+    yawUniform = glGetUniformLocation(meshProgram, "heading");
+    viewportUniform = glGetUniformLocation(compositeProgram, "viewport");
+    feetUniform = glGetUniformLocation(compositeProgram, "feet");
+    anchorUniform = glGetUniformLocation(compositeProgram, "imageAnchor");
+    tintUniform = glGetUniformLocation(compositeProgram, "tint");
+    linearUniform = glGetUniformLocation(compositeProgram, "linearScene");
+    framingUniform = glGetUniformLocation(meshProgram, "modelScale");
+    drawScaleUniform = glGetUniformLocation(compositeProgram, "drawScale");
+    styleUniform = glGetUniformLocation(meshProgram, "fourBand");
+    glUseProgram(compositeProgram);
+    glUniform1i(glGetUniformLocation(compositeProgram, "characterImage"), 0);
+    return true;
+}
+
+namespace
+{
+bool DecodeImage(const ModelAssets::Image& source,
+                 std::vector<unsigned char>& pixels,
+                 UINT& width,
+                 UINT& height)
+{
+    struct Apartment
+    {
+        HRESULT status = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
+        ~Apartment()
+        {
+            if (SUCCEEDED(status))
+            {
+                CoUninitialize();
+            }
+        }
+    } apartment;
+
+    if (FAILED(apartment.status) && apartment.status != RPC_E_CHANGED_MODE)
+    {
+        return false;
+    }
+    using Microsoft::WRL::ComPtr;
+    ComPtr<IWICImagingFactory> factory;
+    ComPtr<IWICStream> stream;
+    ComPtr<IWICBitmapDecoder> decoder;
+    ComPtr<IWICBitmapFrameDecode> frame;
+    ComPtr<IWICFormatConverter> converter;
+    if (FAILED(CoCreateInstance(
+            CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))) ||
+        FAILED(factory->CreateStream(&stream)) ||
+        FAILED(stream->InitializeFromMemory(const_cast<BYTE*>(source.encoded.data()),
+                                            DWORD(source.encoded.size()))) ||
+        FAILED(factory->CreateDecoderFromStream(
+            stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder)) ||
+        FAILED(decoder->GetFrame(0, &frame)) || FAILED(frame->GetSize(&width, &height)) || !width ||
+        !height || width > 4096 || height > 4096 ||
+        FAILED(factory->CreateFormatConverter(&converter)) ||
+        FAILED(converter->Initialize(frame.Get(),
+                                     GUID_WICPixelFormat32bppRGBA,
+                                     WICBitmapDitherTypeNone,
+                                     nullptr,
+                                     0,
+                                     WICBitmapPaletteTypeCustom)))
+    {
+        return false;
+    }
+    pixels.resize(size_t(width) * height * 4);
+    return SUCCEEDED(converter->CopyPixels(nullptr, width * 4, UINT(pixels.size()), pixels.data()));
+}
+} // namespace
+
+bool CharacterModel::LoadGltf(const wchar_t* path,
+                              const ModelAssets::Catalog* catalog,
+                              const std::map<std::string, std::string>* bindings,
+                              const std::vector<std::string>* ambientClips)
+{
+    Release();
+    const auto start = FrameProfiler::Clock::now();
+    std::string error;
+    auto asset = ModelAssets::Asset::Load(path, error);
+    if (!asset || (catalog && !catalog->ConfigureParts(*asset, error)))
+    {
+        std::cerr << "GLB 모델 로드 실패: " << AssetFiles::Utf8(path) << " · " << error << '\n';
+        return false;
+    }
+    GraphicsState restore;
+    imported = std::move(asset);
+    framing = imported->framing;
+    if (!CreatePrograms(true))
+    {
+        std::cerr << "GLB 셰이더 또는 렌더 타깃 생성 실패: " << AssetFiles::Utf8(path) << '\n';
+        Release();
+        return false;
+    }
+    // Skinned primitives sharing skin/material/part can use one draw, independent of mesh node.
+    using Key = std::tuple<int, int, int, int, int>;
+    std::map<Key, std::vector<size_t>> groups;
+    auto bakedColor = [&](int material)
+    {
+        const auto& m = imported->materials[material];
+        return m.texture < 0 && m.alphaMode == 0 && !m.unlit && m.emission[0] == 0 &&
+               m.emission[1] == 0 && m.emission[2] == 0;
+    };
+    for (size_t i = 0; i < imported->primitives.size(); ++i)
+    {
+        const auto& p = imported->primitives[i];
+        groups[{p.skin,
+                p.skin < 0 || imported->nodes[p.node].morphCount ? p.node : -1,
+                bakedColor(p.material) ? 0 : p.material,
+                p.slot,
+                p.index}]
+            .push_back(i);
+    }
+    std::vector<ModelAssets::Vertex> vertices;
+    vertices.reserve(imported->vertices.size());
+    for (const auto& group : groups)
+    {
+        auto draw = imported->primitives[group.second.front()];
+        draw.material = std::get<2>(group.first);
+        draw.first = unsigned(vertices.size());
+        draw.count = 0;
+        for (const auto i : group.second)
+        {
+            const auto& p = imported->primitives[i];
+            vertices.insert(vertices.end(),
+                            imported->vertices.begin() + p.first,
+                            imported->vertices.begin() + p.first + p.count);
+            if (bakedColor(p.material))
+            {
+                const auto& color = imported->materials[p.material].color;
+                for (size_t vertex = vertices.size() - p.count; vertex < vertices.size(); ++vertex)
+                {
+                    for (size_t channel = 0; channel < 4; ++channel)
+                    {
+                        vertices[vertex].color[channel] *= color[channel];
+                    }
+                }
+            }
+            draw.count += p.count;
+        }
+        importedDraws.push_back(draw);
+    }
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &buffer);
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER,
+                 vertices.size() * sizeof(ModelAssets::Vertex),
+                 vertices.data(),
+                 GL_STATIC_DRAW);
+    GLint64 uploaded = 0;
+    glGetBufferParameteri64v(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &uploaded);
+    if (uploaded != static_cast<GLint64>(vertices.size() * sizeof(ModelAssets::Vertex)))
+    {
+        std::cerr << "GLB 정점 버퍼 할당 실패: " << AssetFiles::Utf8(path) << '\n';
+        Release();
+        return false;
+    }
+    const int widths[] = {3, 3, 4, 4, 4, 2, 3, 3, 3, 3, 3, 3, 3, 3};
+    size_t offset = 0;
+    for (GLuint i = 0; i < 14; ++i)
+    {
+        glEnableVertexAttribArray(i);
+        glVertexAttribPointer(i,
+                              widths[i],
+                              GL_FLOAT,
+                              GL_FALSE,
+                              sizeof(ModelAssets::Vertex),
+                              reinterpret_cast<void*>(offset * sizeof(float)));
+        offset += widths[i];
+    }
+    vertexCount = static_cast<GLsizei>(vertices.size());
+    const GLuint block = glGetUniformBlockIndex(meshProgram, "JointPalette");
+    if (block == GL_INVALID_INDEX)
+    {
+        Release();
+        return false;
+    }
+    glUniformBlockBinding(meshProgram, block, 5);
+    glGenBuffers(1, &paletteBuffer);
+    glBindBuffer(GL_UNIFORM_BUFFER, paletteBuffer);
+    glBufferData(GL_UNIFORM_BUFFER,
+                 ModelAssets::MaximumBones * sizeof(ModelAssets::Matrix),
+                 nullptr,
+                 GL_STREAM_DRAW);
+    glGetBufferParameteri64v(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &uploaded);
+    if (uploaded != static_cast<GLint64>(ModelAssets::MaximumBones * sizeof(ModelAssets::Matrix)))
+    {
+        std::cerr << "GLB 본 버퍼 할당 실패: " << AssetFiles::Utf8(path) << '\n';
+        Release();
+        return false;
+    }
+    objectUniform = glGetUniformLocation(meshProgram, "objectTransform");
+    normalizationUniform = glGetUniformLocation(meshProgram, "normalization");
+    skinnedUniform = glGetUniformLocation(meshProgram, "skinned");
+    materialUniform = glGetUniformLocation(meshProgram, "materialColor");
+    emissionUniform = glGetUniformLocation(meshProgram, "emission");
+    textureUniform = glGetUniformLocation(meshProgram, "hasTexture");
+    alphaUniform = glGetUniformLocation(meshProgram, "alphaMode");
+    cutoffUniform = glGetUniformLocation(meshProgram, "alphaCutoff");
+    unlitUniform = glGetUniformLocation(meshProgram, "unlit");
+    morphUniform = glGetUniformLocation(meshProgram, "morphWeights");
+    glUseProgram(meshProgram);
+    glUniform1i(glGetUniformLocation(meshProgram, "baseTexture"), 0);
+    glActiveTexture(GL_TEXTURE0);
+    size_t decodedBytes = 0;
+    for (const auto& source : imported->images)
+    {
+        std::vector<unsigned char> pixels;
+        UINT width = 0, height = 0;
+        if (!DecodeImage(source, pixels, width, height) ||
+            pixels.size() > 256 * 1024 * 1024 - decodedBytes)
+        {
+            std::cerr << "GLB 텍스처 해독 실패/메모리 한도 초과: " << AssetFiles::Utf8(path)
+                      << '\n';
+            Release();
+            return false;
+        }
+        decodedBytes += pixels.size();
+        GLint maximum = 0;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
+        if (width > UINT(maximum) || height > UINT(maximum))
+        {
+            Release();
+            return false;
+        }
+        GLuint texture = 0;
+        glGenTextures(1, &texture);
+        textures.push_back(texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     GL_SRGB8_ALPHA8,
+                     width,
+                     height,
+                     0,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     pixels.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, source.minFilter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, source.magFilter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, source.wrapS);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, source.wrapT);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        FrameProfiler::Upload(pixels.size());
+    }
+    const char* names[] = {
+        "idle", "walk", "run", "cast", "jump", "turn_left", "turn_right", "attack"};
+    for (size_t i = 0; i < importedClips.size(); ++i)
+    {
+        std::string name = names[i];
+        if (bindings)
+        {
+            const auto binding = bindings->find(name);
+            if (binding != bindings->end())
+            {
+                name = binding->second;
+            }
+        }
+        importedClips[i] = imported->FindClip(name);
+    }
+    const int idle = importedClips[0];
+    for (size_t i = 0; i < importedClips.size(); ++i)
+    {
+        if (importedClips[i] < 0)
+        {
+            const int attack = importedClips[static_cast<size_t>(Motion::Attack)];
+            importedClips[i] =
+                i == static_cast<size_t>(Motion::Cast) && attack >= 0 ? attack : idle;
+        }
+    }
+    if (ambientClips)
+    {
+        for (const auto& name : *ambientClips)
+        {
+            const int clip = imported->FindClip(name);
+            if (clip >= 0)
+            {
+                importedAmbient.push_back(clip);
+            }
+            else
+            {
+                std::cerr << "GLB 보조 애니메이션을 찾지 못했습니다: " << name << '\n';
+            }
+        }
+    }
+    Reset();
+    FrameProfiler::Upload(vertices.size() * sizeof(ModelAssets::Vertex));
+    FrameProfiler::Event("gltf_model_loaded",
+                         AssetFiles::Utf8(path),
+                         vertices.size() * sizeof(ModelAssets::Vertex),
+                         FrameProfiler::Milliseconds(start));
+    // Only static scenery needs a CPU vertex copy after upload.
+    std::vector<ModelAssets::Vertex>().swap(imported->vertices);
+    for (auto& source : imported->images)
+    {
+        std::vector<unsigned char>().swap(source.encoded);
+    }
+    return Ready();
+}
+
+bool CharacterModel::Play(
+    State& state, const std::string& clip, bool loop, float speed, float fadeSeconds)
+{
+    if (!imported || !Ready())
+    {
+        return false;
+    }
+    if (state.owner != this)
+    {
+        Reset(state, state.yaw);
+    }
+    const bool started = imported->Play(state.imported, clip, loop, speed, fadeSeconds);
+    state.namedClip = started || state.namedClip;
+    return started;
+}
+
+void CharacterModel::ResumeLocomotion(State& state)
+{
+    state.namedClip = false;
+    state.transition = 0;
+    state.imported.from = state.imported.pose;
+    state.imported.fromMorph = state.imported.morph;
+}
+
+void CharacterModel::AnimateGltf(State& state, float dt, Motion kind, float phase)
+{
+    if (state.namedClip)
+    {
+        imported->Update(state.imported, dt);
+        return;
+    }
+    const int clip = importedClips[static_cast<size_t>(kind)];
+    state.imported.ambientSeconds = std::fmod(state.imported.ambientSeconds + dt, 86400.f);
+    const bool loop = kind == Motion::Idle || kind == Motion::Walk || kind == Motion::Run;
+    const float fraction =
+        loop ? phase - std::floor(phase) : (std::max)(0.f, (std::min)(1.f, phase));
+    const float seconds = clip < 0 ? 0 : fraction * imported->clips[clip].duration;
+    const float blend = state.transition * state.transition * (3 - 2 * state.transition);
+    imported->Sample(state.imported, clip, seconds, blend);
+}
+
+void CharacterModel::DrawGltf(const State& state, const Parts* selection)
+{
+    glUniformMatrix4fv(normalizationUniform, 1, GL_FALSE, imported->normalization.data());
+    glBindBufferBase(GL_UNIFORM_BUFFER, 5, paletteBuffer);
+    glBindBuffer(GL_UNIFORM_BUFFER, paletteBuffer);
+    std::vector<ModelAssets::Matrix> palette;
+    // Opaque and masked geometry writes depth first. Transparent surfaces follow back-to-front.
+    std::vector<size_t> order(importedDraws.size());
+    std::iota(order.begin(), order.end(), 0);
+    auto depth = [&](const ModelAssets::Primitive& p)
+    {
+        const auto& m = state.imported.global[p.node];
+        const float point[] = {m[12], m[13], m[14]};
+        const auto world = ModelAssets::Point(imported->normalization, point);
+        const float x = world[0] * std::cos(state.yaw) - world[1] * std::sin(state.yaw);
+        const float y = world[0] * std::sin(state.yaw) + world[1] * std::cos(state.yaw);
+        return .603f * (x + y) + .519f * world[2];
+    };
+    std::stable_sort(order.begin(),
+                     order.end(),
+                     [&](size_t a, size_t b)
+                     {
+                         const bool alphaA =
+                             imported->materials[importedDraws[a].material].alphaMode == 2;
+                         const bool alphaB =
+                             imported->materials[importedDraws[b].material].alphaMode == 2;
+                         return alphaA != alphaB ? !alphaA
+                                : alphaA         ? depth(importedDraws[a]) < depth(importedDraws[b])
+                                                 : false;
+                     });
+    int lastSkin = -2;
+    glActiveTexture(GL_TEXTURE0);
+    for (const auto i : order)
+    {
+        const auto& draw = importedDraws[i];
+        if (draw.slot >= 0 && selection && (*selection)[draw.slot] != draw.index)
+        {
+            continue;
+        }
+        const auto& material = imported->materials[draw.material];
+        const bool alpha = material.alphaMode == 2;
+        GraphicsState::Enable(GL_BLEND, alpha);
+        glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+        glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(alpha ? GL_FALSE : GL_TRUE);
+        glUniform1i(skinnedUniform, draw.skin >= 0);
+        glUniform4fv(morphUniform, 1, state.imported.morph[draw.node].data());
+        if (draw.skin >= 0 && draw.skin != lastSkin)
+        {
+            imported->Palette(state.imported, draw.skin, palette);
+            glBufferSubData(
+                GL_UNIFORM_BUFFER, 0, palette.size() * sizeof(ModelAssets::Matrix), palette.data());
+            FrameProfiler::Upload(palette.size() * sizeof(ModelAssets::Matrix));
+            lastSkin = draw.skin;
+        }
+        glUniformMatrix4fv(objectUniform, 1, GL_FALSE, state.imported.global[draw.node].data());
+        glUniform4fv(materialUniform, 1, material.color.data());
+        glUniform3fv(emissionUniform, 1, material.emission.data());
+        glUniform1i(textureUniform, material.texture >= 0);
+        glUniform1i(alphaUniform, material.alphaMode);
+        glUniform1f(cutoffUniform, material.alphaCutoff);
+        glUniform1i(unlitUniform, material.unlit);
+        glBindTexture(GL_TEXTURE_2D, material.texture >= 0 ? textures[material.texture] : 0);
+        FrameProfiler::DrawArrays(GL_TRIANGLES, draw.first, draw.count);
+    }
 }
 
 bool CharacterModel::CreateTargets()
@@ -498,6 +927,13 @@ void CharacterModel::Reset(State& state, float facing)
     state = State();
     state.owner = this;
     state.yaw = facing;
+    if (imported)
+    {
+        imported->Reset(state.imported);
+        state.imported.layers = importedAmbient;
+        AnimateGltf(state, 0, Motion::Idle, 0);
+        return;
+    }
     if (joints.empty())
         return;
     state.pose.resize(joints.size());
@@ -514,11 +950,13 @@ void CharacterModel::Animate(float dt, Motion kind, float phase, float facing)
 
 void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, float facing)
 {
-    if (state.owner != this || state.pose.size() != joints.size())
+    if (state.owner != this ||
+        (imported ? state.imported.owner != imported.get() : state.pose.size() != joints.size()))
     {
         Reset(state, facing);
     }
-    if (!Ready() || dt <= 0)
+    if (!Ready() || !std::isfinite(dt) || dt <= 0 || !std::isfinite(phase) ||
+        !std::isfinite(facing) || static_cast<size_t>(kind) >= clips.size())
         return;
     dt = (std::min)(dt, .05f);
     const float difference = std::atan2(std::sin(facing - state.yaw), std::cos(facing - state.yaw));
@@ -543,6 +981,11 @@ void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, f
     if (kind != state.motion)
     {
         state.transitionFrom = state.pose;
+        if (imported)
+        {
+            state.imported.from = state.imported.pose;
+            state.imported.fromMorph = state.imported.morph;
+        }
         state.transition = 0;
         state.motion = kind;
     }
@@ -551,6 +994,11 @@ void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, f
     const float blend = state.transition * state.transition * (3 - 2 * state.transition);
     state.yaw += difference * (1 - std::exp(-24.f * dt));
     state.yaw = std::atan2(std::sin(state.yaw), std::cos(state.yaw));
+    if (imported)
+    {
+        AnimateGltf(state, dt, kind, phase);
+        return;
+    }
     for (size_t i = 0; i < state.pose.size(); ++i)
         state.pose[i] = Blend(state.transitionFrom[i], Sample(kind, i, phase), blend);
     UpdateSkin(state);
@@ -568,7 +1016,10 @@ bool CharacterModel::Draw(Renderer& renderer,
                           float height,
                           const Parts* selection)
 {
-    if (!Ready() || animation.skin.size() != joints.size() || !std::isfinite(height) || height <= 0)
+    if (!Ready() || animation.owner != this ||
+        (imported ? animation.imported.owner != imported.get()
+                  : animation.skin.size() != joints.size()) ||
+        !std::isfinite(height) || height <= 0)
         return false;
     renderer.Flush();
     FrameProfiler::Scope timing(FrameProfiler::Stage::CharacterDraw);
@@ -590,26 +1041,33 @@ bool CharacterModel::Draw(Renderer& renderer,
     glClearDepth(1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(meshProgram);
-    glUniformMatrix4fv(bonesUniform,
-                       static_cast<GLsizei>(animation.skin.size()),
-                       GL_FALSE,
-                       animation.skin[0].data());
-    FrameProfiler::Upload(animation.skin.size() * sizeof(Matrix));
     glUniform2f(yawUniform, std::cos(animation.yaw), std::sin(animation.yaw));
     glUniform1f(framingUniform, framing);
-    glUniform1i(styleUniform, !parts.empty());
+    glUniform1i(styleUniform, !parts.empty() || imported != nullptr);
     glBindVertexArray(vao);
-    if (parts.empty())
+    if (imported)
     {
-        FrameProfiler::DrawArrays(GL_TRIANGLES, 0, vertexCount);
+        DrawGltf(animation, selection);
     }
     else
     {
-        for (const auto& part : parts)
+        glUniformMatrix4fv(bonesUniform,
+                           static_cast<GLsizei>(animation.skin.size()),
+                           GL_FALSE,
+                           animation.skin[0].data());
+        FrameProfiler::Upload(animation.skin.size() * sizeof(Matrix));
+        if (parts.empty())
         {
-            if (part.slot < 0 || !selection || (*selection)[part.slot] == part.index)
+            FrameProfiler::DrawArrays(GL_TRIANGLES, 0, vertexCount);
+        }
+        else
+        {
+            for (const auto& part : parts)
             {
-                FrameProfiler::DrawArrays(GL_TRIANGLES, part.first, part.count);
+                if (part.slot < 0 || !selection || (*selection)[part.slot] == part.index)
+                {
+                    FrameProfiler::DrawArrays(GL_TRIANGLES, part.first, part.count);
+                }
             }
         }
     }
@@ -627,6 +1085,7 @@ bool CharacterModel::Draw(Renderer& renderer,
     glUseProgram(compositeProgram);
     glUniform2f(viewportUniform, float(state.viewport[2]), float(state.viewport[3]));
     glUniform2f(feetUniform, feet.x, feet.y);
+    glUniform2f(anchorUniform, 64, imported ? 120.f : 140.f);
     glUniform1f(drawScaleUniform, height / (90.f * framing));
     glUniform4f(tintUniform, tint.r, tint.g, tint.b, tint.a);
     glUniform1i(linearUniform, renderer.IsHDRScene());

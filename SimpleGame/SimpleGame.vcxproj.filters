@@ -46,6 +46,10 @@
     <ClInclude Include="PrototypeUI.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ShaderFiles.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="SpriteSheet.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="AssetFiles.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ModelAsset.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ModelCatalog.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="ModelLibrary.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="CharacterModel.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="ModelActor.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="NpcAppearance.h"><Filter>헤더 파일</Filter></ClInclude>
@@ -74,6 +78,11 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="AssetFiles.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ModelAsset.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ModelAnimation.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ModelCatalog.cpp"><Filter>소스 파일</Filter></ClCompile>
+    <ClCompile Include="ModelLibrary.cpp"><Filter>소스 파일</Filter></ClCompile>
     <ClCompile Include="CharacterModel.cpp"><Filter>소스 파일</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -84,6 +93,8 @@
     <None Include="Shaders\Batch.vs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\Batch.fs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\Geometry.fs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\ImportedMesh.vs"><Filter>소스 파일\Shaders</Filter></None>
+    <None Include="Shaders\ImportedMesh.fs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\CharacterMesh.vs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\CharacterMesh.fs"><Filter>소스 파일\Shaders</Filter></None>
     <None Include="Shaders\CharacterComposite.vs"><Filter>소스 파일\Shaders</Filter></None>

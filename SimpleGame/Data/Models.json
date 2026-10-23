@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "npcCatalog": "Art/Blender/ModularCollection/catalog.json",
+  "spiritCatalog": "Art/Blender/MobCollection/mob_catalog.json",
+  "ambientClips": {
+    "forgotten": [
+      "등롱 불길 · 뒤 불혀Action",
+      "등롱 불길 · 열기Action",
+      "등롱 불길 · 왼 불혀Action",
+      "등롱 불길 · 중심Action"
+    ]
+  },
+  "scenery": {
+    "enabled": false,
+    "house": "BUILDING_HOME_00",
+    "hall": "BUILDING_SHOP_02",
+    "rock": "NATURE_ROCK_11",
+    "trees": ["NATURE_TREE_OAK_06", "NATURE_TREE_PINE_07", "NATURE_TREE_DEAD_08"]
+  }
+}

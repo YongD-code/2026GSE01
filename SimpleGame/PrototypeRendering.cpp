@@ -447,16 +447,18 @@ void Prototype::StoryPerson(const StoryLayout::Site& site,
     }
 
     const bool childPortrait = site.kind == StoryLayout::Kind::Child;
+    const auto appearance =
+        models.npcDirect ? models.catalog.Story(index, site.appearance) : site.appearance;
     r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
     if (DrawKeyedModel(npcModel,
                        p,
-                       78 * site.appearance.scale,
+                       78 * appearance.scale,
                        animation,
                        Color(1, 1, 1),
                        CharacterModel::Motion::Idle,
                        time * .75f + index * .11f,
                        state,
-                       &site.appearance.partIndices))
+                       &appearance.partIndices))
     {
         return;
     }

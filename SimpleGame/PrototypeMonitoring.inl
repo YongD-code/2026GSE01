@@ -120,7 +120,10 @@ void PublishMonitoring()
                                                                                      : "inactive";
         npcs << "{\"id\":" << Monitoring::Quote(StoryLayout::NpcSprites()[index].id)
              << ",\"name\":" << Monitoring::Quote(first ? first->name : "미등록 NPC")
-             << ",\"part_indices\":" << partIndices(NpcAppearance::Story(index))
+             << ",\"part_indices\":"
+             << partIndices(models.npcDirect
+                                ? models.catalog.Story(index, NpcAppearance::Story(index))
+                                : NpcAppearance::Story(index))
              << ",\"status\":" << Monitoring::Quote(status)
              << ",\"active\":" << (active ? "true" : "false")
              << ",\"home_region\":" << Monitoring::Quote(World::VillageId(0))

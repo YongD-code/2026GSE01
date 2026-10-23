@@ -126,6 +126,22 @@ void Prototype::DrawObject(const Object& o)
         visual.h = 90;
         scale = static_cast<float>(o.h / visual.h);
     }
+    const float importedWidth = o.kind == 1 ? 48.f : static_cast<float>(visual.w);
+    const float importedDepth = o.kind == 1 ? 48.f : static_cast<float>(visual.d);
+    const Point importedOrigin = o.kind == 1 ? Screen(o.x + (o.w - importedWidth * scale) * .5,
+                                                      o.y + (o.d - importedDepth * scale) * .5)
+                                             : Screen(o.x, o.y);
+    if (models.DrawScenery(r,
+                           o.kind,
+                           variant,
+                           importedOrigin,
+                           importedWidth,
+                           importedDepth,
+                           static_cast<float>(visual.h),
+                           scale))
+    {
+        return;
+    }
     const std::string meshKey = "object:shared-v5:" + std::to_string(visual.kind) + ":" +
                                 std::to_string(visual.w) + ":" + std::to_string(visual.d) + ":" +
                                 std::to_string(visual.h) + ":" + std::to_string(variant);
