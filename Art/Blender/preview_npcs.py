@@ -3,7 +3,7 @@ import bpy
 from array import array
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
-folder = root / 'SimpleGame/Assets/Characters/Blender'
+folder = root / 'Art/Blender/LegacyNpcSprites'
 images = [bpy.data.images.load(str(folder / name / 'preview.png')) for name in ('npc1', 'npc2')]
 w, h = images[0].size
 pixels = array('f', [0]) * (w * 2 * h * 4)

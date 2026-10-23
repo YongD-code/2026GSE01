@@ -152,9 +152,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="CharacterModel.h" />
     <ClInclude Include="AssetFiles.h" />
@@ -226,20 +223,14 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\SolidRect.fs" />
-    <None Include="Shaders\SolidRect.vs" />
-    <None Include="Shaders\Geometry.vs" />
     <None Include="Shaders\Batch.vs" />
     <None Include="Shaders\Batch.fs" />
-    <None Include="Shaders\Geometry.fs" />
     <None Include="Shaders\CharacterMesh.vs" />
     <None Include="Shaders\ImportedMesh.vs" />
     <None Include="Shaders\ImportedMesh.fs" />
     <None Include="Shaders\CharacterMesh.fs" />
     <None Include="Shaders\CharacterComposite.vs" />
     <None Include="Shaders\CharacterComposite.fs" />
-    <None Include="Shaders\Sprite.vs" />
-    <None Include="Shaders\Sprite.fs" />
     <None Include="Shaders\Fullscreen.vs" />
     <None Include="Shaders\BloomFilter.fs" />
     <None Include="Shaders\Composite.fs" />
@@ -258,20 +249,21 @@
     <None Include="Data\Combat.ini" />
     <None Include="Data\Monitoring.ini" />
     <None Include="Assets\Characters\protagonist.png" />
-    <None Include="Assets\Characters\mira.png" />
-    <None Include="Assets\Characters\keeper.png" />
   </ItemGroup>
   <Target Name="CopySpriteAssets" AfterTargets="Build">
     <!-- Collect deployment-only files during the build, outside IDE project items. -->
     <ItemGroup>
-      <SpriteAssets Include="Assets\**\*.png" />
+      <SpriteAssets Include="Assets\**\*.png" Exclude="Assets\Characters\Blender\preview.png" />
       <ModelAssets Include="Assets\**\*.meshbin" />
       <ShaderAssets Include="Shaders\**\*.vs;Shaders\**\*.fs" />
       <GameData Include="Data\**\*.tsv;Data\**\*.ini;Data\**\*.json" />
       <NpcExports Include="..\Art\Blender\ModularCollection\**\*.glb;..\Art\Blender\ModularCollection\**\*.gltf;..\Art\Blender\ModularCollection\**\*.bin;..\Art\Blender\ModularCollection\**\*.json;..\Art\Blender\ModularCollection\**\*.png;..\Art\Blender\ModularCollection\**\*.jpg;..\Art\Blender\ModularCollection\**\*.jpeg" />
       <SpiritExports Include="..\Art\Blender\MobCollection\**\*.glb;..\Art\Blender\MobCollection\**\*.gltf;..\Art\Blender\MobCollection\**\*.bin;..\Art\Blender\MobCollection\**\*.json;..\Art\Blender\MobCollection\**\*.png;..\Art\Blender\MobCollection\**\*.jpg;..\Art\Blender\MobCollection\**\*.jpeg" />
       <ModelLicenses Include="ThirdParty\*.LICENSE" />
+      <RuntimeDependencies Include="Dependencies\freeglut.dll;Dependencies\glew32.dll" Condition="'$(Platform)'=='Win32'" />
+      <RuntimeDependencies Include="Dependencies\x64\freeglut.dll;Dependencies\x64\glew32.dll" Condition="'$(Platform)'=='x64'" />
     </ItemGroup>
+    <Copy SourceFiles="@(RuntimeDependencies)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(GameData)"
           DestinationFiles="@(GameData->'$(OutDir)Data\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />

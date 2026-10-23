@@ -84,7 +84,6 @@ class Renderer
                 bool animatedEffect = false,
                 float rotation = 0,
                 int effectMode = 0);
-    void DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a);
 
   private:
     struct Vertex

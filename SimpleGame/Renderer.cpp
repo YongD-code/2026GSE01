@@ -584,13 +584,3 @@ void Renderer::Text(float x,
            0,
            c);
 }
-
-void Renderer::DrawSolidRect(
-    float x, float y, float, float size, float r, float g, float b, float a)
-{
-    Rect(m_Width * .5f + x - size * .5f,
-         m_Height * .5f - y - size * .5f,
-         size,
-         size,
-         Color(r, g, b, a));
-}

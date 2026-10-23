@@ -15,7 +15,7 @@ ASSET_NAME = globals().get('ASSET_NAME', 'protagonist')
 CUSTOMIZE = globals().get('CUSTOMIZE')
 OUT = ROOT / 'SimpleGame/Assets/Characters/Blender'
 if ASSET_NAME != 'protagonist':
-    OUT = OUT / ASSET_NAME
+    OUT = ROOT / 'Art/Blender/LegacyNpcSprites' / ASSET_NAME
 OUT.mkdir(parents=True, exist_ok=True)
 PREVIEW = '--preview-only' in sys.argv
 SIZE = 192

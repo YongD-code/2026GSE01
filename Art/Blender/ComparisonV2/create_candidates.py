@@ -212,7 +212,7 @@ def build(name):
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/(name+'_candidate.blend')))
     bpy.ops.render.render(write_still=True)
     # Comparison uses identical Workbench lighting on both sides.
-    source=BASE.parents[1]/'SimpleGame/Assets/Characters/Blender'/name/'preview.png'
+    source=BASE/'LegacyNpcSprites'/name/'preview.png'
     pair=[bpy.data.images.load(str(source)),bpy.data.images.load(str(OUT/(name+'_after_studio.png')))]
     w,h=pair[0].size
     pixels=array('f',[0])*(w*2*h*4)
