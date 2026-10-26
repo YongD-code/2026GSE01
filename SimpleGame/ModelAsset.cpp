@@ -12,8 +12,12 @@
 #include <wincrypt.h>
 #pragma comment(lib, "crypt32.lib")
 #pragma warning(push, 0)
+// /sdl elevates CRT deprecation diagnostics independently of the warning level.
+// Keep the upstream C implementation unchanged and restore diagnostics immediately below.
+#pragma warning(disable : 4996)
 #define CGLTF_IMPLEMENTATION
 #include "ThirdParty/cgltf.h"
+#undef CGLTF_IMPLEMENTATION
 #pragma warning(pop)
 
 namespace ModelAssets

@@ -43,6 +43,10 @@ class CharacterModel
         Motion turn = Motion::TurnLeft;
         ModelAssets::State imported;
         bool namedClip = false;
+        // Actor-local distance clock for authored quadruped stance/swing cycles.
+        double gaitTravel = 0;
+        float gaitPhase = 0;
+        bool gaitInitialized = false, gaitRunning = false;
     };
 
     CharacterModel() = default;

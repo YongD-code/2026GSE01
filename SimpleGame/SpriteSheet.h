@@ -46,6 +46,13 @@ struct SpriteAnimation
     Facing facing = Facing::South;
     float phase = 0;
     bool moving = false;
+    double travel = 0;
+
+    void UpdateWorld(double x, double y, float dt, bool sprint, float pixelsPerFrame)
+    {
+        Update((x - y) * .85, (x + y) * .43, dt, sprint, pixelsPerFrame);
+        travel += std::hypot(x, y);
+    }
 
     void Update(double x, double y, float dt, bool sprint, float pixelsPerFrame = 0.f)
     {

@@ -88,7 +88,10 @@ void Prototype::StoryFacade(const Object& building)
 void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
 {
     const Point origin = Screen(at.x, at.y);
-    const std::string key = "story-detail-v2:" + site.id;
+    const std::string key =
+        "story-detail-v3:" + site.id +
+        (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
+                                                                        : ":present");
     if (r.BeginCachedMesh(key, origin))
     {
         const Color wood(.27f, .18f, .11f), edge(.12f, .10f, .085f), timber(.46f, .32f, .19f);
@@ -218,6 +221,27 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
                     sheet(i * 9 - 3, -16, 43, 5, 9);
                 }
                 sheet(-10, -8, 24, 20, 16);
+                if (CemeteryCleared())
+                {
+                    // Two physical fragments remain on the altar until investigated.
+                    const bool collected = chapter.step > chapter.Index("P007_SEAL");
+                    if (!collected)
+                    {
+                        for (int i = 0; i < 2; ++i)
+                        {
+                            const double x = -9 + i * 17;
+                            r.Triangle(p(x - 5, 4, 25),
+                                       p(x + 2, 4, 42 - i * 5),
+                                       p(x + 6, 4, 25),
+                                       Color(.17f, .11f, .23f));
+                            r.Triangle(p(x + 2, 4, 42 - i * 5),
+                                       p(x + 6, 4, 25),
+                                       p(x + 3, 10, 25),
+                                       Color(.38f, .25f, .44f));
+                            line(x, 4, 29, x + 2, 4, 35, 1, Color(.78f, .58f, .87f));
+                        }
+                    }
+                }
             }
             else
             {

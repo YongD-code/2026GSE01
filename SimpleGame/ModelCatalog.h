@@ -12,6 +12,7 @@ struct Definition
     std::wstring path;
     std::map<std::string, std::string> clips;
     std::vector<std::string> ambientClips;
+    float walkStrideRatio = 0, runStrideRatio = 0, runThresholdRatio = 0;
 };
 
 // A catalog describes export files, not .blend authoring documents or executable code.

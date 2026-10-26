@@ -299,6 +299,11 @@ for kind, end in clips.items():
 rig.animation_data.action = None
 clear_pose()
 
+locomotion = None
+if gait == 'quadruped':
+    import quadruped_locomotion
+    locomotion = quadruped_locomotion.apply_rig(rig, species)
+
 surface_forms.stylize_scene()
 bpy.ops.wm.save_as_mainfile(filepath=str(destination/'model.blend'))
 bpy.ops.object.select_all(action='DESELECT')
@@ -306,11 +311,13 @@ rig.select_set(True)
 for obj in bpy.context.scene.objects:
     if obj.type == 'MESH':
         obj.select_set(True)
+export_temporary = destination/'model_export.glb'
 with surface_forms.export_materials():
-    bpy.ops.export_scene.gltf(filepath=str(destination/'model.glb'),
+    bpy.ops.export_scene.gltf(filepath=str(export_temporary),
                               export_format='GLB', use_selection=True,
                               export_animations=True, export_animation_mode='ACTIONS',
                               export_extras=True)
+export_temporary.replace(destination/'model.glb')
 if source and hashlib.sha256(source.read_bytes()).hexdigest() != source_hash:
     raise RuntimeError('Protected source model changed')
 catalog_path = HERE/'mob_catalog.json'
@@ -327,6 +334,8 @@ entry = {'id': species_id, 'key': species, 'name': label, 'disposition': disposi
          'turnStepDegrees': 45,
          'materialExport': 'PBR base colors; four-band lighting is authored in the blend source',
          'triangles': sum(len(p.vertices)-2 for o in bpy.context.scene.objects if o.type == 'MESH' for p in o.data.polygons)}
+if locomotion:
+    quadruped_locomotion.update_entry(entry, rig, locomotion)
 catalog['species'] = [e for e in catalog['species'] if e['id'] != species_id] + [entry]
 catalog['species'].sort(key=lambda e: e['id'])
 catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

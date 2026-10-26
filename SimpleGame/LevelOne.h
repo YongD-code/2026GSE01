@@ -276,6 +276,8 @@ class LevelOne
     float skillCooldown = 0;
     int skillsUsed = 0;
     std::set<int> resolvedBosses;
+    // Session-only arena ownership. Snapshots are taken outside active fights.
+    int arenaBoss = 0;
 
     int Capturable(WorldPoint player) const
     {
@@ -1260,8 +1262,7 @@ class LevelOne
                          blocked);
                 }
                 const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
-                enemy.animation.Update(
-                    (ax - ay) * .85, (ax + ay) * .43, enemyDt, enemy.running, 9.f);
+                enemy.animation.UpdateWorld(ax, ay, enemyDt, enemy.running, 9.f);
                 continue;
             }
             WorldPoint enemyTarget = combatTarget;
@@ -1274,7 +1275,7 @@ class LevelOne
             if (!enemy.returning && !enemy.alerted && distance < combat.aggro &&
                 ClearLine(enemy.position, enemyTarget, blocked))
                 enemy.alerted = true;
-            if (enemy.alerted &&
+            if (enemy.alerted && (arenaBoss == 0 || enemy.boss != arenaBoss) &&
                 (Distance(enemyTarget, enemy.home) > 650 ||
                  Distance(enemy.position, enemy.home) > 600 ||
                  Distance(enemyTarget, {0, 0}) <= 210 || enemy.trail.size() >= 2048))
@@ -1324,14 +1325,14 @@ class LevelOne
             const double ax = enemy.position.x - previous.x, ay = enemy.position.y - previous.y;
             enemy.running = std::hypot(ax, ay) > 75 * enemyDt;
             const float authoredStride = StoryEncounter::Get(enemy.boss).walkFrameDistance;
-            enemy.animation.Update((ax - ay) * .85,
-                                   (ax + ay) * .43,
-                                   enemyDt,
-                                   false,
-                                   authoredStride > 0 ? authoredStride
-                                   : enemy.type == 0  ? 7.f
-                                   : enemy.type == 1  ? 11.f
-                                                      : 9.f);
+            enemy.animation.UpdateWorld(ax,
+                                        ay,
+                                        enemyDt,
+                                        false,
+                                        authoredStride > 0 ? authoredStride
+                                        : enemy.type == 0  ? 7.f
+                                        : enemy.type == 1  ? 11.f
+                                                           : 9.f);
             if (enemy.phase == 1 || enemy.phase == 2)
             {
                 const WorldPoint direction =

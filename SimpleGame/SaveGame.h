@@ -434,7 +434,7 @@ class SaveGame
                 {
                     person.destination = person.position;
                     person.action = Population::Resting;
-                    person.timer = 1 + person.id % 6;
+                    person.timer = 1.f + static_cast<float>(person.id % 6);
                 }
             }
         }

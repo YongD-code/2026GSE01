@@ -112,11 +112,11 @@
       "source": "Art/Blender/SpiritCollection/hands/model.blend",
       "sourceSha256": "0b85417c6a88b56028fd8f737b71edc0ae3ba6bd9d8649e4f0026a1b35f1295c",
       "meshCount": 168,
-      "boneCount": 20,
+      "boneCount": 26,
       "clips": {
         "idle": {
           "firstFrame": 1,
-          "lastFrame": 33,
+          "lastFrame": 49,
           "loop": true
         },
         "walk": {
@@ -147,7 +147,19 @@
       },
       "turnStepDegrees": 45,
       "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
-      "triangles": 21148
+      "triangles": 21148,
+      "locomotion": {
+        "version": 1,
+        "walkGait": "four_beat_walk",
+        "runGait": "trot",
+        "walkStrideRatio": 0.31054183448555156,
+        "runStrideRatio": 0.47775666843931003,
+        "runThresholdRatio": 1.1943916710982752,
+        "sourceHeight": 2.511738881468773,
+        "stanceFraction": 0.72,
+        "runStanceFraction": 0.52,
+        "method": "planted stance, two-bone IK bake, articulated toes, chest/pelvis weighting"
+      }
     },
     {
       "id": 3,
@@ -264,11 +276,11 @@
       "source": null,
       "sourceSha256": null,
       "meshCount": 13,
-      "boneCount": 14,
+      "boneCount": 20,
       "clips": {
         "idle": {
           "firstFrame": 1,
-          "lastFrame": 33,
+          "lastFrame": 49,
           "loop": true
         },
         "walk": {
@@ -304,7 +316,19 @@
       },
       "turnStepDegrees": 45,
       "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
-      "triangles": 5300
+      "triangles": 5300,
+      "locomotion": {
+        "version": 1,
+        "walkGait": "four_beat_walk",
+        "runGait": "trot",
+        "walkStrideRatio": 0.3823478800595532,
+        "runStrideRatio": 0.5735218200893298,
+        "runThresholdRatio": 0.8029305481250618,
+        "sourceHeight": 2.6154192350804806,
+        "stanceFraction": 0.7,
+        "runStanceFraction": 0.5,
+        "method": "planted stance, two-bone IK bake, articulated toes, chest/pelvis weighting"
+      }
     },
     {
       "id": 6,
@@ -318,11 +342,11 @@
       "source": null,
       "sourceSha256": null,
       "meshCount": 13,
-      "boneCount": 14,
+      "boneCount": 20,
       "clips": {
         "idle": {
           "firstFrame": 1,
-          "lastFrame": 33,
+          "lastFrame": 49,
           "loop": true
         },
         "walk": {
@@ -358,7 +382,19 @@
       },
       "turnStepDegrees": 45,
       "materialExport": "PBR base colors; four-band lighting is authored in the blend source",
-      "triangles": 4660
+      "triangles": 4660,
+      "locomotion": {
+        "version": 1,
+        "walkGait": "four_beat_walk",
+        "runGait": "gallop",
+        "walkStrideRatio": 0.5218687703397581,
+        "runStrideRatio": 1.143141115982327,
+        "runThresholdRatio": 1.2922464789365438,
+        "sourceHeight": 2.0120000652968884,
+        "stanceFraction": 0.69,
+        "runStanceFraction": 0.3,
+        "method": "planted stance, two-bone IK bake, articulated toes, chest/pelvis weighting"
+      }
     }
   ]
 }

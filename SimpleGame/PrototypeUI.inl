@@ -39,7 +39,7 @@ std::string ObjectiveHint() const
     const auto* quest = chapter.Current();
     if (!quest)
         return chapter.quests.empty() ? "퀘스트 데이터를 읽지 못했습니다." : "1장 완료 · 자유 탐험";
-    return quest->objective;
+    return StoryObjectiveText(*quest);
 }
 
 UIRect JournalBounds() const
@@ -140,6 +140,11 @@ std::vector<std::string> JournalEntries()
         const auto* quest = chapter.Current();
         add(quest ? "현재 목표 · " + quest->title : "현재 목표 · 1장 완료");
         add(ObjectiveHint());
+        if (chapter.step > chapter.Index("P007_SEAL"))
+        {
+            add("보관 중인 사건 물증 · 검은 파편 / 특수 봉인 파편");
+            add("같은 문양이 새겨진 두 파편. 판매·소모되지 않으며 이야기 진행과 함께 저장됩니다.");
+        }
         add("초록색 목표 표시는 미니맵을 확인하세요. 범위 밖 목표는 화살표로 표시됩니다.");
         add("완료한 이벤트 · " + std::to_string(chapter.step) + " / " +
             std::to_string(chapter.quests.size()));
@@ -470,17 +475,30 @@ void DrawMinimap()
                       person.mailId >= 0 ? Color(1.f, .76f, .3f) : Color(.5f, .7f, .8f));
         }
     }
+    const auto room = CemeteryRoom::Bounds();
+    const WorldPoint corners[] = {{room.x, room.y},
+                                  {room.x + room.w, room.y},
+                                  {room.x + room.w, room.y + room.d},
+                                  {room.x, room.y + room.d}};
+    for (int i = 0; i < 4; ++i)
+    {
+        const Point a = project(corners[i]), b = project(corners[(i + 1) % 4]);
+        if (inside(a) && inside(b))
+        {
+            r.Line(a, b, 1.5f, Color(.66f, .58f, .74f));
+        }
+    }
     for (const auto& site : StoryLayout::Sites())
     {
-        const Point p = project(site.position);
-        if (inside(p) && StoryLayout::Visible(site, chapter))
+        const Point p = project(StoryPosition(site));
+        if (inside(p) && StoryVisible(site))
         {
             r.Ellipse(p.x, p.y, 2, 2, Color(.56f, .69f, .76f));
         }
     }
     if (const auto* quest = chapter.Current())
     {
-        WorldPoint target = quest->trigger == "skill" ? player : quest->destination;
+        WorldPoint target = StoryObjectivePosition(*quest);
         for (const auto& enemy : levelOne.enemies)
         {
             if ((quest->trigger == "fight" || quest->trigger == "first_capture" ||
@@ -515,7 +533,10 @@ void DrawMinimap()
         }
     }
     r.Triangle({cx, cy - 5}, {cx - 4, cy + 4}, {cx + 4, cy + 4}, Color(1, 1, 1));
-    r.Text(box.x + 10, box.y + 20, world.Region(player), Color(.85f, .83f, .72f));
+    r.Text(box.x + 10,
+           box.y + 20,
+           CemeteryRoom::Contains(player) ? "공동묘지 · 봉인 묘역" : world.Region(player),
+           Color(.85f, .83f, .72f));
     r.Text(box.x + 8, box.y + box.h - 5, "초록: 목표", Color(.2f, 1.f, .36f));
 }
 
@@ -537,6 +558,12 @@ void DrawQuestTracker()
         progress = chapter.quests.empty() ? 0.f : 1.f;
         counter = chapter.quests.empty() ? "확인 필요" : "100%";
     }
+    else if (quest->id == "P007" || quest->id == "P007_SEAL")
+    {
+        const int completed = quest->id == "P007_SEAL" ? 2 : cemeteryEngaged ? 1 : 0;
+        progress = completed / 3.f;
+        counter = std::to_string(completed) + " / 3";
+    }
     else if (quest->trigger == "survive")
     {
         progress = chapter.rewardPending ? 0.f : (std::min)(1.f, storyTrialTime / 5.f);
@@ -557,13 +584,13 @@ void DrawQuestTracker()
     WrappedText(box.x + 12,
                 box.y + 44,
                 box.w - 24,
-                quest                    ? quest->title
-                : chapter.quests.empty() ? "퀘스트 데이터 없음"
-                                         : "1장 완료",
+                quest && (quest->id == "P007" || quest->id == "P007_SEAL") ? "묘지의 인위적인 봉인"
+                : quest                                                    ? quest->title
+                : chapter.quests.empty()                                   ? "퀘스트 데이터 없음"
+                                                                           : "1장 완료",
                 text,
                 1);
-    WrappedText(
-        box.x + 12, box.y + 66, box.w - 24, quest ? quest->objective : ObjectiveHint(), muted, 2);
+    WrappedText(box.x + 12, box.y + 66, box.w - 24, ObjectiveHint(), muted, 2);
     r.Rect(box.x + 12, box.y + 101, box.w - 24, 5, Color(.16f, .20f, .23f));
     if (progress > 0)
     {
@@ -632,6 +659,11 @@ std::vector<std::string> DialoguePages() const
 
 void HUD()
 {
+    if (storyScene != StoryScene::None)
+    {
+        DrawStorySceneOverlay();
+        return;
+    }
     if (titleScreen || slotMode != SlotMode::Closed)
     {
         DrawFront();
@@ -678,8 +710,10 @@ void HUD()
         }
         else
         {
-            UIButton({x + 24, y + 62, w - 48, 44}, "F9  저장된 여정 불러오기");
-            UIButton({x + 24, y + 120, w - 48, 44}, "R  처음부터 시작");
+            UIButton({x + 24, y + 62, w - 48, 44},
+                     cemeteryEngaged ? "R  묘역 입구에서 재도전" : "F9  저장된 여정 불러오기");
+            UIButton({x + 24, y + 120, w - 48, 44},
+                     cemeteryEngaged ? "F9  저장된 여정 불러오기" : "R  처음부터 시작");
         }
         return;
     }
@@ -790,6 +824,15 @@ void HUD()
             const char* names[] = {"경험치 조각", "무기 강화석", "회복물약", "주령석", "봉인권"};
             heading = "주변 전리품";
             body = std::string(names[static_cast<int>(nearest->kind)]) + " · 가까이 가면 자동 흡수";
+        }
+        else if (!controlling && !CemeteryCleared() && Distance(player, CemeteryRoom::Gate()) < 70)
+        {
+            heading = "울음을 삼킨 묘역";
+            const auto* current = chapter.Current();
+            body = cemeteryEngaged ? "전투 중에는 봉인문이 열리지 않습니다."
+                   : current && current->id == "P007"
+                       ? "F · 보스 묘역 진입"
+                       : "라엔과 첫 봉인을 마친 뒤 진입할 수 있습니다.";
         }
         else if (const auto* site = nearbyStory)
         {

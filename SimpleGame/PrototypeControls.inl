@@ -328,7 +328,8 @@ void UpdateCharacterPresentation(float dt, double dx, double dy, double screenDi
 bool ControlsActive() const
 {
     return serviceNpc.empty() && !titleScreen && !openingPlaying && slotMode == SlotMode::Closed &&
-           !pauseMenu && !journal && !chapter.choicePending && !dialoguePending && !levelOne.Dead();
+           storyScene == StoryScene::None && !pauseMenu && !journal && !chapter.choicePending &&
+           !dialoguePending && !levelOne.Dead();
 }
 
 int SkillSet() const

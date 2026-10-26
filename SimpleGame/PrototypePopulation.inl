@@ -146,7 +146,7 @@ void InitializePopulation()
     population.Initialize(world.seed,
                           [this](WorldPoint p)
                           {
-                              return Blocked(p);
+                              return CemeteryRoom::Contains(p, 15) || Blocked(p);
                           });
     levelOne.residentCombatants.clear();
     levelOne.encounterObservers.clear();
@@ -184,7 +184,7 @@ void UpdatePopulation(float dt)
         levelOne,
         [this](WorldPoint p)
         {
-            return Blocked(p);
+            return CemeteryRoom::Contains(p, 15) || Blocked(p);
         },
         SimulationRadius());
     levelOne.residentCombatants.clear();

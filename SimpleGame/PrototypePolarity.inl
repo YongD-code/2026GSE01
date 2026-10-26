@@ -109,7 +109,7 @@ void DrawPolarity(const SkillEffect& effect)
     for (int i = 0; i < 12; ++i)
     {
         const float angle = i * 2.39996f - age * .9f;
-        const float radius = 18 + (i % 4) * 13;
+        const float radius = 18.f + (i % 4) * 13.f;
         const Point p = {core.x + std::cos(angle) * radius,
                          core.y + std::sin(angle) * radius * .62f};
         mote(p,

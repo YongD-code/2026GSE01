@@ -190,7 +190,8 @@ void DrawSpiritRealmShell()
     for (int i = 0; i < 32; ++i)
     {
         const float phase = std::fmod(i * .137f + elapsed * (effect.set == 1 ? .18f : .1f), 1.f);
-        const float x = std::fmod(i * 197.f + std::sin(elapsed + i) * 18 + width, width);
+        const float x =
+            static_cast<float>(std::fmod(i * 197.f + std::sin(elapsed + i) * 18 + width, width));
         const float y = effect.set == 3 ? height * (1 - phase) : height * phase;
         const Point p = {x, y};
         const float dx = (p.x - center.x) / radius;

@@ -250,7 +250,7 @@ void PublishMonitoring()
     {
         json << "{\"id\":" << Monitoring::Quote(quest->id)
              << ",\"title\":" << Monitoring::Quote(quest->title)
-             << ",\"objective\":" << Monitoring::Quote(quest->objective) << '}';
+             << ",\"objective\":" << Monitoring::Quote(StoryObjectiveText(*quest)) << '}';
     }
     else
     {

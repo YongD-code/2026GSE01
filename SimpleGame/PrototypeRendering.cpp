@@ -471,6 +471,10 @@ void Prototype::DrawWorldLabel(WorldPoint position,
                                const std::string& text,
                                Color color)
 {
+    if (storyScene != StoryScene::None)
+    {
+        return;
+    }
     const Point feet = Screen(position.x, position.y);
     if (feet.x < 0 || feet.x > width || feet.y < 0 || feet.y - elevation > height)
     {
@@ -591,12 +595,46 @@ bool Prototype::DrawSpiritModel(int species,
     const bool casting = castProgress >= 0;
     if (spiritMeshes[species].Ready())
     {
+        float stridePhase = animation.phase * .25f;
+        const auto profile = models.catalog.spirits.find(species);
+        if (state && SpiritCatalog::Get(species).gait == 2 &&
+            profile != models.catalog.spirits.end() && profile->second.walkStrideRatio > 0)
+        {
+            auto& model = spiritMeshes[species];
+            if (state->owner != &model)
+            {
+                model.Reset(*state, CharacterFacing(animation.facing));
+            }
+            const auto& gait = profile->second;
+            const float elapsed = state->clock < 0 ? 0 : time - state->clock;
+            const double distance = animation.travel - state->gaitTravel;
+            if (state->gaitInitialized && elapsed > .0001f && elapsed < .2f && distance >= 0 &&
+                distance < 250 && !pauseMenu && !journal)
+            {
+                const float speed = static_cast<float>(distance / elapsed);
+                const float threshold =
+                    size * gait.runThresholdRatio * (state->gaitRunning ? .82f : 1.f);
+                running = running || (animation.moving && speed > threshold);
+                if (animation.moving)
+                {
+                    const double cycle =
+                        size * (running ? gait.runStrideRatio : gait.walkStrideRatio);
+                    state->gaitPhase =
+                        static_cast<float>(std::fmod(state->gaitPhase + distance / cycle, 1.));
+                }
+            }
+            // Rebase after culling, loading or teleporting; camera motion never adds steps.
+            state->gaitTravel = animation.travel;
+            state->gaitInitialized = true;
+            state->gaitRunning = running;
+            stridePhase = state->gaitPhase;
+        }
         const auto motion = casting             ? CharacterModel::Motion::Cast
                             : !animation.moving ? CharacterModel::Motion::Idle
                             : running           ? CharacterModel::Motion::Run
                                                 : CharacterModel::Motion::Walk;
         const float phase = casting            ? castProgress
-                            : animation.moving ? animation.phase * .25f
+                            : animation.moving ? stridePhase
                                                : motionClock * .75f;
         return DrawKeyedModel(
             spiritMeshes[species], feet, size, animation, tint, motion, phase, state);

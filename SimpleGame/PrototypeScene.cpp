@@ -217,6 +217,7 @@ void Prototype::SynchronizeScene()
     scene.Ensure("projectiles", "world");
     scene.Ensure("effects", "world");
     scene.Ensure("interface");
+    BindCemeteryRoom();
 
     auto bind = [this](const std::string& id,
                        const std::string& parent,
@@ -435,9 +436,10 @@ void Prototype::SynchronizeScene()
              DrawPlayer({p.x, p.y});
          });
     scene.Ensure("story", "world");
-    for (const auto& site : StoryLayout::Sites())
+    for (auto site : StoryLayout::Sites())
     {
-        if (!StoryLayout::Visible(site, chapter) || !inView(site.position, 180, 220, 100))
+        site.position = StoryPosition(site);
+        if (!StoryVisible(site) || !inView(site.position, 180, 220, 100))
         {
             continue;
         }
@@ -487,25 +489,24 @@ void Prototype::SynchronizeScene()
                                       &static_cast<const ModelActor&>(node).modelState);
                       });
         }
-        bind(
-            "story-label/" + site.id,
-            bodyId,
-            site.position,
-            ActorLayer::WorldLabel,
-            [this, site](const Actor& node)
-            {
-                const auto pos = node.WorldPosition();
-                const WorldPoint at = {pos.x, pos.y};
-                const bool evidence = site.kind == StoryLayout::Kind::Evidence;
-                if ((!evidence && StoryPersonVisible(site, at)) ||
-                    (evidence && StoryLayout::Visible(site, chapter) && Distance(player, at) < 130))
-                {
-                    DrawWorldLabel(at,
-                                   evidence ? 40.f : StoryLayout::PersonHeight(site) + 12.f,
-                                   site.name,
-                                   Color(.95f, .9f, .72f));
-                }
-            });
+        bind("story-label/" + site.id,
+             bodyId,
+             site.position,
+             ActorLayer::WorldLabel,
+             [this, site](const Actor& node)
+             {
+                 const auto pos = node.WorldPosition();
+                 const WorldPoint at = {pos.x, pos.y};
+                 const bool evidence = site.kind == StoryLayout::Kind::Evidence;
+                 if ((!evidence && StoryPersonVisible(site, at)) ||
+                     (evidence && StoryVisible(site) && Distance(player, at) < 130))
+                 {
+                     DrawWorldLabel(at,
+                                    evidence ? 40.f : StoryLayout::PersonHeight(site) + 12.f,
+                                    site.name,
+                                    Color(.95f, .9f, .72f));
+                 }
+             });
     }
     scene.Ensure("residents", "world");
     for (size_t i = 0; i < population.people.size(); ++i)

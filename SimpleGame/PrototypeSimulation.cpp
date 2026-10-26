@@ -12,6 +12,11 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         time += (std::min)(dt, .05f);
         return;
     }
+    if (storyScene != StoryScene::None)
+    {
+        UpdateStoryScene(dt);
+        return;
+    }
     dt = (std::max)(0.f, (std::min)(dt, .05f));
     const WorldPoint previousPlayer = player;
     const WorldPoint previousSpirit = spirit;
@@ -181,6 +186,10 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
     if (serviceNpc.empty() && !pauseMenu && !journal && !chapter.choicePending && !dialoguePending)
     {
         UpdateChapter();
+        if (storyScene != StoryScene::None)
+        {
+            return;
+        }
         if (ControlsActive())
         {
             if (attackHeld && bufferedCommand.action < 0)
@@ -208,6 +217,17 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         }
         if (!dialoguePending)
         {
+            if (cemeteryEngaged)
+            {
+                for (const auto& enemy : levelOne.enemies)
+                {
+                    if (enemy.boss == 1)
+                    {
+                        cemeteryBossPosition = enemy.position;
+                        break;
+                    }
+                }
+            }
             FrameProfiler::Scope timing(FrameProfiler::Stage::Combat);
             levelOne.Update(
                 dt,
@@ -228,6 +248,13 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                 SimulationRadius());
         }
         SyncPopulationHealth();
+        // Resolve a simultaneous final hit before showing the defeat screen.
+        if (cemeteryEngaged && levelOne.resolvedBosses.count(1))
+        {
+            levelOne.health = (std::max)(1.f, levelOne.health);
+            StartStoryScene(StoryScene::RoomVictory);
+            return;
+        }
         if (!controlling && levelOne.companionCooldown > previousCompanionCooldown)
         {
             spiritCastPose = .55f;
@@ -291,13 +318,13 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         screenDY = 0;
     }
     if (serviceNpc.empty() && !pauseMenu && !journal && !chapter.choicePending && !dialoguePending)
-        companionAnimation.Update(screenDX,
-                                  screenDY,
-                                  dt,
-                                  controlling && sprint,
-                                  capturedSpirit == 0   ? 7.f
-                                  : capturedSpirit == 1 ? 11.f
-                                                        : 9.f);
+        companionAnimation.UpdateWorld(screenDX == 0 && screenDY == 0 ? 0 : spiritDX,
+                                       screenDX == 0 && screenDY == 0 ? 0 : spiritDY,
+                                       dt,
+                                       controlling && sprint,
+                                       capturedSpirit == 0   ? 7.f
+                                       : capturedSpirit == 1 ? 11.f
+                                                             : 9.f);
     WorldPoint target = controlling ? spirit : player;
     if (Distance(target, camera) > 2000)
         camera = target; // Distant vessel switch.

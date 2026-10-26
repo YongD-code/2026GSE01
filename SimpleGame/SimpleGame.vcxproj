@@ -167,6 +167,7 @@
     <ClInclude Include="Actor.h" />
     <ClInclude Include="UILayout.h" />
     <ClInclude Include="StoryLayout.h" />
+    <ClInclude Include="StoryEvent.h" />
     <ClInclude Include="StoryEncounter.h" />
     <ClInclude Include="ClickNavigation.h" />
     <ClInclude Include="PrototypeControls.inl" />
@@ -211,6 +212,7 @@
     <ClCompile Include="ModelCatalog.cpp" />
     <ClCompile Include="ModelLibrary.cpp" />
     <ClCompile Include="PrototypeScene.cpp" />
+    <ClCompile Include="PrototypeStoryEvent.cpp" />
     <ClCompile Include="PrototypeFront.cpp" />
     <ClCompile Include="PrototypeRendering.cpp" />
     <ClCompile Include="PrototypeSimulation.cpp" />

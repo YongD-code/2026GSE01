@@ -255,6 +255,7 @@ void Prototype::OpenSlots(SlotMode mode)
 
 void Prototype::NewGame()
 {
+    ResetStoryEvent();
     openingPending = true;
     openingPlaying = openingSkipping = false;
     openingTime = openingExitTime = openingFade = 0;
@@ -450,6 +451,14 @@ bool Prototype::FrontClick(int x, int y)
 
 bool Prototype::GameUIClick(int x, int y)
 {
+    if (storyScene != StoryScene::None)
+    {
+        if (StorySkipBounds().Contains(x, y))
+        {
+            FinishStoryScene();
+        }
+        return true;
+    }
     if (!serviceNpc.empty())
     {
         for (int i = 0; i < 6; ++i)
@@ -476,7 +485,9 @@ bool Prototype::GameUIClick(int x, int y)
         ClearInput();
         if (choice)
             ChooseChildDialogue(i == 0);
-        else if (i == 0)
+        else if (cemeteryEngaged && i == 0)
+            RetryCemetery();
+        else if (i == 0 || cemeteryEngaged)
             ProgressKey(true);
         else
             Key('r', true);

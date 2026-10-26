@@ -1,8 +1,9 @@
 // Included inside Prototype. Disk state is separate from rendering and input state.
 bool CanSaveProgress() const
 {
-    if (titleScreen || openingPlaying || levelOne.Dead() || chapter.quests.empty() ||
-        levelOne.dodgeTime > 0 || levelOne.invulnerability > 0 || !skillEffects.empty())
+    if (titleScreen || openingPlaying || storyScene != StoryScene::None || cemeteryEngaged ||
+        levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
+        levelOne.invulnerability > 0 || !skillEffects.empty())
     {
         return false;
     }
@@ -40,7 +41,7 @@ bool SaveProgress(bool manual, int slot = 0)
     {
         if (manual)
         {
-            ProgressNotice("전투·귀환·사망 중에는 저장할 수 없습니다.");
+            ProgressNotice("전투·컷신·귀환·사망 중에는 저장할 수 없습니다.");
         }
         return false;
     }
@@ -222,7 +223,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     population.RepairPlacement(
         [this](WorldPoint p)
         {
-            return Blocked(p);
+            return CemeteryRoom::Contains(p, 15) || Blocked(p);
         });
     chapter = std::move(state.chapter);
     storyTrialTime = 0;
@@ -270,6 +271,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     protagonistSprinting = false;
     dodgeHeld = false;
     ClearInput();
+    RestoreStoryEvent();
     camera = controlling ? spirit : player;
     world.Stream(camera, camera, width, height);
     autoSaveTime = 0;

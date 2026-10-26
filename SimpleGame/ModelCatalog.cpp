@@ -156,6 +156,22 @@ bool Catalog::LoadSpirits(const std::wstring& relative, std::string& error)
             definition.path = Export(folder, item.at("export").get<std::string>());
             definition.clips = Clips(item);
             definition.ambientClips = item.value("ambientClips", std::vector<std::string>());
+            if (item.contains("locomotion"))
+            {
+                const auto& locomotion = item.at("locomotion");
+                definition.walkStrideRatio = locomotion.at("walkStrideRatio").get<float>();
+                definition.runStrideRatio = locomotion.at("runStrideRatio").get<float>();
+                definition.runThresholdRatio = locomotion.at("runThresholdRatio").get<float>();
+                for (float value : {definition.walkStrideRatio,
+                                    definition.runStrideRatio,
+                                    definition.runThresholdRatio})
+                {
+                    if (!std::isfinite(value) || value < .01f || value > 20.f)
+                    {
+                        throw std::runtime_error("주령의 보폭/이동 전환 비율이 잘못됐습니다.");
+                    }
+                }
+            }
             if (definition.id < 0 || definition.id > 65535 || definition.key.empty() ||
                 !keys.insert(definition.key).second ||
                 !entries.emplace(definition.id, definition).second)

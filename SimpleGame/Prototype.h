@@ -11,6 +11,7 @@
 #include "SceneGraph.h"
 #include "UILayout.h"
 #include "StoryLayout.h"
+#include "StoryEvent.h"
 #include "ClickNavigation.h"
 #include "Monitoring.h"
 #include "Population.h"
@@ -32,6 +33,17 @@ class Prototype
     bool hudVisible = true;
     bool dodgeHeld = false, screenShake = true;
     bool dialoguePending = false;
+    enum class StoryScene
+    {
+        None,
+        RoomEntrance,
+        RoomVictory,
+        SealDiscovery
+    };
+    StoryScene storyScene = StoryScene::None;
+    float storySceneTime = 0;
+    bool cemeteryEngaged = false;
+    WorldPoint cemeteryBossPosition = CemeteryRoom::Boss();
     int dialoguePage = 0;
     bool pauseMenu = false, exitConfirm = false, exitRequested = false, skipExitSave = false;
     enum class SlotMode
@@ -179,6 +191,10 @@ class Prototype
 
     bool Blocked(WorldPoint p)
     {
+        if (CemeteryRoom::Contains(p, 30) && CemeteryRoom::Blocked(p, !CemeteryCleared()))
+        {
+            return true;
+        }
         if (world.Blocked(p))
             return true;
         const auto nearby = villageCollision.find({World::Index(p.x), World::Index(p.y)});
@@ -208,11 +224,11 @@ class Prototype
         double nearest = 62;
         for (const auto& site : StoryLayout::Sites())
         {
-            if (!StoryLayout::Visible(site, chapter))
+            if (!StoryVisible(site))
             {
                 continue;
             }
-            const double distance = Distance(player, site.position);
+            const double distance = Distance(player, StoryPosition(site));
             if (distance < 62 && quest &&
                 quest->trigger.substr(quest->trigger.find(':') + 1) == site.id)
             {
@@ -252,6 +268,10 @@ class Prototype
     void Interact()
     {
         if (controlling)
+        {
+            return;
+        }
+        if (InteractStoryEvent())
         {
             return;
         }
@@ -373,6 +393,10 @@ class Prototype
         const auto* quest = chapter.Current();
         levelOne.storyTrial = quest && quest->trigger == "survive";
         if (levelOne.Dead())
+        {
+            return;
+        }
+        if (UpdateStoryEvent())
         {
             return;
         }
@@ -828,7 +852,8 @@ class Prototype
 
     void ProgressKey(bool load)
     {
-        if (openingPlaying || slotMode != SlotMode::Closed || exitConfirm)
+        if (openingPlaying || storyScene != StoryScene::None || slotMode != SlotMode::Closed ||
+            exitConfirm)
             return;
         if (!titleScreen || load)
             OpenSlots(load ? SlotMode::Load : SlotMode::Save);
@@ -943,6 +968,15 @@ class Prototype
         {
             if (key == 27 || key == 13 || key == ' ')
                 SkipOpening();
+            keys[key] = true;
+            return;
+        }
+        if (storyScene != StoryScene::None)
+        {
+            if (key == 27 || key == ' ' || key == 13)
+            {
+                FinishStoryScene();
+            }
             keys[key] = true;
             return;
         }
@@ -1076,6 +1110,12 @@ class Prototype
 
         if (key == 'r' && levelOne.Dead())
         {
+            if (cemeteryEngaged)
+            {
+                RetryCemetery();
+                return;
+            }
+            ResetStoryEvent();
             population.people.clear();
             population.society = Population::Society();
             levelOne = LevelOne();
@@ -1183,6 +1223,23 @@ class Prototype
     void Draw();
 
   private:
+    bool CemeteryCleared() const;
+    bool StoryVisible(const StoryLayout::Site& site) const;
+    WorldPoint StoryPosition(const StoryLayout::Site& site) const;
+    WorldPoint StoryObjectivePosition(const Chapter::Quest& quest) const;
+    std::string StoryObjectiveText(const Chapter::Quest& quest) const;
+    bool UpdateStoryEvent();
+    bool InteractStoryEvent();
+    void EnterCemetery();
+    void RetryCemetery();
+    void ResetStoryEvent();
+    void RestoreStoryEvent();
+    void StartStoryScene(StoryScene kind);
+    void UpdateStoryScene(float dt);
+    void FinishStoryScene();
+    UIRect StorySkipBounds() const;
+    void DrawStorySceneOverlay();
+    void BindCemeteryRoom();
     void LoadPresentation(const SpriteLayout& layout);
     void StartOpening();
     void UpdatePresentation(float dt);
