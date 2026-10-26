@@ -21,6 +21,14 @@ enum class ActorLayer
     Interface
 };
 
+// Ground-space bounds relative to the actor origin. Characters use a foot point;
+// scenery uses its footprint rather than the top of its projected image.
+struct ActorFootprint
+{
+    double x = 0, y = 0, width = 0, depth = 0;
+    bool enabled = false;
+};
+
 // A scene node owns its local transform and common lifecycle state.
 // Gameplay actors can override the hooks without depending on Prototype.
 class Actor
@@ -33,6 +41,7 @@ class Actor
     ActorPosition local;
     ActorLayer layer = ActorLayer::World;
     double depthOffset = 0;
+    ActorFootprint footprint;
     bool visible = true;
     bool enabled = true;
 

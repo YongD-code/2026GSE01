@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <queue>
 #include <stdexcept>
 #include <vector>
 
@@ -121,14 +122,20 @@ class SceneGraph
     {
         Traversal guard(*this);
         orderDirty = true;
-        auto ordered = Ordered();
+        std::vector<Actor*> ordered;
+        ordered.reserve(actors.size());
+        for (const auto& entry : actors)
+        {
+            ordered.push_back(entry.second.get());
+        }
         // Ancestors update before descendants regardless of drawing layer.
-        std::stable_sort(ordered.begin(),
-                         ordered.end(),
-                         [](Actor* a, Actor* b)
-                         {
-                             return HierarchyDepth(a) < HierarchyDepth(b);
-                         });
+        std::sort(ordered.begin(),
+                  ordered.end(),
+                  [](Actor* a, Actor* b)
+                  {
+                      const int aDepth = HierarchyDepth(a), bDepth = HierarchyDepth(b);
+                      return aDepth == bDepth ? a->sequence < b->sequence : aDepth < bDepth;
+                  });
         for (Actor* actor : ordered)
         {
             if (actor->IsEnabled())
@@ -203,34 +210,165 @@ class SceneGraph
         return depth;
     }
 
+    static ActorLayer RenderLayer(ActorLayer layer)
+    {
+        // Bodies and scenery share one world pass; Character is a semantic category.
+        return layer == ActorLayer::Character ? ActorLayer::World : layer;
+    }
+
+    struct DrawEntry
+    {
+        Actor* actor;
+        ActorLayer layer;
+        double depth;
+        double minX, minY, maxX, maxY;
+        double minSide, maxSide;
+    };
+
+    static void OrderWorld(std::vector<DrawEntry>& entries)
+    {
+        size_t first = 0;
+        while (first < entries.size() && entries[first].layer < ActorLayer::World)
+        {
+            ++first;
+        }
+        size_t end = first;
+        while (end < entries.size() && entries[end].layer == ActorLayer::World)
+        {
+            ++end;
+        }
+        const size_t count = end - first;
+        if (count < 2)
+        {
+            return;
+        }
+
+        // Side projection is x-y. Only horizontally overlapping ground projections
+        // can occlude each other; sweep them before creating footprint dependencies.
+        std::vector<size_t> candidates;
+        candidates.reserve(count);
+        for (size_t i = 0; i < count; ++i)
+        {
+            const auto& entry = entries[first + i];
+            if (entry.actor->footprint.enabled && entry.actor->IsVisible())
+            {
+                candidates.push_back(i);
+            }
+        }
+        std::sort(candidates.begin(),
+                  candidates.end(),
+                  [&](size_t a, size_t b)
+                  {
+                      const double left = entries[first + a].minSide;
+                      const double right = entries[first + b].minSide;
+                      return left == right ? a < b : left < right;
+                  });
+
+        std::vector<std::vector<size_t>> after(count);
+        std::vector<size_t> incoming(count, 0);
+        for (size_t i = 0; i < candidates.size(); ++i)
+        {
+            const size_t aIndex = candidates[i];
+            const auto& a = entries[first + aIndex];
+            for (size_t j = i + 1; j < candidates.size(); ++j)
+            {
+                const size_t bIndex = candidates[j];
+                const auto& b = entries[first + bIndex];
+                if (b.minSide > a.maxSide)
+                {
+                    break;
+                }
+                const bool aBehind = a.maxX <= b.minX || a.maxY <= b.minY;
+                const bool bBehind = b.maxX <= a.minX || b.maxY <= a.minY;
+                if (aBehind == bBehind)
+                {
+                    // Overlapping footprints or opposite diagonal separation have
+                    // no unambiguous dependency. Retain the stable depth order.
+                    continue;
+                }
+                const size_t behind = aBehind ? aIndex : bIndex;
+                const size_t front = aBehind ? bIndex : aIndex;
+                after[behind].push_back(front);
+                ++incoming[front];
+            }
+        }
+
+        // A footprint relation is a partial order, not a valid std::sort comparator.
+        // Resolve it explicitly, choosing the original depth/sequence order for ties.
+        std::priority_queue<size_t, std::vector<size_t>, std::greater<size_t>> ready;
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (incoming[i] == 0)
+            {
+                ready.push(i);
+            }
+        }
+        std::vector<bool> emitted(count, false);
+        std::vector<DrawEntry> ordered;
+        ordered.reserve(count);
+        while (ordered.size() < count)
+        {
+            if (ready.empty())
+            {
+                // Intersecting authored scenery can form a cycle. Break it in
+                // deterministic depth order rather than omitting or flickering nodes.
+                size_t next = 0;
+                while (emitted[next])
+                {
+                    ++next;
+                }
+                ready.push(next);
+            }
+            const size_t next = ready.top();
+            ready.pop();
+            emitted[next] = true;
+            ordered.push_back(entries[first + next]);
+            for (size_t front : after[next])
+            {
+                if (!emitted[front] && --incoming[front] == 0)
+                {
+                    ready.push(front);
+                }
+            }
+        }
+        std::copy(ordered.begin(), ordered.end(), entries.begin() + first);
+    }
+
     const std::vector<Actor*>& Ordered()
     {
         if (!orderDirty)
             return drawOrder;
 
-        struct Entry
-        {
-            Actor* actor;
-            double depth;
-        };
-
-        std::vector<Entry> entries;
+        std::vector<DrawEntry> entries;
         entries.reserve(actors.size());
         for (const auto& entry : actors)
         {
             Actor* actor = entry.second.get();
             const auto p = actor->WorldPosition();
-            entries.push_back({actor, p.x + p.y + actor->depthOffset});
+            const auto& foot = actor->footprint;
+            const double x = p.x + foot.x, y = p.y + foot.y;
+            // Allow the body to overlap the edge even when its foot point is outside.
+            const double padding = actor->layer == ActorLayer::Character ? 32 : 0;
+            entries.push_back({actor,
+                               RenderLayer(actor->layer),
+                               x + y + (foot.width + foot.depth) * .5 + actor->depthOffset,
+                               x,
+                               y,
+                               x + foot.width,
+                               y + foot.depth,
+                               x - y - foot.depth - padding,
+                               x + foot.width - y + padding});
         }
         std::sort(entries.begin(),
                   entries.end(),
-                  [](const Entry& a, const Entry& b)
+                  [](const DrawEntry& a, const DrawEntry& b)
                   {
-                      if (a.actor->layer != b.actor->layer)
-                          return a.actor->layer < b.actor->layer;
+                      if (a.layer != b.layer)
+                          return a.layer < b.layer;
                       return a.depth == b.depth ? a.actor->sequence < b.actor->sequence
                                                 : a.depth < b.depth;
                   });
+        OrderWorld(entries);
         drawOrder.clear();
         drawOrder.reserve(entries.size());
         for (const auto& entry : entries)

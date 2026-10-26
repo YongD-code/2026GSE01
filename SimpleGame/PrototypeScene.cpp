@@ -227,6 +227,9 @@ void Prototype::SynchronizeScene()
         auto& actor = scene.Ensure(id, parent);
         actor.SetWorldPosition({position.x, position.y, 0});
         actor.layer = layer;
+        actor.footprint = {
+            0, 0, 0, 0, layer == ActorLayer::World || layer == ActorLayer::Character};
+        actor.depthOffset = 0;
         actor.draw = std::move(draw);
         return actor;
     };
@@ -235,19 +238,37 @@ void Prototype::SynchronizeScene()
     {
         if (!objectInView(data))
             return;
+        const auto& buildings = StoryLayout::Buildings();
+        const bool storyFacade = data.kind == 0 && std::any_of(buildings.begin(),
+                                                               buildings.end(),
+                                                               [&data](const Object& building)
+                                                               {
+                                                                   return building.kind == 0 &&
+                                                                          building.x == data.x &&
+                                                                          building.y == data.y;
+                                                               });
         auto& actor = bind(id,
                            parent,
                            {data.x, data.y},
                            ActorLayer::World,
-                           [this, data](const Actor& node)
+                           [this, data, storyFacade](const Actor& node)
                            {
                                auto placed = data;
                                const auto position = node.WorldPosition();
                                placed.x = position.x;
                                placed.y = position.y;
                                DrawObject(placed);
+                               if (storyFacade)
+                               {
+                                   StoryFacade(placed);
+                               }
                            });
-        actor.depthOffset = data.w + data.d;
+        actor.footprint = {0, 0, data.w, data.d, true};
+        if (data.kind == 1)
+        {
+            // The foliage is elevated; the trunk determines front/back occlusion.
+            actor.footprint = {data.w * .5, data.d * .5, 0, 0, true};
+        }
     };
 
     auto modelBind = [this](const std::string& id,
@@ -258,28 +279,14 @@ void Prototype::SynchronizeScene()
         auto& actor = scene.Ensure<ModelActor>(id, parent);
         actor.SetWorldPosition({position.x, position.y, 0});
         actor.layer = ActorLayer::Character;
+        actor.footprint = {0, 0, 0, 0, true};
+        actor.depthOffset = 0;
         actor.draw = std::move(draw);
         return actor;
     };
 
     for (size_t i = 0; i < villageObjects.size(); ++i)
         object("village/object/" + std::to_string(i), "village", villageObjects[i]);
-    for (const auto& building : StoryLayout::Buildings())
-    {
-        if (building.kind != 0 || !objectInView(building))
-        {
-            continue;
-        }
-        auto& facade = bind("story-building/" + std::to_string(int(building.x)),
-                            "village",
-                            {building.x, building.y},
-                            ActorLayer::World,
-                            [this, building](const Actor&)
-                            {
-                                StoryFacade(building);
-                            });
-        facade.depthOffset = building.w + building.d + .1f;
-    }
 
     for (const auto& entry : world.chunks)
     {
@@ -371,7 +378,8 @@ void Prototype::SynchronizeScene()
                         Screen(at.x + 44, at.y + 16, 32),
                         2,
                         Color(.04f, .04f, .05f));
-             });
+             })
+            .footprint = {28, 0, 20, 16, true};
         bind(post + "/label",
              post,
              office,
