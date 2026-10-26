@@ -132,6 +132,13 @@ class LevelOne
         float aggro = 270, chaseSpeed = 155, chargeSpeed = 570;
         float meleeWindup = .48f, chargeWindup = .7f, rangedWindup = .8f;
         float meleeDamage = 18, chargeDamage = 28, rangedDamage = 16;
+        // Attack shapes are shared by damage checks and ground warnings.
+        float meleeReach = 85, meleeFacingDot = .35f;
+        float chargeDuration = .48f, chargeRadius = 30;
+        float rangedSpread = .18f, rangedReach = 520;
+        float saintWindup = 1.1f, saintRecovery = 1.25f, saintRadius = 78;
+        float rangedSpeed = 440, projectileRangeRate = 440;
+        float saintShotSpeed = 220, saintShotBudget = 420;
     } combat;
 
     void LoadCombat()
@@ -911,7 +918,7 @@ class LevelOne
                 // A locked ground seal can be dodged; every third toll is a radial volley.
                 if (enemy.ritualCount % 3 != 2)
                 {
-                    if (Distance(player, enemy.ritualTarget) < 78 &&
+                    if (Distance(player, enemy.ritualTarget) < combat.saintRadius &&
                         ClearLine(enemy.position, player, blocked))
                     {
                         Hurt(combat.rangedDamage * 1.35f);
@@ -923,8 +930,9 @@ class LevelOne
                     {
                         const double angle = i * 6.2831853 / 8;
                         projectiles.push_back({enemy.position,
-                                               {std::cos(angle) * 220, std::sin(angle) * 220},
-                                               420,
+                                               {std::cos(angle) * combat.saintShotSpeed,
+                                                std::sin(angle) * combat.saintShotSpeed},
+                                               combat.saintShotBudget,
                                                combat.rangedDamage,
                                                false,
                                                true});
@@ -932,7 +940,7 @@ class LevelOne
                 }
                 ++enemy.ritualCount;
                 enemy.phase = 3;
-                enemy.phaseTime = 1.25f;
+                enemy.phaseTime = combat.saintRecovery;
                 return;
             }
             enemy.saintSightTime -= dt;
@@ -947,7 +955,7 @@ class LevelOne
             {
                 enemy.ritualTarget = player;
                 enemy.phase = 1;
-                enemy.phaseTime = 1.1f;
+                enemy.phaseTime = combat.saintWindup;
                 return;
             }
             if (distance > 280)
@@ -1005,7 +1013,7 @@ class LevelOne
                            (std::min)(1.,
                                       ((player.x - before.x) * vx + (player.y - before.y) * vy) /
                                           (vx * vx + vy * vy + .0001)));
-            if (Distance(player, {before.x + vx * t, before.y + vy * t}) < 30)
+            if (Distance(player, {before.x + vx * t, before.y + vy * t}) < combat.chargeRadius)
                 Hurt(combat.chargeDamage);
             if (enemy.phaseTime <= 0 || Distance(before, enemy.position) < 1)
             {
@@ -1021,13 +1029,14 @@ class LevelOne
             if (attackType == 1)
             {
                 enemy.phase = 2;
-                enemy.phaseTime = .48f;
+                enemy.phaseTime = combat.chargeDuration;
                 return;
             }
             if (attackType == 0)
             {
                 const double dx = player.x - enemy.position.x, dy = player.y - enemy.position.y;
-                if (distance < 85 && (dx * enemy.aim.x + dy * enemy.aim.y) >= distance * .35 &&
+                if (distance < combat.meleeReach &&
+                    (dx * enemy.aim.x + dy * enemy.aim.y) >= distance * combat.meleeFacingDot &&
                     ClearLine(enemy.position, player, blocked))
                     Hurt(combat.meleeDamage);
             }
@@ -1035,14 +1044,16 @@ class LevelOne
             {
                 for (int i = -1; i <= 1; ++i)
                 {
-                    const double angle = i * .18, c = std::cos(angle), s = std::sin(angle);
-                    projectiles.push_back({enemy.position,
-                                           {(enemy.aim.x * c - enemy.aim.y * s) * 440,
-                                            (enemy.aim.x * s + enemy.aim.y * c) * 440},
-                                           520,
-                                           combat.rangedDamage,
-                                           false,
-                                           true});
+                    const double angle = i * combat.rangedSpread, c = std::cos(angle),
+                                 s = std::sin(angle);
+                    projectiles.push_back(
+                        {enemy.position,
+                         {(enemy.aim.x * c - enemy.aim.y * s) * combat.rangedSpeed,
+                          (enemy.aim.x * s + enemy.aim.y * c) * combat.rangedSpeed},
+                         combat.rangedReach,
+                         combat.rangedDamage,
+                         false,
+                         true});
                 }
             }
             enemy.phase = 3;
@@ -1321,6 +1332,24 @@ class LevelOne
                                    : enemy.type == 0  ? 7.f
                                    : enemy.type == 1  ? 11.f
                                                       : 9.f);
+            if (enemy.phase == 1 || enemy.phase == 2)
+            {
+                const WorldPoint direction =
+                    SpiritCatalog::Get(enemy.type).combatType == 3
+                        ? WorldPoint{enemy.ritualTarget.x - enemy.position.x,
+                                     enemy.ritualTarget.y - enemy.position.y}
+                        : enemy.aim;
+                if (std::hypot(direction.x, direction.y) > .001)
+                {
+                    // Face the committed attack without advancing a stationary walk cycle.
+                    SpriteAnimation facing;
+                    facing.Update((direction.x - direction.y) * .85,
+                                  (direction.x + direction.y) * .43,
+                                  0,
+                                  false);
+                    enemy.animation.facing = facing.facing;
+                }
+            }
         }
         damageResident = -1;
         if (Dead())
@@ -1344,12 +1373,14 @@ class LevelOne
             {
                 const float scale = timeScale(shot.position, 2);
                 const float step =
-                    (std::min)((std::min)(remainingTime, .008f), shot.remaining / (440.f * scale));
+                    (std::min)((std::min)(remainingTime, .008f),
+                               shot.remaining / (combat.projectileRangeRate * scale));
                 if (step <= 0)
                     break;
                 remainingTime -= step;
                 const float flightTime = step * scale;
-                shot.remaining = (std::max)(0.f, shot.remaining - 440.f * flightTime);
+                shot.remaining =
+                    (std::max)(0.f, shot.remaining - combat.projectileRangeRate * flightTime);
                 shot.position.x += shot.velocity.x * flightTime;
                 shot.position.y += shot.velocity.y * flightTime;
                 if (blocked(shot.position))

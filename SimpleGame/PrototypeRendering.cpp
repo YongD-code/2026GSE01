@@ -788,6 +788,7 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
 
 void Prototype::DrawCombatWarnings()
 {
+    const auto& combat = levelOne.combat;
     for (const auto& enemy : levelOne.enemies)
     {
         // Include the full ranged telegraph/charge reach, but skip distant NPC battles.
@@ -797,19 +798,21 @@ void Prototype::DrawCombatWarnings()
         {
             continue;
         }
-        if (enemy.type == SpiritCatalog::Saint && enemy.alerted && !enemy.weakened &&
-            enemy.health > 0)
+        const int attackType = SpiritCatalog::Get(enemy.type).combatType;
+        if (attackType == 3 && enemy.alerted && !enemy.weakened && enemy.health > 0)
         {
             const bool preparing = enemy.phase == 1;
-            const float after = 1.25f - enemy.phaseTime;
+            const float after = combat.saintRecovery - enemy.phaseTime;
             if (preparing || (enemy.phase == 3 && after < .4f))
             {
                 const int toll = preparing ? enemy.ritualCount : enemy.ritualCount - 1;
                 const bool radial = toll % 3 == 2;
                 const WorldPoint target = radial ? enemy.position : enemy.ritualTarget;
                 const Point center = Screen(target.x, target.y, 2);
-                const float alpha = preparing ? .35f : (1 - after / .4f) * .8f;
-                const double radius = radial ? 110 : 78;
+                const float progress =
+                    1 - (std::max)(0.f, (std::min)(1.f, enemy.phaseTime / combat.saintWindup));
+                const float alpha = preparing ? .2f + progress * .45f : (1 - after / .4f) * .8f;
+                const double radius = radial ? 110 : combat.saintRadius;
                 for (int i = 0; i < 32; ++i)
                 {
                     const double a = i * 6.2831853 / 32, b = (i + 1) * 6.2831853 / 32;
@@ -817,6 +820,20 @@ void Prototype::DrawCombatWarnings()
                            Screen(target.x + std::cos(b) * radius, target.y + std::sin(b) * radius),
                            2,
                            Color(.85f, .45f, 1.f, alpha));
+                }
+                if (radial)
+                {
+                    const double reach =
+                        combat.saintShotBudget * combat.saintShotSpeed / combat.projectileRangeRate;
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        const double angle = i * 6.2831853 / 8;
+                        r.Line(Screen(target.x, target.y),
+                               Screen(target.x + std::cos(angle) * reach,
+                                      target.y + std::sin(angle) * reach),
+                               2,
+                               Color(.85f, .45f, 1.f, alpha));
+                    }
                 }
                 spiritSpellArt[2].DrawSpellTile(r,
                                                 radial ? 3 : 0,
@@ -831,30 +848,56 @@ void Prototype::DrawCombatWarnings()
         if (!enemy.alerted || enemy.weakened || enemy.health <= 0 ||
             (enemy.phase != 1 && enemy.phase != 2))
             continue;
-        const Color warning =
-            enemy.phase == 2 ? Color(2.f, .2f, .1f, .6f) : Color(1.f, .24f, .07f, .45f);
+        const float windup = attackType == 0   ? combat.meleeWindup
+                             : attackType == 1 ? combat.chargeWindup
+                                               : combat.rangedWindup;
+        const float progress = 1 - (std::max)(0.f, (std::min)(1.f, enemy.phaseTime / windup));
+        const Color warning = enemy.phase == 2 ? Color(2.f, .2f, .1f, .6f)
+                                               : Color(1.f, .24f, .07f, .18f + progress * .42f);
         const auto origin = enemy.position;
-        if (enemy.type == 1)
+        if (attackType == 1)
         {
-            const double reach = levelOne.combat.chargeSpeed * .48;
-            const double nx = -enemy.aim.y * 30, ny = enemy.aim.x * 30;
+            const double duration =
+                enemy.phase == 2 ? (std::max)(0.f, enemy.phaseTime) : combat.chargeDuration;
+            const double reach = combat.chargeSpeed * duration * (enemy.slowed > 0 ? .35 : 1.);
+            const double nx = -enemy.aim.y * combat.chargeRadius,
+                         ny = enemy.aim.x * combat.chargeRadius;
             r.Quad(Screen(origin.x + nx, origin.y + ny),
                    Screen(origin.x - nx, origin.y - ny),
                    Screen(origin.x + enemy.aim.x * reach - nx, origin.y + enemy.aim.y * reach - ny),
                    Screen(origin.x + enemy.aim.x * reach + nx, origin.y + enemy.aim.y * reach + ny),
                    warning);
+            // Swept circle contact also reaches around the start and end of the path.
+            for (int end = 0; end < 2; ++end)
+            {
+                const WorldPoint cap = {origin.x + enemy.aim.x * reach * end,
+                                        origin.y + enemy.aim.y * reach * end};
+                for (int i = 0; i < 16; ++i)
+                {
+                    const double a = i * 6.2831853 / 16, b = (i + 1) * 6.2831853 / 16;
+                    r.Triangle(Screen(cap.x, cap.y),
+                               Screen(cap.x + std::cos(a) * combat.chargeRadius,
+                                      cap.y + std::sin(a) * combat.chargeRadius),
+                               Screen(cap.x + std::cos(b) * combat.chargeRadius,
+                                      cap.y + std::sin(b) * combat.chargeRadius),
+                               warning);
+                }
+            }
         }
-        else if (enemy.type == 0)
+        else if (attackType == 0)
         {
             const double base = std::atan2(enemy.aim.y, enemy.aim.x);
+            const double halfArc = std::acos(combat.meleeFacingDot);
             for (int i = 0; i < 16; ++i)
             {
-                const double a = base - 1.213 + i * 2.426 / 16;
-                const double b = base - 1.213 + (i + 1) * 2.426 / 16;
+                const double a = base - halfArc + i * halfArc * 2 / 16;
+                const double b = base - halfArc + (i + 1) * halfArc * 2 / 16;
                 const Point center = Screen(origin.x, origin.y);
                 r.Quad(center,
-                       Screen(origin.x + std::cos(a) * 85, origin.y + std::sin(a) * 85),
-                       Screen(origin.x + std::cos(b) * 85, origin.y + std::sin(b) * 85),
+                       Screen(origin.x + std::cos(a) * combat.meleeReach,
+                              origin.y + std::sin(a) * combat.meleeReach),
+                       Screen(origin.x + std::cos(b) * combat.meleeReach,
+                              origin.y + std::sin(b) * combat.meleeReach),
                        center,
                        warning);
             }
@@ -863,10 +906,12 @@ void Prototype::DrawCombatWarnings()
         {
             for (int i = -1; i <= 1; ++i)
             {
-                const double a = i * .18, c = std::cos(a), s = std::sin(a);
+                const double a = i * combat.rangedSpread, c = std::cos(a), s = std::sin(a);
+                const double reach =
+                    combat.rangedReach * combat.rangedSpeed / combat.projectileRangeRate;
                 r.Line(Screen(origin.x, origin.y),
-                       Screen(origin.x + (enemy.aim.x * c - enemy.aim.y * s) * 520,
-                              origin.y + (enemy.aim.x * s + enemy.aim.y * c) * 520),
+                       Screen(origin.x + (enemy.aim.x * c - enemy.aim.y * s) * reach,
+                              origin.y + (enemy.aim.x * s + enemy.aim.y * c) * reach),
                        2,
                        warning);
             }
