@@ -514,7 +514,8 @@ class Prototype
                          float motionClock,
                          float castProgress = -1.f,
                          CharacterModel::State* state = nullptr,
-                         bool running = false);
+                         bool running = false,
+                         CharacterModel::Motion action = CharacterModel::Motion::Cast);
     bool DrawKeyedModel(CharacterModel& model,
                         Point feet,
                         float size,
@@ -533,6 +534,8 @@ class Prototype
         WorldPoint hitDirection = {0, 0};
         float hitStrength = 0;
         float castPose = 0;
+        float bossCastProgress = -1;
+        CharacterModel::Motion action = CharacterModel::Motion::Cast;
         float remnantTime = -2;
         int type = 0, boss = 0;
         bool alerted = false, weakened = false;
@@ -541,6 +544,7 @@ class Prototype
 
     void DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state);
     void DrawCombatWarnings();
+    void DrawEaterBossWarnings(const LevelOne::Enemy& enemy);
     void Hearth(WorldPoint position);
 
     void Panel(float x, float y, float w, float h)

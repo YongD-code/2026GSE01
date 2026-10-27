@@ -572,6 +572,44 @@ void Prototype::SynchronizeScene()
                           : enemy.phase == 2 ? 1.f
                           : enemy.phase == 3 ? .25f
                                              : 0.f;
+        if (enemy.boss == EaterBoss::Encounter)
+        {
+            const auto& attack = enemy.eater;
+            if (enemy.phase == 1)
+            {
+                visual.bossCastProgress =
+                    .05f + .4f * EaterBoss::Progress(attack.plan.windup, enemy.phaseTime);
+            }
+            else if (enemy.phase == 2 && attack.pattern != EaterBoss::Pattern::Rush)
+            {
+                visual.bossCastProgress =
+                    .45f + .45f * EaterBoss::Progress(attack.plan.active, enemy.phaseTime);
+            }
+            else if (enemy.phase == 4)
+            {
+                visual.bossCastProgress =
+                    .15f + .7f * EaterBoss::Progress(EaterBoss::TransitionTime, enemy.phaseTime);
+            }
+            else if (enemy.phase == 3 && attack.hasAttack &&
+                     attack.plan.recovery - enemy.phaseTime < .2f)
+            {
+                visual.bossCastProgress =
+                    .9f + .1f * (attack.plan.recovery - enemy.phaseTime) / .2f;
+            }
+            else
+            {
+                visual.castPose = 0;
+            }
+            if (visual.bossCastProgress >= 0)
+            {
+                visual.castPose = visual.bossCastProgress;
+            }
+            if (attack.pattern == EaterBoss::Pattern::Sweep &&
+                (enemy.phase == 2 || enemy.phase == 3))
+            {
+                visual.action = CharacterModel::Motion::Attack;
+            }
+        }
         visual.animation = enemy.animation;
         visual.boss = enemy.boss;
         visual.alerted = enemy.alerted;
@@ -590,7 +628,27 @@ void Prototype::SynchronizeScene()
         if (enemy.boss > 0)
         {
             const auto& encounter = StoryEncounter::Get(enemy.boss);
-            const std::string name = encounter.name;
+            std::string name = encounter.name;
+            if (enemy.boss == EaterBoss::Encounter && enemy.alerted && !enemy.weakened)
+            {
+                if (enemy.eater.phaseTwo)
+                {
+                    name += " · 격앙";
+                }
+                if (enemy.phase == 1 || enemy.phase == 2)
+                {
+                    name += " · ";
+                    name += EaterBoss::Name(enemy.eater.pattern);
+                }
+                else if (enemy.phase == 3)
+                {
+                    name += " · 반격 기회";
+                }
+                else if (enemy.phase == 4)
+                {
+                    name += " · 봉인 붕괴";
+                }
+            }
             const float elevation = enemy.weakened ? 78.f : encounter.size + 27;
             bind(id + "/label",
                  "enemies",

@@ -4,6 +4,7 @@
 #include "CaptureRules.h"
 #include "SpiritCatalog.h"
 #include "StoryEncounter.h"
+#include "EaterBoss.h"
 #include <algorithm>
 #include <random>
 #include <string>
@@ -32,7 +33,7 @@ class LevelOne
         int remnantRarity = 1;
         int boss = 0;
         float slowed = 0;
-        // 0: approach, 1: committed windup, 2: charge, 3: recovery.
+        // 0: approach, 1: committed windup, 2: active attack, 3: recovery, 4: boss transition.
         int phase = 0;
         float phaseTime = 0, stagger = 0, staggerGuard = 0;
         WorldPoint aim = {0, 0};
@@ -45,6 +46,7 @@ class LevelOne
         bool saintSightClear = false;
         WorldPoint saintSightTarget = {0, 0};
         int ritualCount = 0;
+        EaterBoss::State eater;
     };
 
     struct Projectile
@@ -139,6 +141,7 @@ class LevelOne
         float saintWindup = 1.1f, saintRecovery = 1.25f, saintRadius = 78;
         float rangedSpeed = 440, projectileRangeRate = 440;
         float saintShotSpeed = 220, saintShotBudget = 420;
+        float eaterWindupScale = 1, eaterDamageScale = 1, eaterRecoveryBonus = 1.25f;
     } combat;
 
     void LoadCombat()
@@ -150,18 +153,22 @@ class LevelOne
         const std::wstring folder = slash == std::wstring::npos ? L"" : path.substr(0, slash + 1);
         const std::wstring paths[] = {
             folder + L"Data/Combat.ini", L"Data/Combat.ini", L"SimpleGame/Data/Combat.ini"};
-        std::map<std::string, float*> values = {{"dodge_duration", &combat.dodgeDuration},
-                                                {"dodge_wait", &combat.dodgeWait},
-                                                {"dodge_speed", &combat.dodgeSpeed},
-                                                {"aggro", &combat.aggro},
-                                                {"chase_speed", &combat.chaseSpeed},
-                                                {"charge_speed", &combat.chargeSpeed},
-                                                {"melee_windup", &combat.meleeWindup},
-                                                {"charge_windup", &combat.chargeWindup},
-                                                {"ranged_windup", &combat.rangedWindup},
-                                                {"melee_damage", &combat.meleeDamage},
-                                                {"charge_damage", &combat.chargeDamage},
-                                                {"ranged_damage", &combat.rangedDamage}};
+        std::map<std::string, float*> values = {
+            {"dodge_duration", &combat.dodgeDuration},
+            {"dodge_wait", &combat.dodgeWait},
+            {"dodge_speed", &combat.dodgeSpeed},
+            {"aggro", &combat.aggro},
+            {"chase_speed", &combat.chaseSpeed},
+            {"charge_speed", &combat.chargeSpeed},
+            {"melee_windup", &combat.meleeWindup},
+            {"charge_windup", &combat.chargeWindup},
+            {"ranged_windup", &combat.rangedWindup},
+            {"melee_damage", &combat.meleeDamage},
+            {"charge_damage", &combat.chargeDamage},
+            {"ranged_damage", &combat.rangedDamage},
+            {"eater_windup_scale", &combat.eaterWindupScale},
+            {"eater_damage_scale", &combat.eaterDamageScale},
+            {"eater_recovery_bonus", &combat.eaterRecoveryBonus}};
         for (const auto& candidate : paths)
         {
             std::ifstream file(candidate.c_str());
@@ -434,6 +441,10 @@ class LevelOne
                 hitStop = .045f;
                 hitStopGuard = .18f;
             }
+        }
+        if (enemy.boss == EaterBoss::Encounter && enemy.phase == 3)
+        {
+            damage *= combat.eaterRecoveryBonus;
         }
         enemy.health -= enemy.boss == 12 ? .05f : damage;
         if (enemy.boss == 12)
@@ -915,6 +926,8 @@ class LevelOne
         }
     }
 
+#include "EaterBossCombat.inl"
+
     template <class Collision>
     void AttackEnemy(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
     {
@@ -923,6 +936,11 @@ class LevelOne
         enemy.staggerGuard = (std::max)(0.f, enemy.staggerGuard - dt);
         if (enemy.stagger > 0)
             return;
+        if (enemy.boss == EaterBoss::Encounter)
+        {
+            AttackEaterBoss(enemy, player, dt, blocked);
+            return;
+        }
         enemy.phaseTime -= dt;
         const double distance = Distance(enemy.position, player);
         if (attackType == 3)

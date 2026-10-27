@@ -34,6 +34,9 @@
     <ClInclude Include="VillageLayout.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="VillageSociety.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="LevelOne.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="EaterBoss.h"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="EaterBossCombat.inl"><Filter>헤더 파일</Filter></ClInclude>
+    <ClInclude Include="EaterBossRendering.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="SaveGame.h"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="PrototypeSave.inl"><Filter>헤더 파일</Filter></ClInclude>
     <ClInclude Include="Chapter.h"><Filter>헤더 파일</Filter></ClInclude>

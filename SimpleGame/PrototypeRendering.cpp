@@ -2,6 +2,7 @@
 #include "Prototype.h"
 #include "EnvironmentGeometry.h"
 #include "PrototypeStoryProps.inl"
+#include "EaterBossRendering.inl"
 
 void Prototype::House(const Object& o)
 {
@@ -586,7 +587,8 @@ bool Prototype::DrawSpiritModel(int species,
                                 float motionClock,
                                 float castProgress,
                                 CharacterModel::State* state,
-                                bool running)
+                                bool running,
+                                CharacterModel::Motion action)
 {
     if (!UsingSpiritModel(species))
     {
@@ -629,7 +631,7 @@ bool Prototype::DrawSpiritModel(int species,
             state->gaitRunning = running;
             stridePhase = state->gaitPhase;
         }
-        const auto motion = casting             ? CharacterModel::Motion::Cast
+        const auto motion = casting             ? action
                             : !animation.moving ? CharacterModel::Motion::Idle
                             : running           ? CharacterModel::Motion::Run
                                                 : CharacterModel::Motion::Walk;
@@ -783,9 +785,12 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
                              enemy.animation,
                              Color(1, 1, 1),
                              time + float(enemy.position.x * .01),
-                             enemy.castPose > 0 ? .25f + .5f * enemy.castPose : -1.f,
+                             enemy.bossCastProgress >= 0 ? enemy.bossCastProgress
+                             : enemy.castPose > 0        ? .25f + .5f * enemy.castPose
+                                                         : -1.f,
                              state,
-                             enemy.running))
+                             enemy.running,
+                             enemy.action))
     {
         // Health bars and alerts below still belong to the existing enemy Actor.
     }
@@ -829,6 +834,14 @@ void Prototype::DrawCombatWarnings()
     const auto& combat = levelOne.combat;
     for (const auto& enemy : levelOne.enemies)
     {
+        if (enemy.boss == EaterBoss::Encounter)
+        {
+            if (enemy.alerted && !enemy.weakened && enemy.health > 0)
+            {
+                DrawEaterBossWarnings(enemy);
+            }
+            continue;
+        }
         // Include the full ranged telegraph/charge reach, but skip distant NPC battles.
         const Point warningOrigin = Screen(enemy.position.x, enemy.position.y);
         if (warningOrigin.x < -680 || warningOrigin.x > width + 680 || warningOrigin.y < -500 ||

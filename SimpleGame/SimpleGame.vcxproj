@@ -179,6 +179,9 @@
     <ClInclude Include="VillageLayout.h" />
     <ClInclude Include="VillageSociety.inl" />
     <ClInclude Include="LevelOne.h" />
+    <ClInclude Include="EaterBoss.h" />
+    <ClInclude Include="EaterBossCombat.inl" />
+    <ClInclude Include="EaterBossRendering.inl" />
     <ClInclude Include="SpiritCatalog.h" />
     <ClInclude Include="SaveGame.h" />
     <ClInclude Include="PrototypeSave.inl" />
