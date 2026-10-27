@@ -89,8 +89,7 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
 {
     const Point origin = Screen(at.x, at.y);
     const std::string key =
-        "story-detail-v5:" + site.id +
-        (site.id == "smith" && smithModel.Ready() ? ":workstation" : "") +
+        "story-detail-v6:" + site.id + (StoryCharacterModel(site.id) ? ":workstation" : "") +
         (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
                                                                         : ":present");
     if (r.BeginCachedMesh(key, origin))
@@ -318,7 +317,7 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
                 sheet(29, -28, 18, 15, 11);
             }
         }
-        else if (site.id == "merchant")
+        else if (site.id == "merchant" && !merchantModel.Ready())
         {
             desk();
             for (int i = 0; i < 4; ++i)

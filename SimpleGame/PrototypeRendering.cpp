@@ -423,20 +423,44 @@ bool Prototype::StoryPersonVisible(const StoryLayout::Site& site, WorldPoint pos
 {
     return site.kind != StoryLayout::Kind::Evidence && StoryLayout::Visible(site, chapter) &&
            site.spriteIndex >= 0 && site.spriteIndex < StoryLayout::NpcCount &&
-           ((site.id == "smith" && smithModel.Ready()) || npcModel.Ready() ||
+           ((site.id == "smith" && smithModel.Ready()) ||
+            (site.id == "merchant" && merchantModel.Ready()) || npcModel.Ready() ||
             storyNpcSheets[site.spriteIndex].Ready()) &&
            CharacterInView(position, StoryLayout::PersonHeight(site));
 }
 
-void Prototype::UpdateSmithActor(StationaryNpcActor& actor, float dt)
+CharacterModel* Prototype::StoryCharacterModel(const std::string& id)
+{
+    CharacterModel* model = id == "smith"      ? &smithModel
+                            : id == "merchant" ? &merchantModel
+                                               : nullptr;
+    return model && model->Ready() ? model : nullptr;
+}
+
+void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, const std::string& id)
 {
     constexpr float facing = 2.35619449f;
-    auto& state = actor.modelState;
-    if (state.owner != &smithModel)
+    auto* model = StoryCharacterModel(id);
+    if (!model)
     {
-        smithModel.Reset(state, facing);
-        smithModel.Play(state, "NPC_SMITH_FORGE", true, 1, .18f);
+        return;
+    }
+    const bool shop = id == "merchant";
+    const char* idle = shop ? "NPC_MERCHANT_IDLE" : "NPC_SMITH_IDLE";
+    const char* greet = shop ? "NPC_MERCHANT_GREET" : "NPC_SMITH_GREET";
+    auto& state = actor.modelState;
+    auto work = [&]()
+    {
+        const char* clip = shop ? (actor.workCycle == 0 ? "NPC_MERCHANT_SORT" : "NPC_MERCHANT_PACK")
+                                : "NPC_SMITH_FORGE";
+        model->Play(state, clip, !shop, 1, .18f);
+    };
+    if (state.owner != model)
+    {
+        model->Reset(state, facing);
         actor.attending = false;
+        actor.workCycle = 0;
+        work();
     }
     if (pauseMenu || journal || titleScreen || openingPlaying || slotMode != SlotMode::Closed ||
         !std::isfinite(dt) || dt <= 0)
@@ -445,22 +469,34 @@ void Prototype::UpdateSmithActor(StationaryNpcActor& actor, float dt)
     }
     const auto at = actor.WorldPosition();
     const double distance = Distance(player, {at.x, at.y});
-    const bool conversation =
-        serviceNpc == "smith" || (speaker == "대장장이" && (dialoguePending || messageTime > 0));
+    const bool conversation = serviceNpc == id || (speaker == (shop ? "잡화상" : "대장장이") &&
+                                                   (dialoguePending || messageTime > 0));
     const bool attending = !controlling && !levelOne.Dead() &&
                            (conversation || distance < (actor.attending ? 140 : 96));
     if (attending != actor.attending)
     {
         actor.attending = attending;
-        smithModel.Play(
-            state, attending ? "NPC_SMITH_GREET" : "NPC_SMITH_FORGE", !attending, 1, .18f);
+        if (attending)
+        {
+            model->Play(state, greet, false, 1, .18f);
+        }
+        else
+        {
+            actor.workCycle = 0;
+            work();
+        }
     }
     else if (attending && state.imported.finished)
     {
-        smithModel.Play(state, "NPC_SMITH_IDLE", true, 1, .18f);
+        model->Play(state, idle, true, 1, .18f);
     }
-    // Fixed heading keeps the rigid workstation under the authored hammer arc.
-    smithModel.Animate(state, dt, CharacterModel::Motion::Idle, 0, facing);
+    else if (!attending && shop && state.imported.finished)
+    {
+        actor.workCycle = (actor.workCycle + 1) % 2;
+        work();
+    }
+    // Fixed heading keeps workstations aligned with the authored hand motion.
+    model->Animate(state, dt, CharacterModel::Motion::Idle, 0, facing);
 }
 
 void Prototype::StoryPerson(const StoryLayout::Site& site,
@@ -489,7 +525,9 @@ void Prototype::StoryPerson(const StoryLayout::Site& site,
     r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
     if (DrawKeyedModel(npcModel,
                        p,
-                       site.id == "smith" ? StoryLayout::PersonHeight(site) : 78 * appearance.scale,
+                       site.id == "smith" || site.id == "merchant"
+                           ? StoryLayout::PersonHeight(site)
+                           : 78 * appearance.scale,
                        animation,
                        Color(1, 1, 1),
                        CharacterModel::Motion::Idle,

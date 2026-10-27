@@ -100,6 +100,10 @@ inline float PersonHeight(const Site& site)
     {
         return 64.f;
     }
+    if (site.id == "merchant")
+    {
+        return 80.f;
+    }
     return 78.f * site.appearance.scale;
 }
 

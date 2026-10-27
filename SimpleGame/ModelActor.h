@@ -14,4 +14,5 @@ class StationaryNpcActor : public ModelActor
 {
   public:
     bool attending = false;
+    int workCycle = 0;
 };

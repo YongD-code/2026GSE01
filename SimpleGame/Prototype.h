@@ -75,6 +75,7 @@ class Prototype
     CharacterModel protagonistModel;
     CharacterModel npcModel;
     CharacterModel smithModel;
+    CharacterModel merchantModel;
     ModelLibrary models;
     bool useProtagonistModel = false;
     float protagonistYaw = 2.35619449f, protagonistGait = 0;
@@ -505,7 +506,8 @@ class Prototype
                      CharacterModel::State* state);
     bool CharacterInView(WorldPoint position, float bodyHeight) const;
     bool StoryPersonVisible(const StoryLayout::Site& site, WorldPoint position) const;
-    void UpdateSmithActor(StationaryNpcActor& actor, float dt);
+    CharacterModel* StoryCharacterModel(const std::string& id);
+    void UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, const std::string& id);
     void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
     void Wisp(int type, WorldPoint position, CharacterModel::State* state);
     bool DrawSpiritModel(int species,
@@ -647,6 +649,12 @@ class Prototype
                 L"Art/Blender/StoryCharacters/Blacksmith/model.glb", nullptr, &smithClips))
         {
             std::cerr << "대장장이 전용 모델 로드 실패, 기존 NPC 외형을 사용합니다." << std::endl;
+        }
+        const std::map<std::string, std::string> merchantClips = {{"idle", "NPC_MERCHANT_IDLE"}};
+        if (!merchantModel.LoadGltf(
+                L"Art/Blender/StoryCharacters/Merchant/model.glb", nullptr, &merchantClips))
+        {
+            std::cerr << "잡화상 전용 모델 로드 실패, 기존 NPC 외형을 사용합니다." << std::endl;
         }
         SpriteLayout storyLayout;
         storyLayout.columns = 2;

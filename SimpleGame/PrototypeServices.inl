@@ -172,11 +172,11 @@ void DrawService()
         if (i == 0)
         {
             const int npc = StoryLayout::NpcSpriteIndex(serviceNpc);
-            if (serviceNpc == "smith" && smithModel.Ready())
+            if (auto* model = StoryCharacterModel(serviceNpc))
             {
                 CharacterModel::State icon;
-                smithModel.Reset(icon, 2.35619449f);
-                smithModel.Draw(
+                model->Reset(icon, 2.35619449f);
+                model->Draw(
                     r, {cell.x + 23, cell.y + cell.h - 2}, Color(1, 1, 1), icon, cell.h - 4);
             }
             else if (npc >= 0)
