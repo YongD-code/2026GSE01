@@ -1,0 +1,164 @@
+{
+  "characterId": "merchant",
+  "stage": "bespoke_shopkeeper_01",
+  "concept": "kind middle-aged woman; tied hair, pear-shaped dress and patched apron",
+  "source": "model.blend",
+  "export": "model.glb",
+  "rig": "NPC_MERCHANT_RIG",
+  "boneCount": 14,
+  "meshes": [
+    {
+      "index": 0,
+      "mesh": "NPC_MERCHANT_HEAD_FACE",
+      "slot": "bespoke",
+      "vertices": 1574,
+      "triangles": 2996
+    },
+    {
+      "index": 1,
+      "mesh": "NPC_MERCHANT_HAIR_BUN",
+      "slot": "bespoke",
+      "vertices": 672,
+      "triangles": 1254
+    },
+    {
+      "index": 2,
+      "mesh": "NPC_MERCHANT_DRESS_BODY",
+      "slot": "bespoke",
+      "vertices": 448,
+      "triangles": 840
+    },
+    {
+      "index": 3,
+      "mesh": "NPC_MERCHANT_APRON",
+      "slot": "bespoke",
+      "vertices": 480,
+      "triangles": 888
+    },
+    {
+      "index": 4,
+      "mesh": "NPC_MERCHANT_BELT_KEYS",
+      "slot": "bespoke",
+      "vertices": 448,
+      "triangles": 844
+    },
+    {
+      "index": 5,
+      "mesh": "NPC_MERCHANT_SHOE_L",
+      "slot": "bespoke",
+      "vertices": 90,
+      "triangles": 168
+    },
+    {
+      "index": 6,
+      "mesh": "NPC_MERCHANT_SHOE_R",
+      "slot": "bespoke",
+      "vertices": 90,
+      "triangles": 168
+    },
+    {
+      "index": 7,
+      "mesh": "NPC_MERCHANT_ARM_L",
+      "slot": "bespoke",
+      "vertices": 60,
+      "triangles": 112
+    },
+    {
+      "index": 8,
+      "mesh": "NPC_MERCHANT_HAND_L",
+      "slot": "bespoke",
+      "vertices": 236,
+      "triangles": 448
+    },
+    {
+      "index": 9,
+      "mesh": "NPC_MERCHANT_ARM_R",
+      "slot": "bespoke",
+      "vertices": 60,
+      "triangles": 112
+    },
+    {
+      "index": 10,
+      "mesh": "NPC_MERCHANT_HAND_R",
+      "slot": "bespoke",
+      "vertices": 236,
+      "triangles": 448
+    },
+    {
+      "index": 11,
+      "mesh": "NPC_MERCHANT_HELD_ROLL",
+      "slot": "bespoke",
+      "vertices": 126,
+      "triangles": 244
+    },
+    {
+      "index": 12,
+      "mesh": "NPC_MERCHANT_COUNTER",
+      "slot": "bespoke",
+      "vertices": 164,
+      "triangles": 256
+    },
+    {
+      "index": 13,
+      "mesh": "NPC_MERCHANT_PARCEL",
+      "slot": "bespoke",
+      "vertices": 114,
+      "triangles": 212
+    },
+    {
+      "index": 14,
+      "mesh": "NPC_MERCHANT_COUNTER_GOODS",
+      "slot": "bespoke",
+      "vertices": 156,
+      "triangles": 288
+    }
+  ],
+  "clips": {
+    "idle": {
+      "action": "NPC_MERCHANT_IDLE",
+      "firstFrame": 1,
+      "lastFrame": 97,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "sort": {
+      "action": "NPC_MERCHANT_SORT",
+      "firstFrame": 1,
+      "lastFrame": 145,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    },
+    "pack": {
+      "action": "NPC_MERCHANT_PACK",
+      "firstFrame": 1,
+      "lastFrame": 121,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    },
+    "greet": {
+      "action": "NPC_MERCHANT_GREET",
+      "firstFrame": 1,
+      "lastFrame": 73,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    }
+  },
+  "gameIntegrated": true,
+  "gameExecutionVerified": false,
+  "stationary": true,
+  "locomotionClips": [],
+  "counterContact": {
+    "topZ": 1.1175,
+    "parcelTopZ": 1.3,
+    "rigidMeshes": [
+      "COUNTER",
+      "PARCEL",
+      "COUNTER_GOODS"
+    ]
+  },
+  "materialExport": "four-band Blender preview; GLB PBR color fallback"
+}

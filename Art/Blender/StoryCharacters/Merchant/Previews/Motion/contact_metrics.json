@@ -1,0 +1,30 @@
+{
+  "pack": [
+    {
+      "frame": 25,
+      "shoeFloor": 0.012
+    },
+    {
+      "frame": 46,
+      "shoeFloor": 0.012
+    },
+    {
+      "frame": 73,
+      "shoeFloor": 0.012
+    }
+  ],
+  "greet": [
+    {
+      "frame": 25,
+      "shoeFloor": 0.012
+    },
+    {
+      "frame": 46,
+      "shoeFloor": 0.012
+    },
+    {
+      "frame": 73,
+      "shoeFloor": 0.012
+    }
+  ]
+}
