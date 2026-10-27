@@ -29,6 +29,7 @@ struct Definition
     bool passive;
     int gait; // 0: hover, 1: biped, 2: quadruped.
     const char* disposition;
+    bool bossOnly = false;
 };
 
 inline const Definition& Get(int species)
@@ -81,7 +82,8 @@ inline const Definition& Get(int species)
           Saint,
           false,
           0,
-          "dangerous"},
+          "dangerous",
+          true},
          {"울음 먹는 자",
           "길 잃은 이의 울음을 삼키며 해진 가면 뒤에서 눈물을 흘리는 주령.",
           L"Assets/Spirits/Models/eater.png",
@@ -93,7 +95,8 @@ inline const Definition& Get(int species)
           Forgotten,
           false,
           1,
-          "dangerous"},
+          "dangerous",
+          true},
          {"길지기 사슴",
           "가지뿔에 작은 방울과 기원 천을 매달고 잊힌 길목을 지키는 선한 주령.",
           L"Assets/Spirits/Models/stag.png",

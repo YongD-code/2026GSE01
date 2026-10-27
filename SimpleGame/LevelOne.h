@@ -774,6 +774,33 @@ class LevelOne
         return true;
     }
 
+    void SanitizeFieldEncounters()
+    {
+        bool removed = false;
+        enemies.erase(std::remove_if(enemies.begin(),
+                                     enemies.end(),
+                                     [&](const Enemy& enemy)
+                                     {
+                                         if (enemy.boss != 0 ||
+                                             (!SpiritCatalog::Get(enemy.type).bossOnly &&
+                                              !World::CemeteryReserved(enemy.position)))
+                                         {
+                                             return false;
+                                         }
+                                         if (enemy.slot >= 0 && enemy.slot < 4 && !enemy.weakened)
+                                         {
+                                             camps[enemy.camp].health[enemy.slot] = -1;
+                                         }
+                                         removed = true;
+                                         return true;
+                                     }),
+                      enemies.end());
+        if (removed)
+        {
+            regionLoaded = false;
+        }
+    }
+
     template <class Collision>
     void StreamEncounters(WorldPoint player, std::uint64_t seed, Collision blocked)
     {
@@ -869,16 +896,14 @@ class LevelOne
                 enemy.camp = key;
                 enemy.slot = slot;
                 enemy.type = static_cast<int>((hash >> (slot * 8)) % 3);
-                // One rare saint in selected outlying camps; village/tutorial stays unchanged.
-                if (slot == 0 && hash % 7 == 0 && std::hypot(home.x, home.y) > 1200)
+                if (std::hypot(home.x, home.y) > 800 && ((hash >> (slot * 8 + 2)) % 4) == 0)
                 {
-                    enemy.type = SpiritCatalog::Saint;
+                    const int added[] = {SpiritCatalog::Stag, SpiritCatalog::Hound};
+                    enemy.type = added[(hash >> (slot * 8 + 16)) % 2];
                 }
-                else if (std::hypot(home.x, home.y) > 800 && ((hash >> (slot * 8 + 2)) % 4) == 0)
+                if (SpiritCatalog::Get(enemy.type).bossOnly)
                 {
-                    const int added[] = {
-                        SpiritCatalog::Eater, SpiritCatalog::Stag, SpiritCatalog::Hound};
-                    enemy.type = added[(hash >> (slot * 8 + 16)) % 3];
+                    continue;
                 }
                 enemy.maximum = SpiritCatalog::Get(enemy.type).health;
                 enemy.health = record.health[slot] < 0

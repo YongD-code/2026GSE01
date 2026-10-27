@@ -214,6 +214,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     state.chapter.quests = chapter.quests;
     state.level.captureRules.Load();
     state.level.LoadCombat();
+    state.level.SanitizeFieldEncounters();
     world = std::move(restoredWorld);
     levelOne = std::move(state.level);
     population.people = std::move(state.residents);
