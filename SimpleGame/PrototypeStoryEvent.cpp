@@ -38,7 +38,7 @@ std::string Prototype::StoryObjectiveText(const Chapter::Quest& quest) const
     }
     if (quest.id == "P007_SEAL")
     {
-        return "묘역 동쪽 제단의 봉인 흔적을 조사해 두 파편 확보하기";
+        return "묘역 북동쪽 석벽의 봉인 흔적을 조사해 두 파편 확보하기";
     }
     return quest.objective;
 }
@@ -337,7 +337,7 @@ void Prototype::DrawStorySceneOverlay()
         title = "끊어진 울음";
         caption = storySceneTime < 2.8f ? "괴물의 형체가 무너지자, 삼켜졌던 울음이 흩어진다."
                   : storySceneTime < 5.6f
-                      ? "울음이 사라진 자리. 제단 아래에 검은 봉인 자국이 드러났다."
+                      ? "울음이 사라진 자리. 석벽에 검은 봉인 자국이 드러났다."
                       : "누군가 주령을 이곳에 묶어 두었다. 남은 흔적을 조사하자.";
     }
     else
@@ -356,7 +356,10 @@ void Prototype::BindCemeteryRoom()
 {
     const auto b = CemeteryRoom::Bounds();
     const Point center = Screen(b.x + b.w * .5, b.y + b.d * .5);
-    if (center.x < -650 || center.x > width + 650 || center.y < -450 || center.y > height + 500)
+    const double horizontal = (b.w + b.d) * .425 + 80;
+    const double vertical = (b.w + b.d) * .215;
+    if (center.x + horizontal < -96 || center.x - horizontal > width + 96 ||
+        center.y + vertical < -96 || center.y - vertical - 130 > height + 96)
     {
         return;
     }
@@ -367,13 +370,13 @@ void Prototype::BindCemeteryRoom()
     floor.draw = [this, b](const Actor&)
     {
         const Point origin = Screen(b.x, b.y);
-        const std::string key = "cemetery:floor-v1";
+        const std::string key = "cemetery:floor-v2";
         if (r.BeginCachedMesh(key, origin))
         {
             Ground(b.x, b.y, b.w, b.d, Color(.13f, .17f, .17f));
-            for (int row = 0; row < 7; ++row)
+            for (int row = 0; row < int(b.d / 40); ++row)
             {
-                for (int col = 0; col < 11; ++col)
+                for (int col = 0; col < int(b.w / 40); ++col)
                 {
                     const double x = b.x + col * 40 + 1, y = b.y + row * 40 + 1;
                     const float tone = float((row * 7 + col * 3) % 5) * .012f;
@@ -402,7 +405,7 @@ void Prototype::BindCemeteryRoom()
         actor.draw = [this, o, i](const Actor&)
         {
             const Point origin = Screen(o.x, o.y);
-            const std::string key = "cemetery:stone-v1:" + std::to_string(i);
+            const std::string key = "cemetery:stone-v2:" + std::to_string(i);
             if (r.BeginCachedMesh(key, origin))
             {
                 if (o.kind == 2)
@@ -447,22 +450,33 @@ void Prototype::BindCemeteryRoom()
             r.DrawCachedMesh(key, origin);
         };
     }
+    const auto opening = CemeteryRoom::GateFootprint();
     auto& gate = scene.Ensure("cemetery/gate", "cemetery");
-    gate.SetWorldPosition({1120, -164, 0});
+    gate.SetWorldPosition({opening.x, opening.y, 0});
     gate.layer = ActorLayer::World;
-    gate.footprint = {0, 0, 60, 8, true};
-    gate.draw = [this](const Actor&)
+    gate.footprint = {0, 0, opening.w, opening.d, true};
+    gate.draw = [this, opening](const Actor&)
     {
-        r.Line(Screen(1116, -160, 84), Screen(1184, -160, 84), 7, Color(.30f, .23f, .19f));
+        const double y = opening.y + opening.d * .5;
+        r.Line(Screen(opening.x - 4, y, opening.h),
+               Screen(opening.x + opening.w + 4, y, opening.h),
+               7,
+               Color(.30f, .23f, .19f));
         if (!CemeteryCleared())
         {
-            for (int i = 0; i < 8; ++i)
+            for (int i = 0; i < 14; ++i)
             {
-                const double x = 1123 + i * 7;
-                r.Line(Screen(x, -160, 5), Screen(x, -160, 76), 3, Color(.24f, .20f, .20f));
+                const double x = opening.x + 3 + i * (opening.w - 6) / 13;
+                r.Line(Screen(x, y, 5), Screen(x, y, opening.h - 8), 3, Color(.24f, .20f, .20f));
             }
-            r.Line(Screen(1120, -160, 24), Screen(1180, -160, 24), 4, Color(.35f, .25f, .21f));
-            r.Line(Screen(1120, -160, 60), Screen(1180, -160, 60), 4, Color(.35f, .25f, .21f));
+            r.Line(Screen(opening.x, y, 24),
+                   Screen(opening.x + opening.w, y, 24),
+                   4,
+                   Color(.35f, .25f, .21f));
+            r.Line(Screen(opening.x, y, 60),
+                   Screen(opening.x + opening.w, y, 60),
+                   4,
+                   Color(.35f, .25f, .21f));
         }
     };
     auto& label = scene.Ensure("cemetery/label", "cemetery");

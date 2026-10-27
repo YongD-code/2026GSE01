@@ -1,38 +1,49 @@
 #pragma once
 #include "World.h"
 
-// The first authored encounter occupies the existing reserved story corridor.
+// The first authored encounter occupies a reserved clearing north of the story road.
 // Coordinates stay independent of quest row indices and serialized quest IDs.
 namespace CemeteryRoom
 {
 inline WorldObject Bounds()
 {
-    return {0, 1108, -440, 440, 280, 0};
+    return World::CemeteryBounds();
 }
 
 inline WorldPoint Gate()
 {
-    return {1148, -160};
+    const auto b = Bounds();
+    return {b.x + 120, b.y + b.d};
 }
 
 inline WorldPoint Entry()
 {
-    return {1148, -205};
+    const auto gate = Gate();
+    return {gate.x, gate.y - 70};
 }
 
 inline WorldPoint Outside()
 {
-    return {1134, -110};
+    const auto gate = Gate();
+    return {gate.x, gate.y + 70};
 }
 
 inline WorldPoint Boss()
 {
-    return {1380, -335};
+    const auto b = Bounds();
+    return {b.x + b.w * .60, b.y + b.d * .38};
 }
 
 inline WorldPoint Seal()
 {
-    return {1460, -235};
+    const auto b = Bounds();
+    return {b.x + b.w - 130, b.y + 42};
+}
+
+inline WorldObject GateFootprint()
+{
+    const auto gate = Gate();
+    return {0, gate.x - 56, gate.y - 4, 112, 8, 84};
 }
 
 inline bool Contains(WorldPoint p, double margin = 0)
@@ -44,16 +55,23 @@ inline bool Contains(WorldPoint p, double margin = 0)
 
 inline const std::vector<WorldObject>& Scenery()
 {
-    static const std::vector<WorldObject> objects = {{0, 1100, -448, 8, 296, 65},
-                                                     {0, 1108, -448, 440, 8, 82},
-                                                     {0, 1548, -448, 8, 296, 65},
-                                                     {0, 1108, -160, 12, 8, 46},
-                                                     {0, 1180, -160, 368, 8, 46},
-                                                     {1, 1112, -172, 8, 22, 82},
-                                                     {1, 1180, -172, 8, 22, 82},
-                                                     {2, 1184, -411, 18, 16, 37},
-                                                     {2, 1242, -411, 18, 16, 46},
-                                                     {2, 1458, -410, 18, 16, 42}};
+    static const std::vector<WorldObject> objects = []
+    {
+        const auto b = Bounds();
+        const auto gate = GateFootprint();
+        return std::vector<WorldObject>{
+            {0, b.x - 8, b.y - 8, 8, b.d + 16, 65},
+            {0, b.x, b.y - 8, b.w, 8, 82},
+            {0, b.x + b.w, b.y - 8, 8, b.d + 16, 65},
+            {0, b.x, gate.y, gate.x - b.x, 8, 46},
+            {0, gate.x + gate.w, gate.y, b.x + b.w - gate.x - gate.w, 8, 46},
+            {1, gate.x - 8, gate.y - 8, 8, 22, 82},
+            {1, gate.x + gate.w, gate.y - 8, 8, 22, 82},
+            // Small edge decorations have no gameplay collision.
+            {2, b.x + 80, b.y + 8, 18, 16, 30},
+            {2, b.x + 140, b.y + 8, 18, 16, 36},
+            {2, b.x + b.w - 64, b.y + 8, 18, 16, 32}};
+    }();
     return objects;
 }
 
@@ -65,11 +83,17 @@ inline bool Blocked(WorldPoint p, bool gateClosed)
     }
     for (const auto& o : Scenery())
     {
+        if (o.kind == 2)
+        {
+            continue;
+        }
         if (p.x > o.x - 12 && p.x < o.x + o.w + 12 && p.y > o.y - 12 && p.y < o.y + o.d + 12)
         {
             return true;
         }
     }
-    return gateClosed && p.x > 1108 && p.x < 1192 && p.y > -184 && p.y < -140;
+    const auto gate = GateFootprint();
+    return gateClosed && p.x > gate.x - 12 && p.x < gate.x + gate.w + 12 && p.y > gate.y - 20 &&
+           p.y < gate.y + gate.d + 16;
 }
 } // namespace CemeteryRoom

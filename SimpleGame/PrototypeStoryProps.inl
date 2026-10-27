@@ -89,7 +89,7 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
 {
     const Point origin = Screen(at.x, at.y);
     const std::string key =
-        "story-detail-v3:" + site.id +
+        "story-detail-v4:" + site.id +
         (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
                                                                         : ":present");
     if (r.BeginCachedMesh(key, origin))
@@ -205,40 +205,42 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
         }
         else if (site.id == "seal" || site.id == "relic")
         {
-            box(-28, -23, 56, 46, 6, stone);
-            box(-22, -18, 44, 36, 13, stone);
-            box(-15, -12, 30, 24, 23, stone);
-            lantern(-34, -18);
-            lantern(34, -18);
+            if (site.id == "relic")
+            {
+                box(-28, -23, 56, 46, 6, stone);
+                box(-22, -18, 44, 36, 13, stone);
+                box(-15, -12, 30, 24, 23, stone);
+                lantern(-34, -18);
+                lantern(34, -18);
+            }
             if (site.id == "seal")
             {
-                line(-25, -17, 10, -25, -17, 65, 5, red);
-                line(25, -17, 10, 25, -17, 65, 5, red);
-                line(-32, -17, 65, 32, -17, 65, 6, edge);
-                line(-25, -17, 51, 25, -17, 51, 3, timber);
-                for (int i = -2; i <= 2; ++i)
+                // Keep the story clue on the wall and leave the floor unobstructed.
+                const double wall = CemeteryRoom::Bounds().y + 1 - at.y;
+                for (int i = 0; i < 4; ++i)
                 {
-                    sheet(i * 9 - 3, -16, 43, 5, 9);
+                    line(-12 + i * 8, wall, 23, 10 - i * 7, wall, 57, 2, red);
                 }
-                sheet(-10, -8, 24, 20, 16);
+                line(-17, wall, 24, 17, wall, 24, 2, ink);
+                line(-17, wall, 57, 17, wall, 57, 2, ink);
                 if (CemeteryCleared())
                 {
-                    // Two physical fragments remain on the altar until investigated.
+                    // Small fragments rest at the wall foot, without a raised platform.
                     const bool collected = chapter.step > chapter.Index("P007_SEAL");
                     if (!collected)
                     {
                         for (int i = 0; i < 2; ++i)
                         {
                             const double x = -9 + i * 17;
-                            r.Triangle(p(x - 5, 4, 25),
-                                       p(x + 2, 4, 42 - i * 5),
-                                       p(x + 6, 4, 25),
+                            r.Triangle(p(x - 5, -20, 1),
+                                       p(x + 2, -20, 13 - i * 3),
+                                       p(x + 6, -20, 1),
                                        Color(.17f, .11f, .23f));
-                            r.Triangle(p(x + 2, 4, 42 - i * 5),
-                                       p(x + 6, 4, 25),
-                                       p(x + 3, 10, 25),
+                            r.Triangle(p(x + 2, -20, 13 - i * 3),
+                                       p(x + 6, -20, 1),
+                                       p(x + 3, -14, 1),
                                        Color(.38f, .25f, .44f));
-                            line(x, 4, 29, x + 2, 4, 35, 1, Color(.78f, .58f, .87f));
+                            line(x, -20, 3, x + 2, -20, 9, 1, Color(.78f, .58f, .87f));
                         }
                     }
                 }

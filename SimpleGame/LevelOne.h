@@ -843,7 +843,7 @@ class LevelOne
                     const int quadrant = (slot + int((hash >> 8) % 4)) % 4;
                     home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
                             baseY + 60 + (quadrant / 2) * 256 + double((placement >> 16) % 120)};
-                    if (World::Settlement(home.x, home.y))
+                    if (World::Settlement(home.x, home.y) || World::CemeteryReserved(home, 64))
                     {
                         continue;
                     }

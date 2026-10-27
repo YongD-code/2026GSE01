@@ -33,6 +33,20 @@ class World
     static constexpr double AxisProjection = .952575456;
     static constexpr double SettlementSpacing =
         VillageHalfSize * 2 + PlayerMoveSpeed * RoadTravelSeconds / AxisProjection;
+
+    static WorldObject CemeteryBounds()
+    {
+        // Twice the previous width and depth: four times the combat floor area.
+        // North of the authored road buildings, so expansion does not engulf them.
+        return {0, 1108, -950, 880, 560, 0};
+    }
+
+    static bool CemeteryReserved(WorldPoint p, double margin = 48)
+    {
+        const auto b = CemeteryBounds();
+        return p.x >= b.x - margin && p.x <= b.x + b.w + margin && p.y >= b.y - margin &&
+               p.y <= b.y + b.d + margin;
+    }
     using Coordinate = std::int64_t;
     using Key = std::pair<Coordinate, Coordinate>;
 
@@ -196,7 +210,7 @@ class World
                 // at least 30 units between cells and never enter the boundary road network.
                 double px = double(x) * ChunkSize + 85 + col * 112 + double((h >> 8) % 12);
                 double py = double(y) * ChunkSize + 85 + row * 112 + double((h >> 16) % 12);
-                if (Settlement(px, py) || RoadPoint({px, py}, 100) ||
+                if (Settlement(px, py) || RoadPoint({px, py}, 100) || CemeteryReserved({px, py}) ||
                     (px >= 500 && px <= 3500 && py >= -450 && py <= 400))
                     continue;
                 int kind = c.biome == 2 ? 2 : 1;

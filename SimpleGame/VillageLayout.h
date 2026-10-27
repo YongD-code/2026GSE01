@@ -32,10 +32,6 @@ inline const std::vector<WorldObject>& AuthoredBuildings()
                                            {2, 280, 280, 25, 25, 24}};
         result.insert(
             result.end(), StoryLayout::Buildings().begin(), StoryLayout::Buildings().end());
-        for (int i = 0; i < 6; ++i)
-        {
-            result.push_back({2, 1080. + i * 45, -90, 18, 16, 38});
-        }
         result.push_back({0, 2930, -250, 210, 110, 140});
         result.push_back({2, 3180, -100, 25, 25, 90});
         result.push_back({2, 3260, -100, 25, 25, 90});
