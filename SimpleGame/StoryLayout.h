@@ -62,8 +62,10 @@ struct Site
 inline const std::vector<Site>& Sites()
 {
     static const std::vector<Site> sites = {
-        {"sibling", "동생", Kind::Child, {-220, -65}, "P000", "P001"},
-        {"parent", "부모", Kind::Adult, {-180, -65}, "P000", ""},
+        // Fixed story characters occupy separate doorsteps and work areas.
+        // Keep their 62-unit interaction circles apart, including later Raen sites.
+        {"sibling", "동생", Kind::Child, {-325, -65}, "P000", "P001"},
+        {"parent", "부모", Kind::Adult, {-175, -65}, "P000", ""},
         {"merchant", "잡화상", Kind::Adult, {210, -80}, "P000", ""},
         {"child", "마을 아이", Kind::Child, {-100, 90}, "P000", ""},
         {"mark", "둘만의 길 표시", Kind::Evidence, {100, 90}, "P000", ""},
@@ -74,10 +76,10 @@ inline const std::vector<Site>& Sites()
         {"grave", "이름 없는 묘비", Kind::Evidence, {1140, 80}, "P000", ""},
         {"seal", "봉인 흔적", Kind::Evidence, {1320, 70}, "P000", ""},
         {"room", "동생의 물건 상자", Kind::Evidence, {-260, -65}, "P000", ""},
-        {"raen_home", "라엔", Kind::Adult, {-120, -65}, "P008_VILLAGER", "C100"},
-        {"sealer", "봉인사", Kind::Adult, {310, -90}, "P000", ""},
-        {"smith", "대장장이", Kind::Adult, {360, -90}, "P000", ""},
-        {"raen_hub", "라엔", Kind::Adult, {270, -90}, "C100", "C102"},
+        {"raen_home", "라엔", Kind::Adult, {-365, -40}, "P008_VILLAGER", "C100"},
+        {"sealer", "봉인사", Kind::Adult, {105, -205}, "P000", ""},
+        {"smith", "대장장이", Kind::Adult, {465, -85}, "P000", ""},
+        {"raen_hub", "라엔", Kind::Adult, {280, 105}, "C100", "C102"},
         {"field_record", "봉인 기록대", Kind::Evidence, {1690, 70}, "P000", ""},
         {"cell", "감금실의 결박", Kind::Evidence, {1980, -55}, "P000", ""},
         {"ledger", "운송 장부", Kind::Evidence, {2570, 70}, "P000", ""},
