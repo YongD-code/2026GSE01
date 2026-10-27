@@ -1,0 +1,463 @@
+{
+  "idle": [
+    {
+      "frame": 1,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 5,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 9,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 13,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 17,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 21,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 25,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 29,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 33,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 37,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 41,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 45,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 49,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 53,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 57,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 61,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 65,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 69,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 73,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 77,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 81,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 85,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 89,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 93,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 97,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    }
+  ],
+  "work": [
+    {
+      "frame": 1,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 4,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.305039
+    },
+    {
+      "frame": 7,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.391673
+    },
+    {
+      "frame": 10,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.642494
+    },
+    {
+      "frame": 13,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.96979
+    },
+    {
+      "frame": 16,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.012419
+    },
+    {
+      "frame": 19,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.02198
+    },
+    {
+      "frame": 22,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.076416
+    },
+    {
+      "frame": 25,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.183826
+    },
+    {
+      "frame": 28,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.295234
+    },
+    {
+      "frame": 31,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.350396
+    },
+    {
+      "frame": 34,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.256549
+    },
+    {
+      "frame": 37,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.042994
+    },
+    {
+      "frame": 40,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.791888
+    },
+    {
+      "frame": 43,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.941502
+    },
+    {
+      "frame": 46,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.009014
+    },
+    {
+      "frame": 49,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.037483
+    },
+    {
+      "frame": 52,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.086503
+    },
+    {
+      "frame": 55,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.170911
+    },
+    {
+      "frame": 58,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.264152
+    },
+    {
+      "frame": 61,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.333803
+    },
+    {
+      "frame": 64,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.339194
+    },
+    {
+      "frame": 67,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.193283
+    },
+    {
+      "frame": 70,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.988352
+    },
+    {
+      "frame": 73,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.851994
+    },
+    {
+      "frame": 76,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.935309
+    },
+    {
+      "frame": 79,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.85412
+    },
+    {
+      "frame": 82,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.683538
+    },
+    {
+      "frame": 85,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.500543
+    },
+    {
+      "frame": 88,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.367931
+    },
+    {
+      "frame": 91,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.307167
+    },
+    {
+      "frame": 94,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.288475
+    },
+    {
+      "frame": 97,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 100,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 103,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 106,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 109,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 112,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 115,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 118,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 121,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    }
+  ],
+  "greet": [
+    {
+      "frame": 1,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 4,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285426
+    },
+    {
+      "frame": 7,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.286675
+    },
+    {
+      "frame": 10,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.288661
+    },
+    {
+      "frame": 13,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.29125
+    },
+    {
+      "frame": 16,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.294265
+    },
+    {
+      "frame": 19,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.2975
+    },
+    {
+      "frame": 22,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.300735
+    },
+    {
+      "frame": 25,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.30375
+    },
+    {
+      "frame": 28,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.306339
+    },
+    {
+      "frame": 31,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.308325
+    },
+    {
+      "frame": 34,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.309574
+    },
+    {
+      "frame": 37,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.31
+    },
+    {
+      "frame": 40,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.309574
+    },
+    {
+      "frame": 43,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.308326
+    },
+    {
+      "frame": 46,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.306339
+    },
+    {
+      "frame": 49,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.30375
+    },
+    {
+      "frame": 52,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.300735
+    },
+    {
+      "frame": 55,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.2975
+    },
+    {
+      "frame": 58,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.294265
+    },
+    {
+      "frame": 61,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.29125
+    },
+    {
+      "frame": 64,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.288661
+    },
+    {
+      "frame": 67,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.286675
+    },
+    {
+      "frame": 70,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285426
+    },
+    {
+      "frame": 73,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    }
+  ]
+}

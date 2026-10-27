@@ -1,0 +1,24 @@
+{
+  "work": [
+    {
+      "frame": 1,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.285
+    },
+    {
+      "frame": 31,
+      "bootFloor": 0.015,
+      "hammerBottom": 1.350396
+    },
+    {
+      "frame": 39,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.765
+    },
+    {
+      "frame": 43,
+      "bootFloor": 0.015,
+      "hammerBottom": 0.941502
+    }
+  ]
+}

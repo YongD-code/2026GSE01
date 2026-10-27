@@ -1,0 +1,153 @@
+{
+  "characterId": "smith",
+  "stage": "stationary_animation_01",
+  "concept": "boisterous dwarf, wild unbraided beard, bespoke anatomy and workwear",
+  "proportions": "approximately three heads; short legs, barrel chest, large hands",
+  "source": "model.blend",
+  "export": "model.glb",
+  "rig": "NPC_SMITH_RIG",
+  "boneCount": 14,
+  "meshes": [
+    {
+      "index": 0,
+      "mesh": "NPC_SMITH_HEAD_FACE",
+      "slot": "bespoke",
+      "vertices": 1640,
+      "triangles": 3088
+    },
+    {
+      "index": 1,
+      "mesh": "NPC_SMITH_HAIR_UNKEMPT",
+      "slot": "bespoke",
+      "vertices": 556,
+      "triangles": 1006
+    },
+    {
+      "index": 2,
+      "mesh": "NPC_SMITH_BEARD_WILD",
+      "slot": "bespoke",
+      "vertices": 714,
+      "triangles": 1276
+    },
+    {
+      "index": 3,
+      "mesh": "NPC_SMITH_TORSO_WORKSHIRT",
+      "slot": "bespoke",
+      "vertices": 288,
+      "triangles": 544
+    },
+    {
+      "index": 4,
+      "mesh": "NPC_SMITH_PANTS",
+      "slot": "bespoke",
+      "vertices": 132,
+      "triangles": 248
+    },
+    {
+      "index": 5,
+      "mesh": "NPC_SMITH_BOOT_L",
+      "slot": "bespoke",
+      "vertices": 132,
+      "triangles": 244
+    },
+    {
+      "index": 6,
+      "mesh": "NPC_SMITH_BOOT_R",
+      "slot": "bespoke",
+      "vertices": 132,
+      "triangles": 244
+    },
+    {
+      "index": 7,
+      "mesh": "NPC_SMITH_APRON_LEATHER",
+      "slot": "bespoke",
+      "vertices": 432,
+      "triangles": 780
+    },
+    {
+      "index": 8,
+      "mesh": "NPC_SMITH_BELT_AND_TOOLS",
+      "slot": "bespoke",
+      "vertices": 246,
+      "triangles": 452
+    },
+    {
+      "index": 9,
+      "mesh": "NPC_SMITH_ARM_L",
+      "slot": "bespoke",
+      "vertices": 178,
+      "triangles": 336
+    },
+    {
+      "index": 10,
+      "mesh": "NPC_SMITH_HAND_L",
+      "slot": "bespoke",
+      "vertices": 304,
+      "triangles": 568
+    },
+    {
+      "index": 11,
+      "mesh": "NPC_SMITH_ARM_R",
+      "slot": "bespoke",
+      "vertices": 98,
+      "triangles": 184
+    },
+    {
+      "index": 12,
+      "mesh": "NPC_SMITH_HAND_R",
+      "slot": "bespoke",
+      "vertices": 304,
+      "triangles": 568
+    },
+    {
+      "index": 13,
+      "mesh": "NPC_SMITH_FORGING_HAMMER",
+      "slot": "bespoke",
+      "vertices": 304,
+      "triangles": 580
+    }
+  ],
+  "gameIntegrated": false,
+  "animationClipsAuthored": true,
+  "stationary": true,
+  "locomotionClips": [],
+  "clips": {
+    "idle": {
+      "action": "NPC_SMITH_IDLE",
+      "firstFrame": 1,
+      "lastFrame": 97,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "work": {
+      "action": "NPC_SMITH_FORGE",
+      "firstFrame": 1,
+      "lastFrame": 121,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "greet": {
+      "action": "NPC_SMITH_GREET",
+      "firstFrame": 1,
+      "lastFrame": 73,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    }
+  },
+  "workContact": {
+    "anvilCenter": [
+      0.72,
+      -0.76
+    ],
+    "anvilTopZ": 0.765,
+    "impactFrames": [
+      39,
+      71
+    ],
+    "previewPropExported": false
+  },
+  "materialExport": "Blend four-band lighting; GLB PBR base-color fallback"
+}
