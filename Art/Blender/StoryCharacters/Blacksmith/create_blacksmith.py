@@ -316,6 +316,18 @@ def arms_and_hands():
     finish('FORGING_HAMMER', 'wrist.R')
 
 
+def workstation():
+    # A single named rigid part shares depth and scale with the moving hammer.
+    for location, size, color in [
+        ((.72, -.76, .27), (.36, .34, .54), 'smith_wood'),
+        ((.72, -.76, .56), (.43, .32, .09), 'smith_iron'),
+        ((.72, -.76, .65), (.22, .21, .15), 'smith_iron'),
+        ((.72, -.76, .740), (.62, .28, .05), 'smith_iron_edge'),
+    ]:
+        g.cube(location, size, color)
+    finish('WORK_ANVIL', 'root')
+
+
 def make_rig():
     armature = bpy.data.armatures.new('NPC_SMITH_SKELETON')
     rig = bpy.data.objects.new('NPC_SMITH_RIG', armature)
@@ -383,6 +395,7 @@ def main():
     hair_and_beard()
     clothing()
     arms_and_hands()
+    workstation()
     rig = make_rig()
     sys.path.insert(0, str(HERE))
     from author_stationary import author_clips
@@ -402,15 +415,17 @@ def main():
                                   export_animation_mode='ACTIONS', export_force_sampling=True,
                                   export_anim_slide_to_zero=True)
     temporary.replace(HERE/'model.glb')
-    info = {'characterId': 'smith', 'stage': 'stationary_animation_01',
+    info = {'characterId': 'smith', 'stage': 'game_connection_01',
             'concept': 'boisterous dwarf, wild unbraided beard, bespoke anatomy and workwear',
             'proportions': 'approximately three heads; short legs, barrel chest, large hands',
             'source': 'model.blend', 'export': 'model.glb', 'rig': rig.name,
             'boneCount': len(rig.data.bones), 'meshes': PARTS,
-            'gameIntegrated': False, 'animationClipsAuthored': True,
+            'gameIntegrated': True, 'gameExecutionVerified': False,
+            'animationClipsAuthored': True,
             'stationary': True, 'locomotionClips': [], 'clips': clips,
             'workContact': {'anvilCenter': [.72, -.76], 'anvilTopZ': .765,
-                            'impactFrames': [39, 71], 'previewPropExported': False},
+                            'impactFrames': [39, 71], 'workstationMesh': 'NPC_SMITH_WORK_ANVIL',
+                            'workstationExported': True},
             'materialExport': 'Blend four-band lighting; GLB PBR base-color fallback'}
     (HERE/'character.json').write_text(json.dumps(info, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     print('BLACKSMITH_SCULPT_READY', len(PARTS), sum(p['triangles'] for p in PARTS), flush=True)

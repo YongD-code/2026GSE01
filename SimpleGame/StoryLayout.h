@@ -96,6 +96,10 @@ inline bool Visible(const Site& site, const Chapter& chapter)
 
 inline float PersonHeight(const Site& site)
 {
+    if (site.id == "smith")
+    {
+        return 64.f;
+    }
     return 78.f * site.appearance.scale;
 }
 

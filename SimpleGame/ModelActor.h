@@ -8,3 +8,10 @@ class ModelActor : public FunctionActor
   public:
     mutable CharacterModel::State modelState;
 };
+
+// A service NPC remembers one customer visit across greeting and idle clips.
+class StationaryNpcActor : public ModelActor
+{
+  public:
+    bool attending = false;
+};

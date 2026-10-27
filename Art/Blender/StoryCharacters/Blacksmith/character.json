@@ -1,6 +1,6 @@
 {
   "characterId": "smith",
-  "stage": "stationary_animation_01",
+  "stage": "game_connection_01",
   "concept": "boisterous dwarf, wild unbraided beard, bespoke anatomy and workwear",
   "proportions": "approximately three heads; short legs, barrel chest, large hands",
   "source": "model.blend",
@@ -105,9 +105,17 @@
       "slot": "bespoke",
       "vertices": 304,
       "triangles": 580
+    },
+    {
+      "index": 14,
+      "mesh": "NPC_SMITH_WORK_ANVIL",
+      "slot": "bespoke",
+      "vertices": 32,
+      "triangles": 48
     }
   ],
-  "gameIntegrated": false,
+  "gameIntegrated": true,
+  "gameExecutionVerified": false,
   "animationClipsAuthored": true,
   "stationary": true,
   "locomotionClips": [],
@@ -147,7 +155,8 @@
       39,
       71
     ],
-    "previewPropExported": false
+    "workstationMesh": "NPC_SMITH_WORK_ANVIL",
+    "workstationExported": true
   },
   "materialExport": "Blend four-band lighting; GLB PBR base-color fallback"
 }

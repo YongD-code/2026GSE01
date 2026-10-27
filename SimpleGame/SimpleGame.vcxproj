@@ -264,6 +264,7 @@
       <GameData Include="Data\**\*.tsv;Data\**\*.ini;Data\**\*.json" />
       <NpcExports Include="..\Art\Blender\ModularCollection\**\*.glb;..\Art\Blender\ModularCollection\**\*.gltf;..\Art\Blender\ModularCollection\**\*.bin;..\Art\Blender\ModularCollection\**\*.json;..\Art\Blender\ModularCollection\**\*.png;..\Art\Blender\ModularCollection\**\*.jpg;..\Art\Blender\ModularCollection\**\*.jpeg" />
       <SpiritExports Include="..\Art\Blender\MobCollection\**\*.glb;..\Art\Blender\MobCollection\**\*.gltf;..\Art\Blender\MobCollection\**\*.bin;..\Art\Blender\MobCollection\**\*.json;..\Art\Blender\MobCollection\**\*.png;..\Art\Blender\MobCollection\**\*.jpg;..\Art\Blender\MobCollection\**\*.jpeg" />
+      <StoryExports Include="..\Art\Blender\StoryCharacters\**\*.glb;..\Art\Blender\StoryCharacters\**\character.json" />
       <ModelLicenses Include="ThirdParty\*.LICENSE" />
       <RuntimeDependencies Include="Dependencies\freeglut.dll;Dependencies\glew32.dll" Condition="'$(Platform)'=='Win32'" />
       <RuntimeDependencies Include="Dependencies\x64\freeglut.dll;Dependencies\x64\glew32.dll" Condition="'$(Platform)'=='x64'" />
@@ -280,6 +281,7 @@
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(NpcExports)" DestinationFiles="@(NpcExports->'$(OutDir)Art\Blender\ModularCollection\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(SpiritExports)" DestinationFiles="@(SpiritExports->'$(OutDir)Art\Blender\MobCollection\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(StoryExports)" DestinationFiles="@(StoryExports->'$(OutDir)Art\Blender\StoryCharacters\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ModelLicenses)" DestinationFiles="@(ModelLicenses->'$(OutDir)Licenses\%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(ShaderAssets)"
           DestinationFiles="@(ShaderAssets->'$(OutDir)Shaders\%(RecursiveDir)%(Filename)%(Extension)')"

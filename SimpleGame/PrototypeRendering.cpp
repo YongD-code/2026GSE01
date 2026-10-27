@@ -423,8 +423,44 @@ bool Prototype::StoryPersonVisible(const StoryLayout::Site& site, WorldPoint pos
 {
     return site.kind != StoryLayout::Kind::Evidence && StoryLayout::Visible(site, chapter) &&
            site.spriteIndex >= 0 && site.spriteIndex < StoryLayout::NpcCount &&
-           (npcModel.Ready() || storyNpcSheets[site.spriteIndex].Ready()) &&
+           ((site.id == "smith" && smithModel.Ready()) || npcModel.Ready() ||
+            storyNpcSheets[site.spriteIndex].Ready()) &&
            CharacterInView(position, StoryLayout::PersonHeight(site));
+}
+
+void Prototype::UpdateSmithActor(StationaryNpcActor& actor, float dt)
+{
+    constexpr float facing = 2.35619449f;
+    auto& state = actor.modelState;
+    if (state.owner != &smithModel)
+    {
+        smithModel.Reset(state, facing);
+        smithModel.Play(state, "NPC_SMITH_FORGE", true, 1, .18f);
+        actor.attending = false;
+    }
+    if (pauseMenu || journal || titleScreen || openingPlaying || slotMode != SlotMode::Closed ||
+        !std::isfinite(dt) || dt <= 0)
+    {
+        return;
+    }
+    const auto at = actor.WorldPosition();
+    const double distance = Distance(player, {at.x, at.y});
+    const bool conversation =
+        serviceNpc == "smith" || (speaker == "대장장이" && (dialoguePending || messageTime > 0));
+    const bool attending = !controlling && !levelOne.Dead() &&
+                           (conversation || distance < (actor.attending ? 140 : 96));
+    if (attending != actor.attending)
+    {
+        actor.attending = attending;
+        smithModel.Play(
+            state, attending ? "NPC_SMITH_GREET" : "NPC_SMITH_FORGE", !attending, 1, .18f);
+    }
+    else if (attending && state.imported.finished)
+    {
+        smithModel.Play(state, "NPC_SMITH_IDLE", true, 1, .18f);
+    }
+    // Fixed heading keeps the rigid workstation under the authored hammer arc.
+    smithModel.Animate(state, dt, CharacterModel::Motion::Idle, 0, facing);
 }
 
 void Prototype::StoryPerson(const StoryLayout::Site& site,
@@ -453,7 +489,7 @@ void Prototype::StoryPerson(const StoryLayout::Site& site,
     r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
     if (DrawKeyedModel(npcModel,
                        p,
-                       78 * appearance.scale,
+                       site.id == "smith" ? StoryLayout::PersonHeight(site) : 78 * appearance.scale,
                        animation,
                        Color(1, 1, 1),
                        CharacterModel::Motion::Idle,

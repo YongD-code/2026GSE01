@@ -89,7 +89,8 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
 {
     const Point origin = Screen(at.x, at.y);
     const std::string key =
-        "story-detail-v4:" + site.id +
+        "story-detail-v5:" + site.id +
+        (site.id == "smith" && smithModel.Ready() ? ":workstation" : "") +
         (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
                                                                         : ":present");
     if (r.BeginCachedMesh(key, origin))
@@ -342,11 +343,14 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             box(-27, -32, 24, 22, 24, stone);
             const Point fire = p(-15, -20, 27);
             r.Ellipse(fire.x, fire.y, 10, 5, Color(.92f, .36f, .10f));
-            box(4, -28, 22, 17, 20, wood);
-            r.Quad(p(0, -30, 30), p(29, -30, 30), p(25, -10, 30), p(6, -10, 30), metal);
-            line(8, -21, 20, 8, -21, 29, 9, metal);
-            line(15, -20, 31, 28, -12, 31, 3, wood);
-            line(26, -15, 32, 30, -9, 32, 6, metal);
+            if (!smithModel.Ready())
+            {
+                box(4, -28, 22, 17, 20, wood);
+                r.Quad(p(0, -30, 30), p(29, -30, 30), p(25, -10, 30), p(6, -10, 30), metal);
+                line(8, -21, 20, 8, -21, 29, 9, metal);
+                line(15, -20, 31, 28, -12, 31, 3, wood);
+                line(26, -15, 32, 30, -9, 32, 6, metal);
+            }
         }
         else if (site.id == "sealer")
         {

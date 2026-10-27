@@ -45,21 +45,8 @@ camera.data.type, camera.data.ortho_scale = 'ORTHO', 3.05
 camera.location = (4, -7, 3.4)
 camera.rotation_euler = (Vector((.12, -.16, 1.02))-camera.location).to_track_quat('-Z', 'Y').to_euler()
 
-# A modelling contact reference, not part of the exported character's meshes.
-g.COLORS.update({'preview_iron': (.12, .15, .16, 1),
-                 'preview_iron_edge': (.24, .28, .29, 1),
-                 'preview_wood': (.18, .095, .044, 1)})
-anvil = []
-for location, size, color in [
-    ((.72, -.76, .27), (.36, .34, .54), 'preview_wood'),
-    ((.72, -.76, .56), (.43, .32, .09), 'preview_iron'),
-    ((.72, -.76, .65), (.22, .21, .15), 'preview_iron'),
-    ((.72, -.76, .740), (.62, .28, .05), 'preview_iron_edge'),
-]:
-    obj = g.cube(location, size, color)
-    obj.name = 'REVIEW_ANVIL_'+str(len(anvil))
-    anvil.append(obj)
-f.stylize_scene()
+# The deployed rigid workstation is present during every stationary clip.
+assert 'NPC_SMITH_WORK_ANVIL' in bpy.data.objects
 
 contact_only = '--contact' in sys.argv
 metrics = {}
@@ -84,8 +71,6 @@ for clip, step in [('idle', 4), ('work', 3), ('greet', 3)]:
         posed_hammer = hammer.evaluated_get(graph)
         bottom = min((hammer.matrix_world @ vertex.co).z for vertex in posed_hammer.data.vertices)
         poses.append({'frame': frame, 'bootFloor': round(floor, 6), 'hammerBottom': round(bottom, 6)})
-        for obj in anvil:
-            obj.hide_render = clip != 'work'
         scene.render.filepath = str(folder/f'{clip}_{frame:03}.png')
         bpy.ops.render.render(write_still=True)
     metrics[clip] = poses

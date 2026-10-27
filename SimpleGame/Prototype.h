@@ -74,6 +74,7 @@ class Prototype
     SpriteAnimation protagonistAnimation;
     CharacterModel protagonistModel;
     CharacterModel npcModel;
+    CharacterModel smithModel;
     ModelLibrary models;
     bool useProtagonistModel = false;
     float protagonistYaw = 2.35619449f, protagonistGait = 0;
@@ -504,6 +505,7 @@ class Prototype
                      CharacterModel::State* state);
     bool CharacterInView(WorldPoint position, float bodyHeight) const;
     bool StoryPersonVisible(const StoryLayout::Site& site, WorldPoint position) const;
+    void UpdateSmithActor(StationaryNpcActor& actor, float dt);
     void DrawWorldLabel(WorldPoint position, float elevation, const std::string& text, Color color);
     void Wisp(int type, WorldPoint position, CharacterModel::State* state);
     bool DrawSpiritModel(int species,
@@ -639,6 +641,12 @@ class Prototype
         if (!models.npcDirect && !npcModel.Load(L"Assets/Characters/Runtime/npc_parts.meshbin"))
         {
             std::cerr << "NPC 조합형 모델을 불러오지 못해 기존 외형으로 표시합니다." << std::endl;
+        }
+        const std::map<std::string, std::string> smithClips = {{"idle", "NPC_SMITH_IDLE"}};
+        if (!smithModel.LoadGltf(
+                L"Art/Blender/StoryCharacters/Blacksmith/model.glb", nullptr, &smithClips))
+        {
+            std::cerr << "대장장이 전용 모델 로드 실패, 기존 NPC 외형을 사용합니다." << std::endl;
         }
         SpriteLayout storyLayout;
         storyLayout.columns = 2;

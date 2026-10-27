@@ -32,6 +32,6 @@ draw.text((20, 12), '대장장이 · 고정 위치용 키프레임 애니메이�
 for i, (number, text) in enumerate([(31, '들어 올리기'), (39, '모루에 타격'), (43, '반동과 회복')]):
     sheet.alpha_composite(Image.open(FOLDER/f'work_{number:03}.png').convert('RGBA'), (i*480, 55))
     draw.text((i*480+20, 587), text, font=label, fill='#f3e3c6')
-draw.text((20, 625), '발 고정 · 이동 클립 없음 · 모루는 접촉 확인용 미리보기 소품', font=small, fill='#b8c3c6')
+draw.text((20, 625), '발 고정 · 이동 클립 없음 · 게임용 모루 메시 포함', font=small, fill='#b8c3c6')
 sheet.convert('RGB').save(HERE/'blacksmith_motion_review.png')
 print('MOTION_REVIEW_READY')

@@ -476,6 +476,31 @@ void Prototype::SynchronizeScene()
                      StoryProp(site, {pos.x, pos.y});
                  });
         }
+        else if (site.id == "smith" && smithModel.Ready())
+        {
+            auto& actor = scene.Ensure<StationaryNpcActor>(bodyId, "story");
+            actor.SetWorldPosition({site.position.x, site.position.y, 0});
+            actor.layer = ActorLayer::Character;
+            actor.footprint = {-30, -22, 60, 68, true};
+            actor.update = [this](Actor& node, float dt)
+            {
+                UpdateSmithActor(static_cast<StationaryNpcActor&>(node), dt);
+            };
+            actor.draw = [this, site](const Actor& node)
+            {
+                const auto& smith = static_cast<const StationaryNpcActor&>(node);
+                const auto at = node.WorldPosition();
+                const Point feet = Screen(at.x, at.y);
+                r.Ellipse(feet.x, feet.y + 1, 15, 5, Color(0, 0, 0, .35f));
+                smithModel.Draw(
+                    r, feet, Color(1, 1, 1), smith.modelState, StoryLayout::PersonHeight(site));
+            };
+            // Draw may follow a sync before the first simulation tick.
+            if (actor.modelState.owner != &smithModel)
+            {
+                UpdateSmithActor(actor, 0);
+            }
+        }
         else
         {
             modelBind(bodyId,
