@@ -332,6 +332,79 @@ bool ControlsActive() const
            !dialoguePending && !levelOne.Dead();
 }
 
+static constexpr double CompanionRecallDistance = 500.;
+
+bool RecallCompanion(bool force = false, bool notify = true)
+{
+    if (!captured || selectedCompanion < 0 ||
+        selectedCompanion >= static_cast<int>(levelOne.collection.size()) ||
+        (!force && Distance(player, spirit) <= CompanionRecallDistance))
+    {
+        return false;
+    }
+    const auto blocked = [this](WorldPoint p)
+    {
+        return Blocked(p);
+    };
+    WorldPoint destination = player;
+    bool found = false;
+    for (double radius : {36., 64., 96.})
+    {
+        for (int direction = 0; direction < 16; ++direction)
+        {
+            const double angle = .55 + direction * 6.283185307179586 / 16;
+            const WorldPoint candidate = {player.x + std::cos(angle) * radius,
+                                          player.y + std::sin(angle) * radius};
+            if (!blocked(candidate) && LevelOne::ClearLine(player, candidate, blocked))
+            {
+                destination = candidate;
+                found = true;
+                break;
+            }
+        }
+        if (found)
+        {
+            break;
+        }
+    }
+    if (!found && blocked(destination))
+    {
+        return false;
+    }
+    if (controlling)
+    {
+        controlling = false;
+        levelOne.damageSpirit = -1;
+        movementWasControlling = false;
+        ClearInput();
+        moving = false;
+        camera = player;
+    }
+    spirit = destination;
+    spiritHasteTime = spiritCastPose = 0;
+    // A moving spirit hit area must not teleport to the new location with its caster.
+    skillEffects.erase(std::remove_if(skillEffects.begin(),
+                                      skillEffects.end(),
+                                      [this](const SkillEffect& effect)
+                                      {
+                                          return effect.set > 0 &&
+                                                 effect.caster == selectedCompanion;
+                                      }),
+                       skillEffects.end());
+    companionAnimation = SpriteAnimation();
+    companionAnimation.facing = protagonistAnimation.facing;
+    if (auto* actor = dynamic_cast<ModelActor*>(scene.Find("characters/companion")))
+    {
+        actor->modelState = CharacterModel::State();
+    }
+    if (notify && ControlsActive())
+    {
+        Say("주령 복귀", "주령이 너무 멀어져 주인공 곁으로 돌아왔습니다.");
+        messageTime = 2.5f;
+    }
+    return true;
+}
+
 int SkillSet() const
 {
     return captured && controlling ? 1 + SpiritCatalog::Get(capturedSpirit).skillSpecies : 0;

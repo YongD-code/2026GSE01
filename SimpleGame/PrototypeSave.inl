@@ -205,6 +205,15 @@ bool LoadProgress(bool startup = false, int slot = 0)
                                                  }),
                                   state.level.enemies.end());
     }
+    const bool recallSavedCompanion =
+        !state.level.collection.empty() &&
+        Distance(state.player, state.spirit) > CompanionRecallDistance;
+    if (recallSavedCompanion)
+    {
+        // Recover old distant-vessel saves before validating the obsolete spirit location.
+        state.spirit = state.player;
+        state.controlling = state.spiritEquipped = false;
+    }
     if (blocked(state.player) || (!state.level.collection.empty() && blocked(state.spirit)))
     {
         automaticSaveAllowed = false;
@@ -273,6 +282,10 @@ bool LoadProgress(bool startup = false, int slot = 0)
     dodgeHeld = false;
     ClearInput();
     RestoreStoryEvent();
+    if (recallSavedCompanion)
+    {
+        RecallCompanion(true, false);
+    }
     camera = controlling ? spirit : player;
     world.Stream(camera, camera, width, height);
     autoSaveTime = 0;

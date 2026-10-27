@@ -18,8 +18,12 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         return;
     }
     dt = (std::max)(0.f, (std::min)(dt, .05f));
+    if (ControlsActive())
+    {
+        RecallCompanion();
+    }
     const WorldPoint previousPlayer = player;
-    const WorldPoint previousSpirit = spirit;
+    WorldPoint previousSpirit = spirit;
     time += dt;
     const float inputDt = dt;
     if (ControlsActive())
@@ -183,6 +187,11 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             attackHeld = false;
         }
     }
+    if (ControlsActive() && RecallCompanion())
+    {
+        // A recall is a placement change, not a stride of hundreds of world units.
+        previousSpirit = spirit;
+    }
     if (serviceNpc.empty() && !pauseMenu && !journal && !chapter.choicePending && !dialoguePending)
     {
         UpdateChapter();
@@ -266,6 +275,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             levelOne.damageSpirit = -1;
             levelOne.invulnerability = .55f;
             spirit = player;
+            previousSpirit = spirit;
             ClearInput();
             Say("조종 해제",
                 "주령이 쓰러져 본체로 돌아왔습니다. 주령은 비조종 상태에서 회복합니다.");
