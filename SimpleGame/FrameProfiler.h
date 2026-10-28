@@ -29,6 +29,11 @@ class FrameProfiler
         InterfaceDraw,
         Monitoring,
         CharacterDraw,
+        MeshUpload,
+        MeshRead,
+        TextRaster,
+        SaveWrite,
+        AnimationSample,
         Count
     };
 
@@ -103,12 +108,13 @@ class FrameProfiler
                 s.events << s.startup.str();
                 s.startup.str("");
                 std::ofstream metadata((stem + L"-session.txt").c_str());
-                metadata << "schema=1\npatch=1.0.102v\nbatching="
+                metadata << "schema=1\npatch=1.0.103v\nbatching="
                          << RenderStorage::Enabled(L"GSE_RENDER_BATCH")
                          << "\ndisk_cache=" << RenderStorage::Enabled(L"GSE_MESH_DISK_CACHE")
                          << "\nGL_VENDOR=" << glGetString(GL_VENDOR)
                          << "\nGL_RENDERER=" << glGetString(GL_RENDERER)
                          << "\nGL_VERSION=" << glGetString(GL_VERSION)
+                         << "\nbatch_flush_events=interval_aggregated"
                          << "\nTimer targets 16ms including update cost; "
                             "CPU submission is not GPU execution time.\n";
                 std::printf("[성능] 분석 로그: %ls\n", stem.c_str());
@@ -156,6 +162,42 @@ class FrameProfiler
     static void UpdateTime(double ms)
     {
         Data().update = ms;
+    }
+
+    static void BatchFlush(bool textureLimit)
+    {
+        ++Data().batchFlushes[textureLimit ? 1 : 0];
+    }
+
+    static void TimerSample(double lateMs)
+    {
+        auto& s = Data();
+        s.timerLateTotal += lateMs;
+        s.timerLateMax = (std::max)(s.timerLateMax, lateMs);
+        ++s.timerSamples;
+    }
+
+    static void Context(const char* mode,
+                        size_t actors,
+                        size_t residents,
+                        size_t enemies,
+                        bool focused,
+                        const char* region)
+    {
+        auto& s = Data();
+        if (s.sequence == 1 || s.contextMode != mode || s.contextFocused != focused ||
+            s.contextRegion != region || Clock::now() - s.contextTime >= std::chrono::seconds(1))
+        {
+            s.contextMode = mode;
+            s.contextFocused = focused;
+            s.contextRegion = region;
+            s.contextTime = Clock::now();
+            Event("scene_context",
+                  std::string(mode) + (focused ? ":focused:" : ":unfocused:") + region,
+                  actors);
+            Event("resident_count", "", residents);
+            Event("enemy_count", "", enemies);
+        }
     }
 
     static void CacheHit()
@@ -237,6 +279,16 @@ class FrameProfiler
             return;
         Event("mesh_ram_hits_interval", "", s.cacheHits);
         s.cacheHits = 0;
+        Event("batch_flush_count", "capacity_or_vertex_ratio", s.batchFlushes[0]);
+        Event("batch_flush_count", "texture_limit", s.batchFlushes[1]);
+        s.batchFlushes = {};
+        if (s.timerSamples)
+        {
+            Event("timer_late_avg", "", s.timerSamples, s.timerLateTotal / s.timerSamples);
+            Event("timer_late_max", "", s.timerSamples, s.timerLateMax);
+            s.timerLateTotal = s.timerLateMax = 0;
+            s.timerSamples = 0;
+        }
         const char* sectionNames[] = {"population",
                                       "combat",
                                       "world_stream",
@@ -244,7 +296,15 @@ class FrameProfiler
                                       "world_draw",
                                       "interface_draw",
                                       "monitoring",
-                                      "character_3d"};
+                                      "character_3d",
+                                      "mesh_pool_upload",
+                                      "mesh_disk_read",
+                                      "text_raster",
+                                      "save_write",
+                                      "animation_sample"};
+        static_assert(sizeof(sectionNames) / sizeof(sectionNames[0]) ==
+                          static_cast<size_t>(Stage::Count),
+                      "Profiler stage names must match");
         for (size_t i = 0; i < s.sections.size(); ++i)
         {
             auto& section = s.sections[i];
@@ -311,6 +371,13 @@ class FrameProfiler
         std::ofstream csv, events;
         std::ostringstream startup;
         unsigned long long cacheHits = 0;
+        std::array<size_t, 2> batchFlushes = {};
+        std::string contextMode;
+        std::string contextRegion;
+        bool contextFocused = false;
+        Clock::time_point contextTime;
+        size_t timerSamples = 0;
+        double timerLateTotal = 0, timerLateMax = 0;
     };
 
     static Statistics& Data()

@@ -631,6 +631,7 @@ std::shared_ptr<Asset> Asset::Load(const std::wstring& path, std::string& error)
         LoadMaterials(*result, *data);
         LoadGeometry(*result, *data, cache);
         LoadClips(*result, *data, cache);
+        result->PrepareAnimation();
         State bind;
         result->Reset(bind);
         std::array<float, 3> low, high;

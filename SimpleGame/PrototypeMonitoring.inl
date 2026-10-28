@@ -78,6 +78,34 @@ void PublishMonitoring()
     int regionNpc[RegionCount] = {}, regionMonsters[RegionCount] = {},
         regionAlert[RegionCount] = {};
     int npcWorking = 0, npcHunting = 0, npcRecovering = 0, npcGold = 0, npcKills = 0;
+    // Resolve ownership once per snapshot instead of searching all residents for every house.
+    std::array<int, VillageLayout::HomeCount> houseOwners;
+    houseOwners.fill(-1);
+    std::fill_n(houseOwners.begin(), VillageLayout::StoryResidents, -2);
+    std::array<int, World::VillageCount> residents = {}, reservedHomes = {}, vacantHomes = {};
+    residents[0] = VillageLayout::StoryResidents;
+    for (const auto& npc : population.people)
+    {
+        if (npc.district >= 0 && npc.district < World::VillageCount)
+        {
+            ++residents[npc.district];
+        }
+        if (npc.migrationVillage >= 0 && npc.migrationVillage < World::VillageCount)
+        {
+            ++reservedHomes[npc.migrationVillage];
+        }
+        for (int home : {npc.houseId, npc.reservedHouse})
+        {
+            if (home >= 0 && home < VillageLayout::HomeCount && houseOwners[home] == -1)
+            {
+                houseOwners[home] = npc.id;
+            }
+        }
+    }
+    for (const auto& house : VillageLayout::Houses())
+    {
+        vacantHomes[house.village] += houseOwners[house.id] == -1;
+    }
     const auto* quest = chapter.Current();
     const auto* nearby = inWorld ? NearbyStory() : nullptr;
     const auto* nearbyResident =
@@ -283,17 +311,7 @@ void PublishMonitoring()
              << ",\"coverage\":\"loaded_only\",\"npc_coverage\":\"complete\"";
         if (i < World::VillageCount)
         {
-            int residents = i == 0 ? VillageLayout::StoryResidents : 0;
-            int reserved = 0, vacant = 0, incoming = 0, known = 0;
-            for (const auto& npc : population.people)
-            {
-                residents += npc.district == i;
-                reserved += npc.migrationVillage == i;
-            }
-            for (const auto& house : VillageLayout::Houses())
-            {
-                vacant += house.village == i && population.HouseOwner(house.id) == -1;
-            }
+            int incoming = 0, known = 0;
             for (const auto& report : population.society.boards[i])
             {
                 known += report.serial > 0;
@@ -302,10 +320,11 @@ void PublishMonitoring()
             {
                 incoming += !letter.delivered && letter.to == i;
             }
-            json << ",\"residents\":" << residents
+            json << ",\"residents\":" << residents[i]
                  << ",\"houses\":" << VillageLayout::HomesPerVillage
-                 << ",\"houses_occupied\":" << residents << ",\"houses_reserved\":" << reserved
-                 << ",\"houses_vacant\":" << vacant << ",\"mail_in_transit\":" << incoming
+                 << ",\"houses_occupied\":" << residents[i]
+                 << ",\"houses_reserved\":" << reservedHomes[i]
+                 << ",\"houses_vacant\":" << vacantHomes[i] << ",\"mail_in_transit\":" << incoming
                  << ",\"news_known\":" << known
                  << ",\"position\":" << position(World::Settlements()[i])
                  << ",\"post_office\":" << position(Population::PostOffice(i))
@@ -323,7 +342,7 @@ void PublishMonitoring()
             json << ',';
         }
         comma = true;
-        const int owner = population.HouseOwner(house.id);
+        const int owner = houseOwners[house.id];
         const bool reserved = owner >= 0 && population.people[owner].houseId != house.id;
         json << "{\"id\":" << Monitoring::Quote("home-" + std::to_string(house.id))
              << ",\"village\":" << Monitoring::Quote(World::VillageId(house.village))

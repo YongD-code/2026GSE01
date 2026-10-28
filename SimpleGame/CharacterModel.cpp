@@ -5,7 +5,6 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <tuple>
-#include <numeric>
 #pragma comment(lib, "windowscodecs.lib")
 #pragma comment(lib, "ole32.lib")
 #include "FrameProfiler.h"
@@ -200,6 +199,8 @@ void CharacterModel::Release()
     textures.clear();
     imported.reset();
     importedDraws.clear();
+    drawOrderScratch.clear();
+    paletteScratch.clear();
     importedAmbient.clear();
     glDeleteVertexArrays(1, &vao);
     glDeleteFramebuffers(1, &framebuffer);
@@ -523,6 +524,14 @@ bool CharacterModel::LoadGltf(const wchar_t* path,
         }
         importedDraws.push_back(draw);
     }
+    // Material classes do not change with the pose. Only transparent depth order is dynamic.
+    std::stable_partition(importedDraws.begin(),
+                          importedDraws.end(),
+                          [&](const ModelAssets::Primitive& draw)
+                          {
+                              return imported->materials[draw.material].alphaMode != 2;
+                          });
+    drawOrderScratch.reserve(importedDraws.size());
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &buffer);
     glBindVertexArray(vao);
@@ -728,10 +737,21 @@ void CharacterModel::DrawGltf(const State& state, const Parts* selection)
     glUniformMatrix4fv(normalizationUniform, 1, GL_FALSE, imported->normalization.data());
     glBindBufferBase(GL_UNIFORM_BUFFER, 5, paletteBuffer);
     glBindBuffer(GL_UNIFORM_BUFFER, paletteBuffer);
-    std::vector<ModelAssets::Matrix> palette;
+    auto& palette = paletteScratch;
     // Opaque and masked geometry writes depth first. Transparent surfaces follow back-to-front.
-    std::vector<size_t> order(importedDraws.size());
-    std::iota(order.begin(), order.end(), 0);
+    auto& order = drawOrderScratch;
+    order.clear();
+    size_t opaqueCount = 0;
+    for (size_t i = 0; i < importedDraws.size(); ++i)
+    {
+        const auto& draw = importedDraws[i];
+        if (draw.slot >= 0 && selection && (*selection)[draw.slot] != draw.index)
+        {
+            continue;
+        }
+        order.push_back(i);
+        opaqueCount += imported->materials[draw.material].alphaMode != 2;
+    }
     auto depth = [&](const ModelAssets::Primitive& p)
     {
         const auto& m = state.imported.global[p.node];
@@ -741,27 +761,17 @@ void CharacterModel::DrawGltf(const State& state, const Parts* selection)
         const float y = world[0] * std::sin(state.yaw) + world[1] * std::cos(state.yaw);
         return .603f * (x + y) + .519f * world[2];
     };
-    std::stable_sort(order.begin(),
+    std::stable_sort(order.begin() + opaqueCount,
                      order.end(),
                      [&](size_t a, size_t b)
                      {
-                         const bool alphaA =
-                             imported->materials[importedDraws[a].material].alphaMode == 2;
-                         const bool alphaB =
-                             imported->materials[importedDraws[b].material].alphaMode == 2;
-                         return alphaA != alphaB ? !alphaA
-                                : alphaA         ? depth(importedDraws[a]) < depth(importedDraws[b])
-                                                 : false;
+                         return depth(importedDraws[a]) < depth(importedDraws[b]);
                      });
     int lastSkin = -2;
     glActiveTexture(GL_TEXTURE0);
     for (const auto i : order)
     {
         const auto& draw = importedDraws[i];
-        if (draw.slot >= 0 && selection && (*selection)[draw.slot] != draw.index)
-        {
-            continue;
-        }
         const auto& material = imported->materials[draw.material];
         const bool alpha = material.alphaMode == 2;
         GraphicsState::Enable(GL_BLEND, alpha);
@@ -950,6 +960,7 @@ void CharacterModel::Animate(float dt, Motion kind, float phase, float facing)
 
 void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, float facing)
 {
+    FrameProfiler::Scope timing(FrameProfiler::Stage::AnimationSample);
     if (state.owner != this ||
         (imported ? state.imported.owner != imported.get() : state.pose.size() != joints.size()))
     {

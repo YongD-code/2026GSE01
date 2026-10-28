@@ -119,6 +119,23 @@ static std::string Lower(std::string text)
     return text;
 }
 
+void Asset::PrepareAnimation()
+{
+    locomotionRoots.clear();
+    for (size_t i = 0; i < nodes.size(); ++i)
+    {
+        if (Lower(nodes[i].name) == "root")
+        {
+            locomotionRoots.push_back(i);
+        }
+    }
+    turnClips.clear();
+    for (const auto& clip : clips)
+    {
+        turnClips.push_back(Lower(clip.name).find("turn_") != std::string::npos);
+    }
+}
+
 int Asset::FindClip(const std::string& name) const
 {
     const auto wanted = Lower(name);
@@ -278,18 +295,15 @@ void Asset::Sample(State& state, int clip, float seconds, float fade, bool inPla
         apply(clips[clip], seconds);
         if (inPlace)
         {
-            const bool turn = Lower(clips[clip].name).find("turn_") != std::string::npos;
-            for (size_t i = 0; i < nodes.size(); ++i)
+            const bool turn = turnClips[clip];
+            for (const size_t i : locomotionRoots)
             {
-                if (Lower(nodes[i].name) == "root")
+                // Gameplay owns horizontal travel and heading. Keep the keyed jump height.
+                state.pose[i][0] = nodes[i].bind[0];
+                state.pose[i][2] = nodes[i].bind[2];
+                if (turn)
                 {
-                    // Gameplay owns horizontal travel and heading. Keep the keyed jump height.
-                    state.pose[i][0] = nodes[i].bind[0];
-                    state.pose[i][2] = nodes[i].bind[2];
-                    if (turn)
-                    {
-                        std::copy_n(nodes[i].bind.begin() + 3, 4, state.pose[i].begin() + 3);
-                    }
+                    std::copy_n(nodes[i].bind.begin() + 3, 4, state.pose[i].begin() + 3);
                 }
             }
         }

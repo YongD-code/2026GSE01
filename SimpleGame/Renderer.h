@@ -112,12 +112,14 @@ class Renderer
         int width = 0, height = 0, descent = 0;
         std::vector<unsigned char> pixels;
         GLuint texture = 0;
+        std::uint64_t lastUsed = 0;
     };
 
     GLuint m_Program = 0, m_Buffer = 0, m_Array = 0, m_PoolBuffer = 0, m_PoolTexture = 0;
     GLint m_Viewport = -1, m_LinearScene = -1;
     int m_Width, m_Height, m_BatchVertices = 0;
     size_t m_PoolVertexLimit = 32768;
+    size_t m_PoolUsed = 0, m_PoolCapacity = 0, m_TextBytes = 0;
     bool m_Initialized = false, m_InHDRScene = false, m_Capturing = false;
     bool m_Batching = true;
     std::unique_ptr<PostProcessing> m_Post;
@@ -131,6 +133,7 @@ class Renderer
     std::string m_CaptureKey;
     std::chrono::steady_clock::time_point m_CaptureStart;
     void UploadPool();
+    void UploadMesh(CachedMesh& mesh);
     void InstallMesh(const std::string& key, std::vector<Vertex> vertices);
     void Submit(const std::string& key, Instance instance, GLuint texture = 0);
     void Templates();

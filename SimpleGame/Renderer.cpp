@@ -135,7 +135,19 @@ void Renderer::FinishScene()
 
 void Renderer::UploadPool()
 {
+    FrameProfiler::Scope timing(FrameProfiler::Stage::MeshUpload);
+    size_t vertices = 0;
+    for (const auto& entry : m_MeshCache)
+    {
+        vertices += entry.second.vertices.size();
+    }
+    if (m_PoolCapacity < vertices)
+    {
+        m_PoolCapacity = (std::min)(
+            m_PoolVertexLimit, (std::max)(vertices, (std::max)(size_t(4096), m_PoolCapacity * 2)));
+    }
     std::vector<float> data;
+    data.reserve(vertices * 8);
     for (auto& entry : m_MeshCache)
     {
         entry.second.first = static_cast<int>(data.size() / 8);
@@ -143,18 +155,46 @@ void Renderer::UploadPool()
             data.insert(data.end(), {v.x, v.y, 0, 0, v.r, v.g, v.b, v.a});
     }
     glBindBuffer(GL_TEXTURE_BUFFER, m_PoolBuffer);
-    glBufferData(GL_TEXTURE_BUFFER, data.size() * sizeof(float), data.data(), GL_STATIC_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, m_PoolCapacity * 8 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_TEXTURE_BUFFER, 0, data.size() * sizeof(float), data.data());
     glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_BUFFER, m_PoolTexture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_PoolBuffer);
     glActiveTexture(GL_TEXTURE0);
+    m_PoolUsed = vertices;
     FrameProfiler::Upload(data.size() * sizeof(float));
     FrameProfiler::Event("mesh_pool_upload", "", data.size() * sizeof(float));
 }
 
+void Renderer::UploadMesh(CachedMesh& mesh)
+{
+    FrameProfiler::Scope timing(FrameProfiler::Stage::MeshUpload);
+    std::vector<float> data;
+    data.reserve(mesh.vertices.size() * 8);
+    for (const auto& v : mesh.vertices)
+    {
+        data.insert(data.end(), {v.x, v.y, 0, 0, v.r, v.g, v.b, v.a});
+    }
+    mesh.first = static_cast<int>(m_PoolUsed);
+    glBindBuffer(GL_TEXTURE_BUFFER, m_PoolBuffer);
+    glBufferSubData(GL_TEXTURE_BUFFER,
+                    m_PoolUsed * 8 * sizeof(float),
+                    data.size() * sizeof(float),
+                    data.data());
+    m_PoolUsed += mesh.vertices.size();
+    FrameProfiler::Upload(data.size() * sizeof(float));
+    FrameProfiler::Event("mesh_pool_append", "", data.size() * sizeof(float));
+}
+
 void Renderer::InstallMesh(const std::string& key, std::vector<Vertex> vertices)
 {
+    if (vertices.empty() || vertices.size() > m_PoolVertexLimit)
+    {
+        FrameProfiler::Event("mesh_pool_rejected", key, vertices.size() * sizeof(Vertex));
+        return;
+    }
     Flush();
+    bool compact = false;
     size_t totalVertices = vertices.size();
     for (const auto& entry : m_MeshCache)
         totalVertices += entry.second.vertices.size();
@@ -171,6 +211,7 @@ void Renderer::InstallMesh(const std::string& key, std::vector<Vertex> vertices)
             FrameProfiler::Event(
                 "mesh_evict", oldest->first, oldest->second.vertices.size() * sizeof(Vertex));
             m_MeshCache.erase(oldest);
+            compact = true;
         }
         else
         {
@@ -181,8 +222,19 @@ void Renderer::InstallMesh(const std::string& key, std::vector<Vertex> vertices)
     CachedMesh mesh;
     mesh.vertices = std::move(vertices);
     mesh.lastUsed = m_Frame;
-    m_MeshCache.emplace(key, std::move(mesh));
-    UploadPool();
+    auto installed = m_MeshCache.emplace(key, std::move(mesh));
+    if (!installed.second)
+    {
+        return;
+    }
+    if (compact || m_PoolUsed + installed.first->second.vertices.size() > m_PoolCapacity)
+    {
+        UploadPool();
+    }
+    else
+    {
+        UploadMesh(installed.first->second);
+    }
 }
 
 bool Renderer::BeginCachedMesh(const std::string& key, Point origin)
@@ -196,7 +248,12 @@ bool Renderer::BeginCachedMesh(const std::string& key, Point origin)
     }
     const auto start = FrameProfiler::Clock::now();
     std::vector<Vertex> loaded;
-    if (RenderStorage::Read(key, loaded))
+    bool read = false;
+    {
+        FrameProfiler::Scope timing(FrameProfiler::Stage::MeshRead);
+        read = RenderStorage::Read(key, loaded);
+    }
+    if (read)
     {
         FrameProfiler::Event("mesh_disk_hit",
                              key,
@@ -229,8 +286,8 @@ void Renderer::EndCachedMesh()
                          m_Vertices.size() * sizeof(Vertex),
                          FrameProfiler::Milliseconds(m_CaptureStart));
     const auto start = FrameProfiler::Clock::now();
-    const bool written = RenderStorage::Write(m_CaptureKey, m_Vertices);
-    FrameProfiler::Event(written ? "mesh_built_saved" : "mesh_built_unsaved",
+    const bool queued = RenderStorage::QueueWrite(m_CaptureKey, m_Vertices);
+    FrameProfiler::Event(queued ? "mesh_cache_queued" : "mesh_cache_not_queued",
                          m_CaptureKey,
                          m_Vertices.size() * sizeof(Vertex),
                          FrameProfiler::Milliseconds(start));
@@ -270,7 +327,7 @@ void Renderer::Submit(const std::string& key, Instance instance, GLuint texture)
         (m_Instances.size() >= 2048 || count > (std::max)(72, m_BatchVertices) * 2 ||
          m_BatchVertices > (std::max)(72, count) * 2))
     {
-        FrameProfiler::Event("batch_flush", "capacity_or_vertex_ratio", m_Instances.size());
+        FrameProfiler::BatchFlush(false);
         Flush();
     }
     int slot = -1;
@@ -281,7 +338,7 @@ void Renderer::Submit(const std::string& key, Instance instance, GLuint texture)
         {
             if (m_Textures.size() == 8)
             {
-                FrameProfiler::Event("batch_flush", "texture_limit", m_Instances.size());
+                FrameProfiler::BatchFlush(true);
                 Flush();
             }
             slot = static_cast<int>(m_Textures.size());
@@ -459,6 +516,7 @@ void Renderer::Text(float x,
     auto found = m_TextCache.find(key);
     if (found == m_TextCache.end())
     {
+        FrameProfiler::Scope timing(FrameProfiler::Stage::TextRaster);
         // Decode UTF-8 explicitly, independent of the Windows system code page.
         int count = MultiByteToWideChar(
             CP_UTF8, MB_ERR_INVALID_CHARS, text.c_str(), static_cast<int>(text.size()), nullptr, 0);
@@ -545,13 +603,26 @@ void Renderer::Text(float x,
         DeleteDC(dc);
         if (!drawn)
             return;
-        // Bound memory use when future dialogue introduces many unique lines.
-        if (m_TextCache.size() >= 128)
+        const size_t bitmapBytes = bitmap.pixels.size();
+        // Retain recently used labels when changing counters introduce new strings.
+        // Flushing the entire cache repeatedly rerasterized unchanged HUD and NPC names.
+        if (m_TextCache.size() >= 512 || m_TextBytes + bitmapBytes > 16 * 1024 * 1024)
         {
             Flush();
-            for (auto& entry : m_TextCache)
-                glDeleteTextures(1, &entry.second.texture);
-            m_TextCache.clear();
+            while (!m_TextCache.empty() &&
+                   (m_TextCache.size() >= 512 || m_TextBytes + bitmapBytes > 16 * 1024 * 1024))
+            {
+                const auto oldest =
+                    std::min_element(m_TextCache.begin(),
+                                     m_TextCache.end(),
+                                     [](const auto& a, const auto& b)
+                                     {
+                                         return a.second.lastUsed < b.second.lastUsed;
+                                     });
+                m_TextBytes -= size_t(oldest->second.width) * oldest->second.height * 4;
+                glDeleteTextures(1, &oldest->second.texture);
+                m_TextCache.erase(oldest);
+            }
         }
         glGenTextures(1, &bitmap.texture);
         glBindTexture(GL_TEXTURE_2D, bitmap.texture);
@@ -569,9 +640,11 @@ void Renderer::Text(float x,
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         FrameProfiler::Upload(bitmap.pixels.size());
-        bitmap.pixels.clear();
+        std::vector<unsigned char>().swap(bitmap.pixels);
+        m_TextBytes += bitmapBytes;
         found = m_TextCache.emplace(key, std::move(bitmap)).first;
     }
+    found->second.lastUsed = m_Frame;
     const TextBitmap& bitmap = found->second;
     Sprite(bitmap.texture,
            float(int(x)),

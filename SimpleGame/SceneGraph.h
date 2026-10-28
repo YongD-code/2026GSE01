@@ -12,6 +12,11 @@
 class SceneGraph
 {
   public:
+    size_t Size() const
+    {
+        return actors.size();
+    }
+
     Actor* Find(const std::string& id) const
     {
         const auto found = actors.find(id);

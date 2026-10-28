@@ -15,15 +15,18 @@ but WITHOUT ANY WARRANTY.
 #include <iostream>
 #include <memory>
 #include <windows.h>
+#include <mmsystem.h>
 
 // Korean text uses GDI rasterization; scene geometry uses OpenGL 3.3 shaders.
 #pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "winmm.lib")
 
 namespace
 {
 std::unique_ptr<Renderer> renderer;
 std::unique_ptr<Prototype> game;
 int previousTime = 0;
+FrameProfiler::Clock::time_point timerDue;
 void Close();
 
 void Display()
@@ -52,6 +55,7 @@ void Timer(int)
     float dt = (std::min)(.05f, (std::max)(0.f, (now - previousTime) * .001f));
     // Poll Shift every frame so pressing/releasing it while moving takes effect immediately.
     const bool focused = GetForegroundWindow() == WindowFromDC(wglGetCurrentDC());
+    FrameProfiler::TimerSample((std::max)(0., FrameProfiler::Milliseconds(timerDue)));
     const bool sprint = focused && (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
     if (!focused)
         game->ClearInput();
@@ -62,7 +66,9 @@ void Timer(int)
     glutPostRedisplay();
     // Include update work in the frame budget instead of adding a fixed wait after it.
     const int elapsed = glutGet(GLUT_ELAPSED_TIME) - now;
-    glutTimerFunc((std::max)(1, 16 - elapsed), Timer, 0);
+    const int delay = (std::max)(1, 16 - elapsed);
+    timerDue = FrameProfiler::Clock::now() + std::chrono::milliseconds(delay);
+    glutTimerFunc(delay, Timer, 0);
 }
 
 void Reshape(int w, int h)
@@ -208,8 +214,16 @@ int main(int argc, char** argv)
     glutSpecialUpFunc(SpecialUp);
     glutEntryFunc(Entry);
     glutCloseFunc(Close);
+    // Match the 16ms callback schedule to a fine Windows timer while the loop is active.
+    const bool fineTimer = timeBeginPeriod(1) == TIMERR_NOERROR;
+    FrameProfiler::Event("timer_resolution_request", fineTimer ? "1ms" : "unavailable", 0);
     previousTime = glutGet(GLUT_ELAPSED_TIME);
+    timerDue = FrameProfiler::Clock::now() + std::chrono::milliseconds(16);
     glutTimerFunc(16, Timer, 0);
     glutMainLoop();
+    if (fineTimer)
+    {
+        timeEndPeriod(1);
+    }
     return 0;
 }

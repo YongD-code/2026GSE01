@@ -137,5 +137,10 @@ class Asset
                 const std::string& mesh,
                 std::array<float, 3>& low,
                 std::array<float, 3>& high) const;
+
+  private:
+    std::vector<size_t> locomotionRoots;
+    std::vector<bool> turnClips;
+    void PrepareAnimation();
 };
 } // namespace ModelAssets

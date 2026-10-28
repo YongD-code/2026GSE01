@@ -45,6 +45,7 @@ bool SaveProgress(bool manual, int slot = 0)
         }
         return false;
     }
+    FrameProfiler::Scope timing(FrameProfiler::Stage::SaveWrite);
     SaveGame::State state;
     state.seed = world.seed;
     state.story = SaveGame::StoryHash(chapter);

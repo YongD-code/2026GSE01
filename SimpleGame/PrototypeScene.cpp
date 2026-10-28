@@ -966,6 +966,22 @@ void Prototype::Draw()
     // Input can load a save or change UI between simulation ticks.
     // Reconcile before rendering, retaining nodes with the same identity.
     SynchronizeScene();
+    const char* mode = openingPlaying                                           ? "opening"
+                       : titleScreen                                            ? "title"
+                       : levelOne.Dead()                                        ? "dead"
+                       : (pauseMenu || journal || slotMode != SlotMode::Closed) ? "paused"
+                       : (dialoguePending || chapter.choicePending)             ? "dialogue"
+                                                                                : "playing";
+    const int village = World::VillageAt(player);
+    const char* region = village >= 0                     ? World::VillageId(village)
+                         : CemeteryRoom::Contains(player) ? "cemetery"
+                                                          : "field";
+    FrameProfiler::Context(mode,
+                           scene.Size(),
+                           population.people.size(),
+                           levelOne.enemies.size(),
+                           GetForegroundWindow() == WindowFromDC(wglGetCurrentDC()),
+                           region);
     r.Begin(Color(.035f, .052f, .069f), !titleScreen && !openingPlaying);
     occupiedLabels.clear();
     {

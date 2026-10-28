@@ -1,5 +1,6 @@
 #pragma once
 #include "Renderer.h"
+#include "FrameProfiler.h"
 #include "World.h"
 #include "SpriteSheet.h"
 #include "CharacterModel.h"

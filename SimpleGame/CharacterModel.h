@@ -113,6 +113,8 @@ class CharacterModel
     GLint styleUniform = -1;
     std::shared_ptr<ModelAssets::Asset> imported;
     std::vector<ModelAssets::Primitive> importedDraws;
+    std::vector<size_t> drawOrderScratch;
+    std::vector<ModelAssets::Matrix> paletteScratch;
     std::vector<int> importedAmbient;
     std::vector<GLuint> textures;
     std::array<int, static_cast<size_t>(Motion::Count)> importedClips;

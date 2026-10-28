@@ -7,6 +7,12 @@
 #include <cmath>
 #include <cstdio>
 #include <utility>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
+#include <exception>
 
 // Derived, disposable data only. Save files are never stored here.
 namespace RenderStorage
@@ -40,9 +46,15 @@ inline std::uint64_t Hash(const void* bytes, size_t size)
     return hash;
 }
 
+inline const std::wstring& MeshFolder()
+{
+    static const auto folder = Folder(L"MeshCache-v4");
+    return folder;
+}
+
 inline std::wstring MeshPath(const std::string& key)
 {
-    const auto folder = Folder(L"MeshCache-v4");
+    const auto& folder = MeshFolder();
     if (folder.empty())
         return {};
     wchar_t name[64] = {};
@@ -82,6 +94,19 @@ template <class Vertex> bool Read(const std::string& key, std::vector<Vertex>& v
     return true;
 }
 
+struct CacheBudget
+{
+    std::mutex mutex;
+    unsigned long long bytes = 0;
+    std::chrono::steady_clock::time_point scanned;
+};
+
+inline CacheBudget& MeshBudget()
+{
+    static CacheBudget budget;
+    return budget;
+}
+
 template <class Vertex> bool Write(const std::string& key, const std::vector<Vertex>& vertices)
 {
     if (!Enabled(L"GSE_MESH_DISK_CACHE") || vertices.empty())
@@ -89,22 +114,39 @@ template <class Vertex> bool Write(const std::string& key, const std::vector<Ver
     const auto path = MeshPath(key);
     if (path.empty())
         return false;
-    // Stop adding derived files at the budget; existing game saves are unrelated.
-    const auto folder = Folder(L"MeshCache-v4");
-    WIN32_FIND_DATAW entry = {};
-    HANDLE find = FindFirstFileW((folder + L"/*.mesh").c_str(), &entry);
-    unsigned long long bytes = 0;
-    if (find != INVALID_HANDLE_VALUE)
+    // Cache the directory total between writes. Periodically reconcile other processes.
+    auto& budget = MeshBudget();
+    std::lock_guard<std::mutex> lock(budget.mutex);
+    const auto now = std::chrono::steady_clock::now();
+    if (budget.scanned == std::chrono::steady_clock::time_point{} ||
+        now - budget.scanned >= std::chrono::seconds(30))
     {
-        do
+        budget.bytes = 0;
+        WIN32_FIND_DATAW entry = {};
+        HANDLE find = FindFirstFileW((MeshFolder() + L"/*.mesh").c_str(), &entry);
+        if (find != INVALID_HANDLE_VALUE)
         {
-            bytes +=
-                (static_cast<unsigned long long>(entry.nFileSizeHigh) << 32) | entry.nFileSizeLow;
-        } while (FindNextFileW(find, &entry));
-        FindClose(find);
+            do
+            {
+                budget.bytes += (static_cast<unsigned long long>(entry.nFileSizeHigh) << 32) |
+                                entry.nFileSizeLow;
+            } while (FindNextFileW(find, &entry));
+            FindClose(find);
+        }
+        budget.scanned = now;
     }
-    if (bytes + vertices.size() * sizeof(Vertex) > 256ull * 1024 * 1024)
+    WIN32_FILE_ATTRIBUTE_DATA previous = {};
+    const auto oldBytes = GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &previous)
+                              ? (static_cast<unsigned long long>(previous.nFileSizeHigh) << 32) |
+                                    previous.nFileSizeLow
+                              : 0ull;
+    const auto fileBytes = sizeof(std::uint32_t) * 4 + sizeof(std::uint64_t) + key.size() +
+                           vertices.size() * sizeof(Vertex);
+    const auto retained = budget.bytes - (oldBytes < budget.bytes ? oldBytes : budget.bytes);
+    if (retained + fileBytes > 256ull * 1024 * 1024)
+    {
         return false;
+    }
     const auto temporary = path + L"." + std::to_wstring(GetCurrentProcessId()) + L".tmp";
     std::ofstream output(temporary.c_str(), std::ios::binary | std::ios::trunc);
     const std::uint32_t header[] = {0x3148534d,
@@ -122,6 +164,114 @@ template <class Vertex> bool Write(const std::string& key, const std::vector<Ver
         DeleteFileW(temporary.c_str());
         return false;
     }
+    budget.bytes = retained + fileBytes;
     return true;
+}
+
+// Only disposable mesh cache data is written here. No GL or world state is used by the worker.
+template <class Vertex> class MeshWriter
+{
+    struct Job
+    {
+        std::string key;
+        std::vector<Vertex> vertices;
+    };
+
+    std::mutex mutex;
+    std::condition_variable ready;
+    std::deque<Job> pending;
+    size_t queuedBytes = 0;
+    bool stopping = false;
+    std::thread worker;
+
+    void Run()
+    {
+        for (;;)
+        {
+            Job job;
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                ready.wait(lock,
+                           [this]
+                           {
+                               return stopping || !pending.empty();
+                           });
+                if (stopping)
+                {
+                    return;
+                }
+                job = std::move(pending.front());
+                queuedBytes -= job.vertices.size() * sizeof(Vertex);
+                pending.pop_front();
+            }
+            try
+            {
+                Write(job.key, job.vertices);
+            }
+            catch (const std::exception&)
+            {
+                // A disposable cache failure must not stop the game or the worker.
+            }
+        }
+    }
+
+  public:
+    MeshWriter()
+        : worker(
+              [this]
+              {
+                  Run();
+              })
+    {
+    }
+
+    ~MeshWriter()
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            stopping = true;
+            pending.clear();
+            queuedBytes = 0;
+        }
+        ready.notify_one();
+        worker.join();
+    }
+
+    bool Submit(const std::string& key, const std::vector<Vertex>& vertices)
+    {
+        const size_t bytes = vertices.size() * sizeof(Vertex);
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            // Bound memory and latency even if storage is slow or unavailable.
+            if (stopping || pending.size() >= 32 || queuedBytes + bytes > 16 * 1024 * 1024)
+            {
+                return false;
+            }
+            pending.push_back({key, vertices});
+            queuedBytes += bytes;
+        }
+        ready.notify_one();
+        return true;
+    }
+};
+
+template <class Vertex> bool QueueWrite(const std::string& key, const std::vector<Vertex>& vertices)
+{
+    if (!Enabled(L"GSE_MESH_DISK_CACHE") || vertices.empty())
+    {
+        return false;
+    }
+    // These shared resources must outlive the writer during static destruction.
+    (void)MeshFolder();
+    (void)MeshBudget();
+    try
+    {
+        static MeshWriter<Vertex> writer;
+        return writer.Submit(key, vertices);
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
 }
 } // namespace RenderStorage
