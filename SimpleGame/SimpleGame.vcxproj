@@ -180,6 +180,8 @@
     <ClInclude Include="VillageSociety.inl" />
     <ClInclude Include="LevelOne.h" />
     <ClInclude Include="EaterBoss.h" />
+    <ClInclude Include="StagSkill.h" />
+    <ClInclude Include="PrototypeStagQ.inl" />
     <ClInclude Include="EaterBossCombat.inl" />
     <ClInclude Include="EaterBossRendering.inl" />
     <ClInclude Include="SpiritCatalog.h" />

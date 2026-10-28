@@ -304,6 +304,10 @@ if gait == 'quadruped':
     import quadruped_locomotion
     locomotion = quadruped_locomotion.apply_rig(rig, species)
 
+if species == 'stag':
+    import stag_q
+    stag_q.author(rig)
+
 surface_forms.stylize_scene()
 bpy.ops.wm.save_as_mainfile(filepath=str(destination/'model.blend'))
 bpy.ops.object.select_all(action='DESELECT')
@@ -336,6 +340,10 @@ entry = {'id': species_id, 'key': species, 'name': label, 'disposition': disposi
          'triangles': sum(len(p.vertices)-2 for o in bpy.context.scene.objects if o.type == 'MESH' for p in o.data.polygons)}
 if locomotion:
     quadruped_locomotion.update_entry(entry, rig, locomotion)
+if species == 'stag':
+    entry['clips'].update(stag_q.metadata())
+    entry['skills'] = {'Q': {'name': '길틔움', 'animation': 'MOB_STAG_ATTACK',
+                              'timing': stag_q.specification()}}
 catalog['species'] = [e for e in catalog['species'] if e['id'] != species_id] + [entry]
 catalog['species'].sort(key=lambda e: e['id'])
 catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

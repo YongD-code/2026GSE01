@@ -821,6 +821,39 @@ void Prototype::SynchronizeScene()
          });
     for (const auto& effect : skillEffects)
     {
+        if (IsStagQ(effect))
+        {
+            const double length = (std::max)(1., Distance(effect.origin, effect.target));
+            const WorldPoint aim = {(effect.target.x - effect.origin.x) / length,
+                                    (effect.target.y - effect.origin.y) / length};
+            for (int branch = 0; branch < 3; ++branch)
+            {
+                if (effect.branchEnds[branch] <= .1f ||
+                    StagSkill::Rise(effect.age, effect.branchEnds[branch]) <= 0)
+                {
+                    continue;
+                }
+                const auto at =
+                    StagSkill::Point(effect.origin, aim, branch, effect.branchEnds[branch]);
+                bind("effects/stag-bloom/" + std::to_string(effect.id) + "/" +
+                         std::to_string(branch),
+                     "effects",
+                     at,
+                     ActorLayer::World,
+                     [this, effect, branch](const Actor&)
+                     {
+                         DrawStagBloom(effect, branch);
+                     });
+            }
+            bind("effects/stag-ground/" + std::to_string(effect.id),
+                 "effects",
+                 effect.origin,
+                 ActorLayer::Warning,
+                 [this, effect](const Actor&)
+                 {
+                     DrawStagQ(effect, true);
+                 });
+        }
         if (effect.set == 0 && effect.slot == 3)
         {
             bind("effects/domain-back/" + std::to_string(effect.id),

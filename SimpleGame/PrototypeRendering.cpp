@@ -763,6 +763,20 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
         castProgress =
             controlling && PreparingSkill() ? .45f : 1.f - (std::min)(1.f, spiritCastPose / .55f);
     }
+    const SkillEffect* stagCast = type == SpiritCatalog::Stag ? StagQCast() : nullptr;
+    if (stagCast)
+    {
+        if (stagCast->age >= StagSkill::Charge && companionAnimation.moving)
+        {
+            animation = companionAnimation;
+            castProgress = -1;
+        }
+        else
+        {
+            castProgress = (std::min)(1.f, stagCast->age / StagSkill::Animation);
+            animation.facing = spiritCastFacing;
+        }
+    }
     if (DrawSpiritModel(type,
                         p,
                         SpiritCatalog::Get(type).size,
@@ -771,7 +785,8 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
                         time,
                         castProgress,
                         state,
-                        controlling && requestedSprint))
+                        controlling && requestedSprint,
+                        stagCast ? CharacterModel::Motion::Attack : CharacterModel::Motion::Cast))
     {
         return;
     }

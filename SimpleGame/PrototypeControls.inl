@@ -12,7 +12,14 @@ struct SkillEffect
     std::vector<WorldPoint> visualTrail, impacts;
     float impactAge = -1;
     int caster = -1;
+    int species = -1;
+    std::array<float, 3> branchEnds = {{1, 1, 1}};
 };
+
+bool IsStagQ(const SkillEffect& effect) const
+{
+    return effect.species == SpiritCatalog::Stag && effect.slot == 0;
+}
 
 std::vector<WorldPoint> moveRoute;
 size_t routeIndex = 0;
@@ -149,7 +156,7 @@ void UpdateBufferedCommand(float dt)
     bufferedCommand.action = -1;
 }
 
-float skillTimers[SpiritCatalog::Count + 1][4] = {};
+float skillTimers[SpiritCatalog::SkillSetCount][4] = {};
 float spiritHasteTime = 0;
 float spiritCastPose = 0;
 Facing spiritCastFacing = Facing::South;
@@ -210,7 +217,9 @@ bool PreparingSkill() const
                                                   (e.slot == 1 && e.age < RedCharge) ||
                                                   (e.slot == 2 && e.age < BlueCharge))) ||
                                   (e.set > 0 && e.slot == 3 && e.age < DomainOpening) ||
-                                  (e.set > 0 && e.slot == 0 &&
+                                  (e.species == SpiritCatalog::Stag && e.slot == 0 &&
+                                   e.age < StagSkill::Charge) ||
+                                  (e.species != SpiritCatalog::Stag && e.set > 0 && e.slot == 0 &&
                                    e.age < (e.set == 2   ? .18f
                                             : e.set == 4 ? .55f
                                                          : .45f));
@@ -407,11 +416,23 @@ bool RecallCompanion(bool force = false, bool notify = true)
 
 int SkillSet() const
 {
+    if (captured && controlling && capturedSpirit == SpiritCatalog::Stag)
+    {
+        return SpiritCatalog::StagSkills;
+    }
     return captured && controlling ? 1 + SpiritCatalog::Get(capturedSpirit).skillSpecies : 0;
 }
 
 const char* SkillName(int set, int slot) const
 {
+    if (set == SpiritCatalog::StagSkills)
+    {
+        if (slot == 0)
+        {
+            return "길틔움";
+        }
+        set = 3;
+    }
     static const char* names[5][4] = {
         {"허식 자", "술식반전 혁", "술식순전 창", "무량공처"},
         {"망각을 찢는 비명", "기억의 결박", "유체 이탈", "잊힌 자들의 합창"},
@@ -434,6 +455,14 @@ WorldPoint CursorWorld() const
 
 const char* SkillDescription(int set, int slot) const
 {
+    if (set == SpiritCatalog::StagSkills)
+    {
+        if (slot == 0)
+        {
+            return "꽃뿌리로 피해·결박 후 끝에서 덩굴 개화 / 보스 둔화";
+        }
+        set = 3;
+    }
     static const char* descriptions[5][4] = {
         {"주력을 모아 커서 방향으로 허식 자 방출",
          "붉은 주력 압축·발사 후 폭발과 밀치기",
@@ -557,14 +586,16 @@ void CastSkill(int slot)
         Say("술식", "아직 주력을 다루는 법을 모릅니다. 묘지에서 라엔을 만나세요.");
         return;
     }
-    const int set = SkillSet();
+    const int cooldownSet = SkillSet();
+    const int set = cooldownSet == SpiritCatalog::StagSkills ? 3 : cooldownSet;
+    const bool stagQ = cooldownSet == SpiritCatalog::StagSkills && slot == 0;
     // Do not reserve unavailable skills for an entire cooldown, even during another cast.
-    if (skillTimers[set][slot] > .3f)
+    if (skillTimers[cooldownSet][slot] > .3f)
     {
         return;
     }
     if (PreparingSkill() || levelOne.dodgeTime > 0 || levelOne.hitStop > 0 ||
-        skillTimers[set][slot] > 0)
+        skillTimers[cooldownSet][slot] > 0)
     {
         BufferCommand(slot);
         return;
@@ -590,12 +621,16 @@ void CastSkill(int slot)
         target.x += 1;
         distance = 1;
     }
-    const double reach = slot == 0 ? (set == 3 ? 175 : set == 2 ? 320 : 420) : 260;
+    const double reach = stagQ       ? StagSkill::Reach
+                         : slot == 0 ? (set == 3   ? 175
+                                        : set == 2 ? 320
+                                                   : 420)
+                                     : 260;
     const double length = slot == 0 && set != 1 && set != 4 ? reach : (std::min)(distance, reach);
     target = {origin.x + (target.x - origin.x) / distance * length,
               origin.y + (target.y - origin.y) / distance * length};
     static const float waits[4] = {6, 9, 12, 40};
-    skillTimers[set][slot] = waits[slot];
+    skillTimers[cooldownSet][slot] = waits[slot];
     levelOne.skillCooldown = (std::max)(levelOne.skillCooldown, waits[slot]);
     const auto* quest = chapter.Current();
     if (set > 0 && (!quest || quest->trigger != "skill" || (set == 1 && slot == quest->amount)))
@@ -630,6 +665,7 @@ void CastSkill(int slot)
     {
         auto& effect = skillEffects.back();
         effect.caster = selectedCompanion;
+        effect.species = capturedSpirit;
         if (slot == 3)
         {
             effect.duration += DomainOpening;
@@ -650,8 +686,37 @@ void CastSkill(int slot)
         effect.position = origin;
         effect.duration = set == 1 ? 1.25f : set == 2 ? 1.65f : set == 3 ? .9f : 1.5f;
         effect.nextPulse = set == 3 ? .45f : .55f;
-        skillTimers[set][slot] = set == 1 ? 5.f : set == 2 ? 7.f : set == 3 ? 8.f : 9.f;
+        skillTimers[cooldownSet][slot] = set == 1 ? 5.f : set == 2 ? 7.f : set == 3 ? 8.f : 9.f;
         spiritCastPose = set == 3 ? .8f : .55f;
+        if (stagQ)
+        {
+            effect.duration = StagSkill::Duration;
+            effect.nextPulse = StagSkill::Charge;
+            skillTimers[cooldownSet][slot] = StagSkill::Cooldown;
+            spiritCastPose = StagSkill::Animation;
+            const double length = Distance(origin, target);
+            const WorldPoint aim = {(target.x - origin.x) / length, (target.y - origin.y) / length};
+            for (int branch = 0; branch < 3; ++branch)
+            {
+                WorldPoint previous = origin;
+                for (int segment = 1; segment <= StagSkill::Segments; ++segment)
+                {
+                    const float t = float(segment) / StagSkill::Segments;
+                    const WorldPoint next = StagSkill::Point(origin, aim, branch, t);
+                    if (!LevelOne::ClearLine(previous,
+                                             next,
+                                             [this](WorldPoint p)
+                                             {
+                                                 return Blocked(p);
+                                             }))
+                    {
+                        effect.branchEnds[branch] = float(segment - 1) / StagSkill::Segments;
+                        break;
+                    }
+                    previous = next;
+                }
+            }
+        }
     }
     if (set == 0 && slot == 0)
     {
@@ -696,6 +761,7 @@ void CastSkill(int slot)
 
 #include "PrototypeRed.inl"
 #include "PrototypePolarity.inl"
+#include "PrototypeStagQ.inl"
 #include "PrototypeSpiritSkills.inl"
 #include "PrototypeSpiritEffects.inl"
 

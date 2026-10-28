@@ -20,7 +20,7 @@ class SaveGame
         LevelOne level;
         std::vector<Population::Person> residents;
         Population::Society society;
-        int formatVersion = 7;
+        int formatVersion = 8;
         Chapter chapter;
         int companion = 0, facing = 0;
         bool controlling = false, dialogue = false;
@@ -28,7 +28,7 @@ class SaveGame
         std::string speaker, message;
         float messageTime = 0;
         bool spiritEquipped = true;
-        float skillTimers[5][4] = {};
+        float skillTimers[SpiritCatalog::SkillSetCount][4] = {};
     };
 
     enum class Result
@@ -153,7 +153,7 @@ class SaveGame
         a.Fields(news.serial, news.origin, news.created, news.safety, news.jobs, news.wages);
     }
 
-    static bool Transfer(Archive& a, State& s, int version = 7)
+    static bool Transfer(Archive& a, State& s, int version = 8)
     {
         s.formatVersion = version;
         auto& l = s.level;
@@ -370,11 +370,19 @@ class SaveGame
         if (version >= 2)
         {
             a.Field(s.spiritEquipped);
-            for (auto& set : s.skillTimers)
+            const int sets = version >= 8 ? SpiritCatalog::SkillSetCount : 5;
+            for (int set = 0; set < sets; ++set)
             {
-                for (float& timer : set)
+                for (float& timer : s.skillTimers[set])
                 {
                     a.Field(timer);
+                }
+            }
+            if (a.reading && version < 8)
+            {
+                for (int slot = 0; slot < 4; ++slot)
+                {
+                    s.skillTimers[SpiritCatalog::StagSkills][slot] = s.skillTimers[3][slot];
                 }
             }
         }
@@ -765,7 +773,7 @@ class SaveGame
         std::uint64_t checksum = 0;
         if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" ||
             (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 &&
-             version != 6 && version != 7))
+             version != 6 && version != 7 && version != 8))
         {
             return false;
         }
@@ -851,7 +859,7 @@ class SaveGame
             return false;
         }
         const std::string payload = archive.stream.str();
-        const std::string bytes = "GSE_SAVE 7 " + std::to_string(Hash(payload)) + "\n" + payload;
+        const std::string bytes = "GSE_SAVE 8 " + std::to_string(Hash(payload)) + "\n" + payload;
         if (bytes.size() > MaximumBytes)
         {
             return false;

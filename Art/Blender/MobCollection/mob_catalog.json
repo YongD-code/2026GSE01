@@ -309,6 +309,13 @@
           "loop": false
         },
         "attack": {
+          "name": "MOB_STAG_ATTACK",
+          "firstFrame": 1,
+          "lastFrame": 33,
+          "loop": false
+        },
+        "cast": {
+          "name": "MOB_STAG_CAST",
           "firstFrame": 1,
           "lastFrame": 19,
           "loop": false
@@ -328,6 +335,26 @@
         "stanceFraction": 0.7,
         "runStanceFraction": 0.5,
         "method": "planted stance, two-bone IK bake, articulated toes, chest/pelvis weighting"
+      },
+      "skills": {
+        "Q": {
+          "name": "길틔움",
+          "animation": "MOB_STAG_ATTACK",
+          "reviewOnly": false,
+          "timing": {
+            "Charge": 0.62,
+            "Travel": 0.58,
+            "Fade": 0.8,
+            "BloomRise": 0.28,
+            "VineHeight": 84.0,
+            "Animation": 1.35,
+            "Cooldown": 7.0,
+            "Reach": 360.0,
+            "Radius": 18.0,
+            "RootTime": 1.1,
+            "Duration": 2.2800000000000002
+          }
+        }
       }
     },
     {

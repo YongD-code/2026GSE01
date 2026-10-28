@@ -58,7 +58,7 @@ bool SaveProgress(bool manual, int slot = 0)
         if (result.id >= 0 && result.id < int(state.residents.size()))
             state.residents[result.id].health = result.health;
     state.spiritEquipped = controlling;
-    for (int set = 0; set < 5; ++set)
+    for (int set = 0; set < SpiritCatalog::SkillSetCount; ++set)
     {
         for (int slot = 0; slot < 4; ++slot)
         {
@@ -264,7 +264,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     dialoguePage = 0;
     RefreshSavedStoryDialogue();
     RestoreResidentDialogue();
-    for (int set = 0; set < 5; ++set)
+    for (int set = 0; set < SpiritCatalog::SkillSetCount; ++set)
     {
         for (int slotIndex = 0; slotIndex < 4; ++slotIndex)
         {

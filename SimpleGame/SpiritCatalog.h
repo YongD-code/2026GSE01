@@ -16,6 +16,9 @@ enum Species
     Count
 };
 
+constexpr int StagSkills = 5;
+constexpr int SkillSetCount = 6;
+
 struct Definition
 {
     const char* name;

@@ -13,6 +13,11 @@ WorldPoint SpiritQPosition(const SkillEffect& effect) const
 
 void UpdateSpiritQ(SkillEffect& effect, float dt)
 {
+    if (IsStagQ(effect))
+    {
+        UpdateStagQ(effect, dt);
+        return;
+    }
     auto clear = [this](WorldPoint a, WorldPoint b)
     {
         return LevelOne::ClearLine(a,
