@@ -352,6 +352,8 @@
             "Reach": 360.0,
             "Radius": 18.0,
             "RootTime": 1.1,
+            "Segments": 48,
+            "BloomPoints": 8,
             "Duration": 2.2800000000000002
           }
         }

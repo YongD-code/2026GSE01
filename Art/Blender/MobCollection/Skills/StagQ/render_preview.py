@@ -88,14 +88,16 @@ def main():
     gold_mat = material('PATH_FLOWER', (1., .67, .11), 1.3)
     core_mat = material('PATH_CORE', (.65, 1., .35), 3)
     stone_mat = material('REVIEW_TARGET', (.15, .20, .20))
-    fill_data = bpy.data.lights.new('Q_BLOOM_FILL', 'AREA')
-    fill_data.energy = 500
-    fill_data.size = 5
-    fill_data.color = (.8, 1., .72)
-    fill = bpy.data.objects.new('Q_BLOOM_FILL', fill_data)
-    scene.collection.objects.link(fill)
-    fill.location = (-2, -SPEC['Reach']*unit, height+2)
-    fill.rotation_euler = (Vector((0, -SPEC['Reach']*unit, height*.5))-fill.location).to_track_quat('-Z', 'Y').to_euler()
+    for location in (.4, .9):
+        fill_data = bpy.data.lights.new('Q_BLOOM_FILL', 'AREA')
+        fill_data.energy = 350
+        fill_data.size = 6
+        fill_data.color = (.8, 1., .72)
+        fill = bpy.data.objects.new('Q_BLOOM_FILL', fill_data)
+        scene.collection.objects.link(fill)
+        target = Vector((0, -SPEC['Reach']*unit*location, height*.5))
+        fill.location = target+Vector((-2, 0, height+2))
+        fill.rotation_euler = (target-fill.location).to_track_quat('-Z', 'Y').to_euler()
     bpy.ops.mesh.primitive_plane_add(size=200)
     bpy.context.object.data.materials.append(ground)
     roots, leaves, flowers, coils, tendrils, towers, upright_leaves = [], [], [], [], [], [], []
@@ -105,12 +107,24 @@ def main():
         side = math.sin(t*math.pi)*12+(branch-1)*62*smooth(split)
         return Vector((side*unit, -SPEC['Reach']*t*unit, .025))
 
-    def stem(branch, strand, t):
-        angle = strand*2.094395102+branch*.8+t*2.7
+    def bloom_at(index):
+        return .05+.95*index/(SPEC['BloomPoints']-1)
+
+    def covered(branch, fraction):
+        if branch == 1:
+            return False
+        at = point(branch, fraction)
+        return any((at-point(1, bloom_at(i))).length < 22*unit
+                   for i in range(SPEC['BloomPoints']))
+
+    def stem(branch, index, strand, t):
+        seed = branch*SPEC['BloomPoints']+index
+        angle = strand*2.094395102+seed*.8+t*2.7
         spread = (4+8*math.sin(t*math.pi))*(.4+.6*t)
-        return point(branch, 1)+Vector(((math.cos(angle)*spread+math.sin(branch*1.1+strand)*t*t*9)*unit,
-                                        (math.sin(angle)*spread+math.cos(branch+strand*.7)*t*t*6)*unit,
-                                        (SPEC['VineHeight']-strand*8)*t*unit))
+        scale = .72+.28*((index+branch*2)%4)/3
+        return point(branch, bloom_at(index))+Vector(((math.cos(angle)*spread+math.sin(seed*1.1+strand)*t*t*9)*unit,
+                    (math.sin(angle)*spread+math.cos(seed+strand*.7)*t*t*6)*unit,
+                    (SPEC['VineHeight']-strand*8)*t*unit*scale))
 
     for branch in range(3):
         pts = [point(branch, i/48) for i in range(49)]
@@ -127,25 +141,27 @@ def main():
             curl = [at+Vector((math.cos(j*.3)*j/24*.4, math.sin(j*.3)*j/24*.4, .01+j/24*.04))
                     for j in range(25)]
             tendrils.append((i/48, curve('Q_TENDRIL', curl, .025, leaf_mat)))
-        at = point(branch, 1)
-        for strand in range(3):
-            pts = [stem(branch, strand, i/32) for i in range(33)]
-            towers.append(curve('Q_RISING_VINE', pts, .085, root_mat))
-            towers.append(curve('Q_RISING_VEIN', [p+Vector((-.075, -.075, .02)) for p in pts], .035, vein_mat))
-            for t in (.34, .68, .9):
-                obj = ball('Q_RISING_LEAF', stem(branch, strand, t), (.18, .06, .025), leaf_mat)
-                obj.rotation_euler.z = branch+strand+t*3
-                upright_leaves.append((t, obj, obj.scale.copy()))
-        for petal in range(5):
-            angle = petal*math.tau/5+branch
-            offset = Vector((math.cos(angle)*.12, math.sin(angle)*.12, .07))
-            obj = ball('Q_FLOWER_PETAL', stem(branch, 0, 1)+offset,
-                       (.16, .065, .025), gold_mat)
-            obj.rotation_euler.z = angle
-            flowers.append((obj, obj.scale.copy(), branch, offset))
-        offset = Vector((0, 0, .09))
-        obj = ball('Q_FLOWER_CENTER', stem(branch, 0, 1)+offset, (.075, .075, .055), core_mat)
-        flowers.append((obj, obj.scale.copy(), branch, offset))
+        for index in range(SPEC['BloomPoints']):
+            fraction = bloom_at(index)
+            if covered(branch, fraction):
+                continue
+            for strand in range(2):
+                pts = [stem(branch, index, strand, i/6) for i in range(7)]
+                towers.append((fraction, curve('Q_RISING_VINE', pts, .085, root_mat)))
+                towers.append((fraction, curve('Q_RISING_VEIN', [p+Vector((-.075, -.075, .02)) for p in pts], .035, vein_mat)))
+                obj = ball('Q_RISING_LEAF', stem(branch, index, strand, .5), (.18, .06, .025), leaf_mat)
+                obj.rotation_euler.z = branch+strand+1.5
+                upright_leaves.append((fraction, .5, obj, obj.scale.copy()))
+            for petal in range(5):
+                angle = petal*math.tau/5+branch
+                offset = Vector((math.cos(angle)*.12, math.sin(angle)*.12, .07))
+                obj = ball('Q_FLOWER_PETAL', stem(branch, index, 0, 1)+offset,
+                           (.16, .065, .025), gold_mat)
+                obj.rotation_euler.z = angle
+                flowers.append((obj, obj.scale.copy(), branch, index, fraction, offset))
+            offset = Vector((0, 0, .09))
+            obj = ball('Q_FLOWER_CENTER', stem(branch, index, 0, 1)+offset, (.075, .075, .055), core_mat)
+            flowers.append((obj, obj.scale.copy(), branch, index, fraction, offset))
     for branch, fraction in ((1, .58), (2, .78)):
         at = point(branch, fraction)
         bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=.18, depth=.8, location=at+Vector((0, 0, .4)))
@@ -162,9 +178,10 @@ def main():
         scene.frame_set(int(frame), subframe=frame-int(frame))
         growth = min(1., max(0., (age-SPEC['Charge'])/SPEC['Travel']))
         fade = min(1., max(0., (SPEC['Duration']-age)/SPEC['Fade']))
-        local = age-SPEC['Charge']-SPEC['Travel']
-        rise = min(1., max(0., local/SPEC['BloomRise']))
-        rise = 1-(1-rise)**3
+        def rise_at(fraction):
+            local = age-SPEC['Charge']-SPEC['Travel']*fraction
+            t = min(1., max(0., local/SPEC['BloomRise']))
+            return local, 1-(1-t)**3
         for obj in roots:
             obj.hide_render = growth <= .001 or fade <= .001
             obj.data.bevel_factor_end = max(.001, growth)
@@ -173,22 +190,25 @@ def main():
             bloom = smooth((growth-t)*8+.12)*fade
             obj.hide_render = growth < t or bloom < .001
             obj.scale = scale*max(.001, bloom)
-        for fraction, obj, scale in upright_leaves:
-            bloom = smooth((rise-fraction)*6)*fade
-            obj.hide_render = local < 0 or rise < fraction or bloom < .001
+        for path_fraction, stem_fraction, obj, scale in upright_leaves:
+            local, rise = rise_at(path_fraction)
+            bloom = smooth((rise-stem_fraction)*6)*fade
+            obj.hide_render = local < 0 or rise < stem_fraction or bloom < .001
             obj.scale = scale*max(.001, bloom)
         for fraction, obj in tendrils:
             obj.hide_render = growth < fraction or fade < .001
             obj.data.bevel_factor_end = max(.001, smooth((growth-fraction)*8))
-        for obj in towers:
+        for fraction, obj in towers:
+            _, rise = rise_at(fraction)
             obj.hide_render = rise <= .001 or fade <= .001
             obj.data.bevel_factor_end = max(.001, rise)
             obj.data.bevel_depth = (.035 if 'VEIN' in obj.name else .085)*max(.001, fade)
-        bloom = smooth((local-SPEC['BloomRise']*.7)/.18)*fade
-        for obj, scale, branch, offset in flowers:
+        for obj, scale, branch, index, fraction, offset in flowers:
+            local, rise = rise_at(fraction)
+            bloom = smooth((local-SPEC['BloomRise']*.7)/.18)*fade
             obj.hide_render = bloom < .001
             obj.scale = scale*max(.001, bloom)
-            obj.location = stem(branch, 0, rise)+offset
+            obj.location = stem(branch, index, 0, rise)+offset
         for fraction, obj in coils:
             obj.hide_render = growth < fraction or fade < .001
             obj.data.bevel_factor_end = max(.001, smooth((growth-fraction)*8))

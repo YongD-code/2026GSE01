@@ -17,6 +17,8 @@ def specification():
     source = (ROOT/'SimpleGame/StagSkill.h').read_text(encoding='utf-8')
     values = {name: float(value) for name, value in
               re.findall(r'constexpr float (\w+) = ([.\d]+)f?;', source)}
+    values.update({name: int(value) for name, value in
+                   re.findall(r'constexpr int (\w+) = (\d+);', source)})
     values['Duration'] = values['Charge']+values['Travel']+values.get('BloomRise', 0)+values['Fade']
     return values
 

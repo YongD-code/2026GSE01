@@ -16,7 +16,7 @@ def label(age):
     if age < SPEC['Charge']:
         return '뿔에 생명력 응축'
     if age < SPEC['Charge']+SPEC['Travel']:
-        return '세 갈래 뿌리 확산'
+        return '경로를 따라 덩굴 분출'
     if age < SPEC['Charge']+SPEC['Travel']+SPEC['BloomRise']:
         return '덩굴 솟구침'
     if age < SPEC['Duration']-.3:
@@ -45,8 +45,8 @@ def main():
         draw.rounded_rectangle((730, 55, 934, 425), radius=8, fill='#12241e', outline='#597350', width=1)
         canvas.paste(close, (737, 90))
         draw.text((745, 64), '시전 동작 확대', fill='#d8edc5', font=medium)
-        draw.text((747, 344), '세 줄기 덩굴 상승', fill='#bad09d', font=medium)
-        draw.text((747, 369), '꼭대기 금빛 개화', fill='#bad09d', font=medium)
+        draw.text((747, 344), '경로를 따라 상승', fill='#bad09d', font=medium)
+        draw.text((747, 369), '덩굴 위 금빛 개화', fill='#bad09d', font=medium)
         draw.text((747, 394), f"재사용 {SPEC['Cooldown']:.0f}초", fill='#bad09d', font=medium)
         draw.text((18, 465), '실제 모델 기반 블렌더 미리보기 · 게임 화면 아님', fill='#a3b4aa', font=small)
         frames.append(canvas)
@@ -55,14 +55,14 @@ def main():
         palette_image.paste(frames[index], (0, row*486))
     palette = palette_image.quantize(colors=192)
     encoded = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
-    encoded[0].save(HERE/'stag_q_rising_vines.gif', save_all=True, append_images=encoded[1:],
+    encoded[0].save(HERE/'stag_q_path_vines.gif', save_all=True, append_images=encoded[1:],
                     duration=[50]*(len(encoded)-1)+[500], loop=0, disposal=2, optimize=False)
-    frames[33].save(HERE/'stag_q_rising_peak.png')
+    frames[33].save(HERE/'stag_q_path_peak.png')
     sheet = Image.new('RGB', (1880, 972), '#0c1714')
     for tile, index in enumerate((6, 17, 26, 33)):
         sheet.paste(frames[index], ((tile%2)*940, (tile//2)*486))
-    sheet.save(HERE/'stag_q_rising_stages.png')
-    print('STAG_Q_GIF_READY', HERE/'stag_q_rising_vines.gif')
+    sheet.save(HERE/'stag_q_path_stages.png')
+    print('STAG_Q_GIF_READY', HERE/'stag_q_path_vines.gif')
 
 
 if __name__ == '__main__':

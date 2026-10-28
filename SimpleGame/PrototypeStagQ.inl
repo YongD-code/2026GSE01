@@ -206,43 +206,37 @@ void DrawStagQ(const SkillEffect& effect, bool ground = false)
     }
 }
 
-void DrawStagBloom(const SkillEffect& effect, int branch)
+void DrawStagBloom(WorldPoint at, int branch, int index, float rise, float local, float fade, float age)
 {
-    const float end = effect.branchEnds[branch];
-    const float rise = StagSkill::Rise(effect.age, end);
-    if (end <= .1f || rise <= 0)
+    if (rise <= 0 || fade <= 0)
     {
         return;
     }
-    const float fade =
-        (std::max)(0.f, (std::min)(1.f, (effect.duration - effect.age) / StagSkill::Fade));
-    const double length = (std::max)(1., Distance(effect.origin, effect.target));
-    const WorldPoint aim = {(effect.target.x - effect.origin.x) / length,
-                            (effect.target.y - effect.origin.y) / length};
-    const WorldPoint at = StagSkill::Point(effect.origin, aim, branch, end);
-    for (int strand = 0; strand < 3; ++strand)
+    const int seed = branch * StagSkill::BloomPoints + index;
+    const float height = .72f + .28f * ((index + branch * 2) % 4) / 3.f;
+    for (int strand = 0; strand < 2; ++strand)
     {
-        auto previous = StagSkill::Stem(at, branch, strand, 0);
-        for (int segment = 1; segment <= 16; ++segment)
+        auto previous = StagSkill::Stem(at, seed, strand, 0);
+        for (int segment = 1; segment <= 6; ++segment)
         {
-            const float t = (std::min)(rise, segment / 16.f);
-            const auto next = StagSkill::Stem(at, branch, strand, t);
-            r.Line(Screen(previous.x, previous.y, previous.z + 2),
-                   Screen(next.x, next.y, next.z + 2),
+            const float t = (std::min)(rise, segment / 6.f);
+            const auto next = StagSkill::Stem(at, seed, strand, t);
+            r.Line(Screen(previous.x, previous.y, previous.z * height + 2),
+                   Screen(next.x, next.y, next.z * height + 2),
                    6 * (1 - t * .7f) * fade,
                    Color(.12f, .25f, .06f, fade));
-            r.Line(Screen(previous.x, previous.y, previous.z + 3),
-                   Screen(next.x, next.y, next.z + 3),
+            r.Line(Screen(previous.x, previous.y, previous.z * height + 3),
+                   Screen(next.x, next.y, next.z * height + 3),
                    1.8f * fade,
                    Color(.55f, 1.2f, .25f, fade * .85f));
-            if (segment % 5 == 0)
+            if (segment == 3)
             {
-                r.EnergyParticle(Screen(next.x, next.y, next.z + 4),
+                r.EnergyParticle(Screen(next.x, next.y, next.z * height + 4),
                                  10,
                                  4,
                                  float(strand + t * 3),
                                  Color(.3f, .8f, .15f, fade * .8f),
-                                 effect.age + segment,
+                                 age + segment,
                                  true);
             }
             previous = next;
@@ -253,43 +247,42 @@ void DrawStagBloom(const SkillEffect& effect, int branch)
         }
         if (rise < 1)
         {
-            r.EnergyParticle(Screen(previous.x, previous.y, previous.z + 4),
+            r.EnergyParticle(Screen(previous.x, previous.y, previous.z * height + 4),
                              10,
                              17,
-                             effect.age,
+                             age,
                              Color(.6f, 1.4f, .3f, fade * .65f),
-                             effect.age + strand,
+                             age + strand,
                              true);
         }
     }
-    const float local = effect.age - StagSkill::Charge - StagSkill::Travel * end;
     const float bloom =
         (std::max)(0.f, (std::min)(1.f, (local - StagSkill::BloomRise * .7f) / .18f));
-    const auto tip = StagSkill::Stem(at, branch, 0, rise);
+    const auto tip = StagSkill::Stem(at, seed, 0, rise);
     for (int petal = 0; petal < 5 && bloom > 0; ++petal)
     {
         const float angle = petal * 1.256637061f + branch;
         r.EnergyParticle(Screen(tip.x + std::cos(angle) * 10 * bloom,
                                 tip.y + std::sin(angle) * 10 * bloom,
-                                tip.z + 6),
+                                tip.z * height + 6),
                          9 * bloom,
                          4 * bloom,
                          angle,
                          Color(1.5f, 1.25f, .35f, fade * bloom * .8f),
-                         effect.age + petal,
+                         age + petal,
                          true);
     }
-    r.EnergyParticle(Screen(tip.x, tip.y, tip.z + 6),
+    r.EnergyParticle(Screen(tip.x, tip.y, tip.z * height + 6),
                      6 * bloom,
                      6 * bloom,
                      0,
                      Color(1.5f, 1.8f, .9f, fade * bloom),
-                     effect.age,
+                     age,
                      true);
     if (local < .35f)
     {
         const float burst = 1 - local / .35f;
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < 4; ++i)
         {
             const double angle = i * 2.39996323;
             r.EnergyParticle(Screen(at.x + std::cos(angle) * (5 + local * 45),
@@ -299,7 +292,7 @@ void DrawStagBloom(const SkillEffect& effect, int branch)
                              3,
                              float(angle),
                              Color(.85f, 1.3f, .4f, burst * fade * .6f),
-                             effect.age + i,
+                             age + i,
                              true);
         }
     }

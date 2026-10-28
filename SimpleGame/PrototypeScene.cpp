@@ -828,22 +828,32 @@ void Prototype::SynchronizeScene()
                                     (effect.target.y - effect.origin.y) / length};
             for (int branch = 0; branch < 3; ++branch)
             {
-                if (effect.branchEnds[branch] <= .1f ||
-                    StagSkill::Rise(effect.age, effect.branchEnds[branch]) <= 0)
+                if (effect.branchEnds[branch] <= .1f)
                 {
                     continue;
                 }
-                const auto at =
-                    StagSkill::Point(effect.origin, aim, branch, effect.branchEnds[branch]);
-                bind("effects/stag-bloom/" + std::to_string(effect.id) + "/" +
-                         std::to_string(branch),
-                     "effects",
-                     at,
-                     ActorLayer::World,
-                     [this, effect, branch](const Actor&)
-                     {
-                         DrawStagBloom(effect, branch);
-                     });
+                for (int index = 0; index < StagSkill::BloomPoints; ++index)
+                {
+                    const float t = StagSkill::BloomAt(effect.branchEnds[branch], index);
+                    const float rise = StagSkill::Rise(effect.age, t);
+                    if (rise <= 0 || StagSkill::CoveredByCenter(effect.origin, aim, branch, t,
+                                                                 effect.branchEnds[1]))
+                    {
+                        continue;
+                    }
+                    const auto at = StagSkill::Point(effect.origin, aim, branch, t);
+                    const float local = effect.age - StagSkill::Charge - StagSkill::Travel * t;
+                    const float fade = (std::max)(0.f, (std::min)(1.f,
+                        (effect.duration - effect.age) / StagSkill::Fade));
+                    const float age = effect.age;
+                    bind("effects/stag-bloom/" + std::to_string(effect.id) + "/" +
+                             std::to_string(branch) + "/" + std::to_string(index),
+                         "effects", at, ActorLayer::World,
+                         [this, at, branch, index, rise, local, fade, age](const Actor&)
+                         {
+                             DrawStagBloom(at, branch, index, rise, local, fade, age);
+                         });
+                }
             }
             bind("effects/stag-ground/" + std::to_string(effect.id),
                  "effects",
