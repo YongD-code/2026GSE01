@@ -1,0 +1,140 @@
+{
+  "characterId": "sealer",
+  "stage": "bespoke_sealer_01",
+  "concept": "calm elderly woman; low silver bun, layered robes and old sealing tools",
+  "source": "model.blend",
+  "export": "model.glb",
+  "rig": "NPC_SEALER_RIG",
+  "boneCount": 14,
+  "meshes": [
+    {
+      "index": 0,
+      "mesh": "NPC_SEALER_HEAD_FACE",
+      "slot": "bespoke",
+      "vertices": 1450,
+      "triangles": 2770
+    },
+    {
+      "index": 1,
+      "mesh": "NPC_SEALER_HAIR_LOW_BUN",
+      "slot": "bespoke",
+      "vertices": 630,
+      "triangles": 1182
+    },
+    {
+      "index": 2,
+      "mesh": "NPC_SEALER_LAYERED_ROBE",
+      "slot": "bespoke",
+      "vertices": 440,
+      "triangles": 824
+    },
+    {
+      "index": 3,
+      "mesh": "NPC_SEALER_SHOULDER_MANTLE",
+      "slot": "bespoke",
+      "vertices": 40,
+      "triangles": 64
+    },
+    {
+      "index": 4,
+      "mesh": "NPC_SEALER_SASH_AND_TALISMANS",
+      "slot": "bespoke",
+      "vertices": 550,
+      "triangles": 1008
+    },
+    {
+      "index": 5,
+      "mesh": "NPC_SEALER_SHOE_L",
+      "slot": "bespoke",
+      "vertices": 72,
+      "triangles": 136
+    },
+    {
+      "index": 6,
+      "mesh": "NPC_SEALER_SHOE_R",
+      "slot": "bespoke",
+      "vertices": 72,
+      "triangles": 136
+    },
+    {
+      "index": 7,
+      "mesh": "NPC_SEALER_ARM_L",
+      "slot": "bespoke",
+      "vertices": 48,
+      "triangles": 92
+    },
+    {
+      "index": 8,
+      "mesh": "NPC_SEALER_HAND_L",
+      "slot": "bespoke",
+      "vertices": 236,
+      "triangles": 448
+    },
+    {
+      "index": 9,
+      "mesh": "NPC_SEALER_ARM_R",
+      "slot": "bespoke",
+      "vertices": 48,
+      "triangles": 92
+    },
+    {
+      "index": 10,
+      "mesh": "NPC_SEALER_HAND_R",
+      "slot": "bespoke",
+      "vertices": 236,
+      "triangles": 448
+    },
+    {
+      "index": 11,
+      "mesh": "NPC_SEALER_WRITING_BRUSH",
+      "slot": "bespoke",
+      "vertices": 118,
+      "triangles": 224
+    },
+    {
+      "index": 12,
+      "mesh": "NPC_SEALER_RITUAL_DESK",
+      "slot": "bespoke",
+      "vertices": 48,
+      "triangles": 72
+    },
+    {
+      "index": 13,
+      "mesh": "NPC_SEALER_RITUAL_PAPER_AND_TOOLS",
+      "slot": "bespoke",
+      "vertices": 186,
+      "triangles": 336
+    }
+  ],
+  "clips": {
+    "idle": {
+      "action": "NPC_SEALER_IDLE",
+      "firstFrame": 1,
+      "lastFrame": 97,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "ritual": {
+      "action": "NPC_SEALER_RITUAL",
+      "firstFrame": 1,
+      "lastFrame": 145,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "greet": {
+      "action": "NPC_SEALER_GREET",
+      "firstFrame": 1,
+      "lastFrame": 73,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    }
+  },
+  "gameIntegrated": true,
+  "gameExecutionVerified": false,
+  "stationary": true,
+  "locomotionClips": [],
+  "ritualPaperTopZ": 1.124
+}
