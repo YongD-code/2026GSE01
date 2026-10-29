@@ -424,7 +424,8 @@ bool Prototype::StoryPersonVisible(const StoryLayout::Site& site, WorldPoint pos
     return site.kind != StoryLayout::Kind::Evidence && StoryLayout::Visible(site, chapter) &&
            site.spriteIndex >= 0 && site.spriteIndex < StoryLayout::NpcCount &&
            ((site.id == "smith" && smithModel.Ready()) ||
-            (site.id == "merchant" && merchantModel.Ready()) || npcModel.Ready() ||
+            (site.id == "merchant" && merchantModel.Ready()) ||
+            (site.id == "sealer" && sealerModel.Ready()) || npcModel.Ready() ||
             storyNpcSheets[site.spriteIndex].Ready()) &&
            CharacterInView(position, StoryLayout::PersonHeight(site));
 }
@@ -433,6 +434,7 @@ CharacterModel* Prototype::StoryCharacterModel(const std::string& id)
 {
     CharacterModel* model = id == "smith"      ? &smithModel
                             : id == "merchant" ? &merchantModel
+                            : id == "sealer"   ? &sealerModel
                                                : nullptr;
     return model && model->Ready() ? model : nullptr;
 }
@@ -446,13 +448,17 @@ void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, co
         return;
     }
     const bool shop = id == "merchant";
-    const char* idle = shop ? "NPC_MERCHANT_IDLE" : "NPC_SMITH_IDLE";
-    const char* greet = shop ? "NPC_MERCHANT_GREET" : "NPC_SMITH_GREET";
+    const bool sealer = id == "sealer";
+    const char* idle = shop ? "NPC_MERCHANT_IDLE" : sealer ? "NPC_SEALER_IDLE" : "NPC_SMITH_IDLE";
+    const char* greet = shop     ? "NPC_MERCHANT_GREET"
+                        : sealer ? "NPC_SEALER_GREET"
+                                 : "NPC_SMITH_GREET";
     auto& state = actor.modelState;
     auto work = [&]()
     {
         const char* clip = shop ? (actor.workCycle == 0 ? "NPC_MERCHANT_SORT" : "NPC_MERCHANT_PACK")
-                                : "NPC_SMITH_FORGE";
+                           : sealer ? "NPC_SEALER_RITUAL"
+                                    : "NPC_SMITH_FORGE";
         model->Play(state, clip, !shop, 1, .18f);
     };
     if (state.owner != model)
@@ -469,7 +475,9 @@ void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, co
     }
     const auto at = actor.WorldPosition();
     const double distance = Distance(player, {at.x, at.y});
-    const bool conversation = serviceNpc == id || (speaker == (shop ? "잡화상" : "대장장이") &&
+    const bool conversation = serviceNpc == id || (speaker == (shop     ? "잡화상"
+                                                               : sealer ? "봉인사"
+                                                                        : "대장장이") &&
                                                    (dialoguePending || messageTime > 0));
     const bool attending = !controlling && !levelOne.Dead() &&
                            (conversation || distance < (actor.attending ? 140 : 96));

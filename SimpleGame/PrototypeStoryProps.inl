@@ -351,7 +351,7 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
                 line(26, -15, 32, 30, -9, 32, 6, metal);
             }
         }
-        else if (site.id == "sealer")
+        else if (site.id == "sealer" && !sealerModel.Ready())
         {
             desk();
             sheet(-18, -31, 28, 30, 16);

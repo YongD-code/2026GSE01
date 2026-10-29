@@ -78,6 +78,7 @@ class Prototype
     CharacterModel npcModel;
     CharacterModel smithModel;
     CharacterModel merchantModel;
+    CharacterModel sealerModel;
     ModelLibrary models;
     bool useProtagonistModel = false;
     float protagonistYaw = 2.35619449f, protagonistGait = 0;
@@ -657,6 +658,12 @@ class Prototype
                 L"Art/Blender/StoryCharacters/Merchant/model.glb", nullptr, &merchantClips))
         {
             std::cerr << "잡화상 전용 모델 로드 실패, 기존 NPC 외형을 사용합니다." << std::endl;
+        }
+        const std::map<std::string, std::string> sealerClips = {{"idle", "NPC_SEALER_IDLE"}};
+        if (!sealerModel.LoadGltf(
+                L"Art/Blender/StoryCharacters/Sealer/model.glb", nullptr, &sealerClips))
+        {
+            std::cerr << "봉인사 전용 모델 로드 실패, 기존 NPC 외형을 사용합니다." << std::endl;
         }
         SpriteLayout storyLayout;
         storyLayout.columns = 2;

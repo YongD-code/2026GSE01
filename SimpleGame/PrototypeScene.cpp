@@ -444,7 +444,8 @@ void Prototype::SynchronizeScene()
             continue;
         }
         if (site.kind != StoryLayout::Kind::Evidence &&
-            (site.id != "merchant" || !merchantModel.Ready()))
+            (site.id != "merchant" || !merchantModel.Ready()) &&
+            (site.id != "sealer" || !sealerModel.Ready()))
         {
             bind("story-setting/" + site.id,
                  "story",
