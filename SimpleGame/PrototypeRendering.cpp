@@ -425,23 +425,25 @@ bool Prototype::StoryPersonVisible(const StoryLayout::Site& site, WorldPoint pos
            site.spriteIndex >= 0 && site.spriteIndex < StoryLayout::NpcCount &&
            ((site.id == "smith" && smithModel.Ready()) ||
             (site.id == "merchant" && merchantModel.Ready()) ||
-            (site.id == "sealer" && sealerModel.Ready()) || npcModel.Ready() ||
+            (site.id == "sealer" && sealerModel.Ready()) ||
+            (site.id.compare(0, 5, "raen_") == 0 && raenModel.Ready()) || npcModel.Ready() ||
             storyNpcSheets[site.spriteIndex].Ready()) &&
            CharacterInView(position, StoryLayout::PersonHeight(site));
 }
 
 CharacterModel* Prototype::StoryCharacterModel(const std::string& id)
 {
-    CharacterModel* model = id == "smith"      ? &smithModel
-                            : id == "merchant" ? &merchantModel
-                            : id == "sealer"   ? &sealerModel
-                                               : nullptr;
+    CharacterModel* model = id == "smith"                    ? &smithModel
+                            : id == "merchant"               ? &merchantModel
+                            : id == "sealer"                 ? &sealerModel
+                            : id.compare(0, 5, "raen_") == 0 ? &raenModel
+                                                             : nullptr;
     return model && model->Ready() ? model : nullptr;
 }
 
 void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, const std::string& id)
 {
-    constexpr float facing = 2.35619449f;
+    constexpr float defaultFacing = 2.35619449f;
     auto* model = StoryCharacterModel(id);
     if (!model)
     {
@@ -449,21 +451,27 @@ void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, co
     }
     const bool shop = id == "merchant";
     const bool sealer = id == "sealer";
-    const char* idle = shop ? "NPC_MERCHANT_IDLE" : sealer ? "NPC_SEALER_IDLE" : "NPC_SMITH_IDLE";
+    const bool raen = id.compare(0, 5, "raen_") == 0;
+    const char* idle = shop     ? "NPC_MERCHANT_IDLE"
+                       : sealer ? "NPC_SEALER_IDLE"
+                       : raen   ? "NPC_RAEN_IDLE"
+                                : "NPC_SMITH_IDLE";
     const char* greet = shop     ? "NPC_MERCHANT_GREET"
                         : sealer ? "NPC_SEALER_GREET"
+                        : raen   ? "NPC_RAEN_GREET"
                                  : "NPC_SMITH_GREET";
     auto& state = actor.modelState;
     auto work = [&]()
     {
         const char* clip = shop ? (actor.workCycle == 0 ? "NPC_MERCHANT_SORT" : "NPC_MERCHANT_PACK")
                            : sealer ? "NPC_SEALER_RITUAL"
+                           : raen   ? (actor.workCycle == 0 ? "NPC_RAEN_IDLE" : "NPC_RAEN_FOCUS")
                                     : "NPC_SMITH_FORGE";
-        model->Play(state, clip, !shop, 1, .18f);
+        model->Play(state, clip, !(shop || raen), 1, .18f);
     };
     if (state.owner != model)
     {
-        model->Reset(state, facing);
+        model->Reset(state, defaultFacing);
         actor.attending = false;
         actor.workCycle = 0;
         work();
@@ -477,6 +485,7 @@ void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, co
     const double distance = Distance(player, {at.x, at.y});
     const bool conversation = serviceNpc == id || (speaker == (shop     ? "잡화상"
                                                                : sealer ? "봉인사"
+                                                               : raen   ? "라엔"
                                                                         : "대장장이") &&
                                                    (dialoguePending || messageTime > 0));
     const bool attending = !controlling && !levelOne.Dead() &&
@@ -498,12 +507,20 @@ void Prototype::UpdateStationaryNpcActor(StationaryNpcActor& actor, float dt, co
     {
         model->Play(state, idle, true, 1, .18f);
     }
-    else if (!attending && shop && state.imported.finished)
+    else if (!attending && (shop || raen) && state.imported.finished)
     {
         actor.workCycle = (actor.workCycle + 1) % 2;
         work();
     }
-    // Fixed heading keeps workstations aligned with the authored hand motion.
+    float facing = defaultFacing;
+    if (raen && distance < 160)
+    {
+        const double dx = player.x - at.x, dy = player.y - at.y;
+        SpriteAnimation orientation;
+        orientation.Update((dx - dy) * .85, (dx + dy) * .43, 0, false);
+        facing = CharacterFacing(orientation.facing);
+    }
+    // Workstations stay fixed; Raen turns to face a nearby player in place.
     model->Animate(state, dt, CharacterModel::Motion::Idle, 0, facing);
 }
 

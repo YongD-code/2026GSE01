@@ -484,6 +484,10 @@ void Prototype::SynchronizeScene()
             actor.SetWorldPosition({site.position.x, site.position.y, 0});
             actor.layer = ActorLayer::Character;
             actor.footprint = {-30, -22, 60, 68, true};
+            if (site.id.compare(0, 5, "raen_") == 0)
+            {
+                actor.footprint = {-14, -14, 28, 28, true};
+            }
             actor.update = [this, site](Actor& node, float dt)
             {
                 UpdateStationaryNpcActor(static_cast<StationaryNpcActor&>(node), dt, site.id);
