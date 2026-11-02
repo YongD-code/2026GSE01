@@ -1,0 +1,168 @@
+{
+  "characterId": "raen",
+  "stage": "bespoke_sorceress_crossed_seal_04",
+  "reference": "SimpleGame/Assets/Characters/Story/raen.png",
+  "concept": "long layered silver hair, burgundy scarf, dark split coat, talismans and boots",
+  "source": "model.blend",
+  "export": "model.glb",
+  "rig": "NPC_RAEN_RIG",
+  "boneCount": 26,
+  "meshes": [
+    {
+      "index": 0,
+      "mesh": "NPC_RAEN_HEAD_FACE",
+      "slot": "bespoke",
+      "vertices": 1272,
+      "triangles": 2456
+    },
+    {
+      "index": 1,
+      "mesh": "NPC_RAEN_HAIR_SILVER_FRONT",
+      "slot": "bespoke",
+      "vertices": 830,
+      "triangles": 1546
+    },
+    {
+      "index": 2,
+      "mesh": "NPC_RAEN_HAIR_LONG_BACK",
+      "slot": "bespoke",
+      "vertices": 446,
+      "triangles": 844
+    },
+    {
+      "index": 3,
+      "mesh": "NPC_RAEN_HAIR_LONG_SIDE_L",
+      "slot": "bespoke",
+      "vertices": 48,
+      "triangles": 84
+    },
+    {
+      "index": 4,
+      "mesh": "NPC_RAEN_HAIR_LONG_SIDE_R",
+      "slot": "bespoke",
+      "vertices": 48,
+      "triangles": 84
+    },
+    {
+      "index": 5,
+      "mesh": "NPC_RAEN_JACKET_AND_WRAP",
+      "slot": "bespoke",
+      "vertices": 538,
+      "triangles": 1012
+    },
+    {
+      "index": 6,
+      "mesh": "NPC_RAEN_SHORTS_AND_STOCKINGS",
+      "slot": "bespoke",
+      "vertices": 198,
+      "triangles": 376
+    },
+    {
+      "index": 7,
+      "mesh": "NPC_RAEN_BOOT_L",
+      "slot": "bespoke",
+      "vertices": 120,
+      "triangles": 220
+    },
+    {
+      "index": 8,
+      "mesh": "NPC_RAEN_BOOT_R",
+      "slot": "bespoke",
+      "vertices": 120,
+      "triangles": 220
+    },
+    {
+      "index": 9,
+      "mesh": "NPC_RAEN_COAT_TAIL_L",
+      "slot": "bespoke",
+      "vertices": 120,
+      "triangles": 200
+    },
+    {
+      "index": 10,
+      "mesh": "NPC_RAEN_COAT_TAIL_R",
+      "slot": "bespoke",
+      "vertices": 120,
+      "triangles": 200
+    },
+    {
+      "index": 11,
+      "mesh": "NPC_RAEN_SCARF_COLLAR",
+      "slot": "bespoke",
+      "vertices": 66,
+      "triangles": 124
+    },
+    {
+      "index": 12,
+      "mesh": "NPC_RAEN_SCARF_TAILS",
+      "slot": "bespoke",
+      "vertices": 32,
+      "triangles": 56
+    },
+    {
+      "index": 13,
+      "mesh": "NPC_RAEN_BELT_AND_SEALS",
+      "slot": "bespoke",
+      "vertices": 400,
+      "triangles": 752
+    },
+    {
+      "index": 14,
+      "mesh": "NPC_RAEN_ARM_L",
+      "slot": "bespoke",
+      "vertices": 96,
+      "triangles": 176
+    },
+    {
+      "index": 15,
+      "mesh": "NPC_RAEN_HAND_L",
+      "slot": "bespoke",
+      "vertices": 236,
+      "triangles": 448
+    },
+    {
+      "index": 16,
+      "mesh": "NPC_RAEN_ARM_R",
+      "slot": "bespoke",
+      "vertices": 96,
+      "triangles": 176
+    },
+    {
+      "index": 17,
+      "mesh": "NPC_RAEN_HAND_R",
+      "slot": "bespoke",
+      "vertices": 244,
+      "triangles": 444
+    }
+  ],
+  "clips": {
+    "idle": {
+      "action": "NPC_RAEN_IDLE",
+      "firstFrame": 1,
+      "lastFrame": 97,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "focus": {
+      "action": "NPC_RAEN_FOCUS",
+      "firstFrame": 1,
+      "lastFrame": 121,
+      "fps": 24,
+      "loop": true,
+      "rootMotion": false
+    },
+    "greet": {
+      "action": "NPC_RAEN_GREET",
+      "firstFrame": 1,
+      "lastFrame": 73,
+      "fps": 24,
+      "loop": false,
+      "rootMotion": false
+    }
+  },
+  "gameIntegrated": true,
+  "gameExecutionVerified": false,
+  "stationary": true,
+  "locomotionClips": []
+}
