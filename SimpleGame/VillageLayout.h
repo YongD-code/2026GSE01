@@ -173,11 +173,19 @@ inline WorldPoint RoutingGoal(WorldPoint start, WorldPoint destination)
     }
     const auto hub = World::Settlements()[from];
     const auto next = World::Settlements()[NextVillage(from, to)];
-    // Reach the trunk road before setting off; local navigation handles individual buildings.
-    if ((hub.x == next.x && std::abs(start.x - hub.x) > 8) ||
-        (hub.y == next.y && std::abs(start.y - hub.y) > 8))
+    // Rejoin the nearest road point instead of retracing the whole journey
+    // when neighbor avoidance produces a small lateral displacement.
+    if (hub.x == next.x && std::abs(start.x - hub.x) > 24)
     {
-        return hub;
+        return {
+            hub.x,
+            (std::max)((std::min)(hub.y, next.y), (std::min)((std::max)(hub.y, next.y), start.y))};
+    }
+    if (hub.y == next.y && std::abs(start.y - hub.y) > 24)
+    {
+        return {
+            (std::max)((std::min)(hub.x, next.x), (std::min)((std::max)(hub.x, next.x), start.x)),
+            hub.y};
     }
     return next;
 }

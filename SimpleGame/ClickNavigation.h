@@ -10,6 +10,122 @@
 
 namespace ClickNavigation
 {
+// NPC searches retain their frontier across scheduled slices, including detours
+// that initially lead away from the destination. No world pointers are retained.
+class Search
+{
+    using Key = std::pair<int, int>;
+
+    struct Node
+    {
+        double cost = 1.e30;
+        Key parent = {0, 0};
+        bool closed = false;
+    };
+
+    WorldPoint start, goal;
+    std::map<Key, Node> nodes;
+    std::priority_queue<std::pair<double, Key>,
+                        std::vector<std::pair<double, Key>>,
+                        std::greater<std::pair<double, Key>>>
+        open;
+    size_t visited = 0;
+
+    WorldPoint Point(Key key) const
+    {
+        return {start.x + key.first * 24, start.y + key.second * 24};
+    }
+
+  public:
+    enum class Result
+    {
+        Pending,
+        Found,
+        Failed
+    };
+
+    Search(WorldPoint origin, WorldPoint destination) : start(origin), goal(destination)
+    {
+        nodes[{0, 0}].cost = 0;
+        open.push({std::hypot(goal.x - start.x, goal.y - start.y), {0, 0}});
+    }
+
+    template <class Collision>
+    Result Advance(Collision blocked, std::vector<WorldPoint>& route, double milliseconds)
+    {
+        const auto began = std::chrono::steady_clock::now();
+        auto clear = [&](WorldPoint a, WorldPoint b)
+        {
+            const int count = (std::max)(1, int(std::ceil(std::hypot(b.x - a.x, b.y - a.y) / 4)));
+            for (int i = 1; i <= count; ++i)
+            {
+                const double t = double(i) / count;
+                if (blocked({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t}))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        // Finish an expansion before yielding, so no unexamined edge is lost on timeout.
+        while (!open.empty() && visited < 4096 && nodes.size() < 8192)
+        {
+            if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began)
+                    .count() >= milliseconds)
+            {
+                return Result::Pending;
+            }
+            const auto key = open.top().second;
+            open.pop();
+            auto& node = nodes[key];
+            if (node.closed)
+            {
+                continue;
+            }
+            node.closed = true;
+            ++visited;
+            const auto at = Point(key);
+            if (std::hypot(at.x - goal.x, at.y - goal.y) < 36 && clear(at, goal))
+            {
+                route = {goal};
+                auto current = key;
+                while (current != Key{0, 0})
+                {
+                    route.push_back(Point(current));
+                    current = nodes[current].parent;
+                }
+                std::reverse(route.begin(), route.end());
+                return Result::Found;
+            }
+            for (int x = -1; x <= 1; ++x)
+            {
+                for (int y = -1; y <= 1; ++y)
+                {
+                    if (x == 0 && y == 0)
+                    {
+                        continue;
+                    }
+                    const Key next = {key.first + x, key.second + y};
+                    const auto target = Point(next);
+                    const double cost = node.cost + std::hypot(target.x - at.x, target.y - at.y);
+                    auto found = nodes.find(next);
+                    if ((found != nodes.end() &&
+                         (found->second.closed || cost >= found->second.cost)) ||
+                        !clear(at, target))
+                    {
+                        continue;
+                    }
+                    auto& neighbor = nodes[next];
+                    neighbor.cost = cost;
+                    neighbor.parent = key;
+                    open.push({cost + std::hypot(goal.x - target.x, goal.y - target.y), next});
+                }
+            }
+        }
+        return Result::Failed;
+    }
+};
+
 // Callers schedule bounded searches; partial routes can be continued in a later frame.
 template <class Collision>
 std::vector<WorldPoint> Find(WorldPoint start,

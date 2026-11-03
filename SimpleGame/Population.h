@@ -68,6 +68,8 @@ class Population
         float health = 100, stamina = 100, timer = 0, decision = 0, attackWait = 0,
               invulnerability = 0;
         float pathWait = 0, simulationTime = 0;
+        float stuckTime = 0;
+        int pathFailures = 0;
         WorldPoint visualVelocity = {0, 0}, separation = {0, 0};
         float stopTime = 0;
         bool locomotionInitialized = false;
@@ -87,6 +89,7 @@ class Population
     std::vector<Person> people;
     std::uint64_t seed = 0;
     size_t planningCursor = 0;
+    std::map<int, ClickNavigation::Search> navigationSearches;
     Society society;
 
     static const std::array<WorldPoint, World::VillageCount>& Hubs()
@@ -213,6 +216,10 @@ class Population
         {
             p.route.clear();
             p.waypoint = 0;
+            p.stuckTime = 0;
+            p.pathFailures = 0;
+            p.pathWait = 0;
+            navigationSearches.erase(p.id);
         }
     }
 
@@ -324,6 +331,7 @@ class Population
                 p.timer = 20;
                 p.gold = (std::max)(0, p.gold - 8);
                 p.route.clear();
+                navigationSearches.erase(p.id);
                 p.target = -1;
             }
             else if (resting)
@@ -460,38 +468,70 @@ class Population
                 }
                 else
                 {
-                    const bool finishingSegment =
-                        !p.route.empty() && p.waypoint + 1 >= p.route.size() &&
-                        Level::Distance(p.position, p.route.back()) < 45 &&
-                        Level::Distance(p.route.back(), p.destination) > 18;
-                    if ((p.waypoint >= p.route.size() || finishingSegment) && p.pathWait <= 0 &&
-                        plans > 0)
+                    if (p.waypoint >= p.route.size() && p.pathWait <= 0 && plans > 0)
                     {
-                        const auto goal = RoutingGoal(p.position, p.destination);
-                        const double d = Level::Distance(p.position, goal);
-                        if (d < .01)
+                        auto search = navigationSearches.find(p.id);
+                        if (search == navigationSearches.end() && navigationSearches.size() >= 8 &&
+                            playerDistance <= fullRateRadius)
                         {
-                            p.pathWait = .5f;
-                            p.animation.moving = false;
-                            p.stopTime = .1f;
-                            continue;
+                            // Slow remote updates must not occupy every local navigation slot.
+                            auto remote = navigationSearches.end();
+                            double farthest = fullRateRadius;
+                            for (auto it = navigationSearches.begin();
+                                 it != navigationSearches.end();
+                                 ++it)
+                            {
+                                const double distance =
+                                    Level::Distance(people[it->first].position, player);
+                                if (distance > farthest)
+                                {
+                                    farthest = distance;
+                                    remote = it;
+                                }
+                            }
+                            if (remote != navigationSearches.end())
+                            {
+                                navigationSearches.erase(remote);
+                            }
                         }
-                        const double t = (std::min)(1., 260. / d);
-                        const WorldPoint step = {p.position.x + (goal.x - p.position.x) * t,
-                                                 p.position.y + (goal.y - p.position.y) * t};
-                        auto route =
-                            ClickNavigation::Find(p.position, step, blocked, 192, 1.5, true);
-                        p.pathWait = .3f;
-                        --plans;
-                        if (!route.empty())
+                        if (search == navigationSearches.end() && navigationSearches.size() < 8)
                         {
-                            p.route = std::move(route);
-                            p.waypoint = 0;
-                        }
-                        else if (p.waypoint >= p.route.size())
-                        {
-                            p.pathWait = 1.f + p.id % 4 * .15f;
+                            if (blocked(p.position))
+                            {
+                                p.position = OpenPoint(p.position, blocked);
+                            }
                             p.destination = OpenPoint(p.destination, blocked);
+                            const auto goal = RoutingGoal(p.position, p.destination);
+                            const double d = Level::Distance(p.position, goal);
+                            const double t = d > .01 ? (std::min)(1., 700. / d) : 1.;
+                            const WorldPoint step =
+                                OpenPoint({p.position.x + (goal.x - p.position.x) * t,
+                                           p.position.y + (goal.y - p.position.y) * t},
+                                          blocked);
+                            search = navigationSearches
+                                         .emplace(p.id, ClickNavigation::Search(p.position, step))
+                                         .first;
+                        }
+                        if (search != navigationSearches.end())
+                        {
+                            --plans;
+                            const auto result = search->second.Advance(blocked, p.route, .9);
+                            if (result != ClickNavigation::Search::Result::Pending)
+                            {
+                                navigationSearches.erase(search);
+                                p.waypoint = 0;
+                                p.stuckTime = 0;
+                                if (result == ClickNavigation::Search::Result::Found)
+                                {
+                                    p.pathFailures = 0;
+                                }
+                                else
+                                {
+                                    p.route.clear();
+                                    p.pathFailures = (std::min)(6, p.pathFailures + 1);
+                                    p.pathWait = .5f + p.pathFailures * .4f + (p.id % 4) * .1f;
+                                }
+                            }
                         }
                     }
                     if (p.waypoint < p.route.size())
@@ -558,11 +598,26 @@ class Population
                                 {(target.x - p.position.x) / d * travel + p.separation.x * portion,
                                  (target.y - p.position.y) / d * travel + p.separation.y * portion},
                                 blocked);
+                            // Neighbor avoidance must not cancel progress or press into a wall.
+                            if (Level::Distance(p.position, target) > d - travel * .2)
+                            {
+                                p.position = before;
+                                Level::Move(p.position,
+                                            {(target.x - before.x) / d * travel,
+                                             (target.y - before.y) / d * travel},
+                                            blocked);
+                                p.separation = {0, 0};
+                            }
                             remaining -= travel;
-                            if (Level::Distance(before, p.position) < .001)
+                            const double progress = d - Level::Distance(p.position, target);
+                            p.stuckTime = progress < travel * .2 ? p.stuckTime + float(portion) : 0;
+                            if (p.stuckTime >= .6f)
                             {
                                 p.route.clear();
-                                p.pathWait = (std::max)(p.pathWait, .3f);
+                                p.waypoint = 0;
+                                p.stuckTime = 0;
+                                navigationSearches.erase(p.id);
+                                p.pathWait = .2f + (p.id % 4) * .1f;
                                 break;
                             }
                             if (Level::Distance(p.position, target) < 4)
@@ -572,6 +627,11 @@ class Population
                         }
                     }
                 }
+            }
+            else
+            {
+                navigationSearches.erase(p.id);
+                p.stuckTime = 0;
             }
             UpdateLocomotion(p, previous, stepDt);
         }

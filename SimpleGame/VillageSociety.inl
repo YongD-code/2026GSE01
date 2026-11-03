@@ -66,6 +66,7 @@ template <class Collision> void Initialize(std::uint64_t worldSeed, Collision bl
 {
     seed = worldSeed;
     planningCursor = 0;
+    navigationSearches.clear();
     society = Society();
     people.clear();
     people.reserve(VillageLayout::ResidentCount);
@@ -77,6 +78,7 @@ template <class Collision> void Initialize(std::uint64_t worldSeed, Collision bl
 
 template <class Collision> void RepairPlacement(Collision blocked)
 {
+    navigationSearches.clear();
     const bool legacy = people.size() != VillageLayout::ResidentCount ||
                         (!people.empty() && people.front().houseId < 0);
     if (legacy)
@@ -115,6 +117,8 @@ template <class Collision> void RepairPlacement(Collision blocked)
         person.waypoint = 0;
         person.target = -1;
         person.pathWait = person.simulationTime = 0;
+        person.stuckTime = 0;
+        person.pathFailures = 0;
         person.visualVelocity = person.separation = {0, 0};
         person.animation.moving = false;
         person.stopTime = .1f;
