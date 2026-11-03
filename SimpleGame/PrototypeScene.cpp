@@ -985,7 +985,7 @@ void Prototype::Draw()
                            scene.Size(),
                            population.people.size(),
                            levelOne.enemies.size(),
-                           GetForegroundWindow() == WindowFromDC(wglGetCurrentDC()),
+                           windowFocused,
                            region);
     r.Begin(Color(.035f, .052f, .069f), !titleScreen && !openingPlaying);
     occupiedLabels.clear();

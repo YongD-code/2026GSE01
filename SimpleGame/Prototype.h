@@ -35,6 +35,7 @@ class Prototype
     bool hudVisible = true;
     bool dodgeHeld = false, screenShake = true;
     bool dialoguePending = false;
+    bool windowFocused = true;
     enum class StoryScene
     {
         None,
@@ -1252,6 +1253,15 @@ class Prototype
         bufferedCommand.action = -1;
         StopMovement();
         attackHeld = false;
+    }
+
+    void SetWindowFocused(bool focused)
+    {
+        windowFocused = focused;
+        if (!focused)
+        {
+            ClearInput();
+        }
     }
 
     void Update(float dt, bool sprint = false);

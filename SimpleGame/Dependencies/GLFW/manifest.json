@@ -1,0 +1,28 @@
+{
+  "name": "GLFW",
+  "version": "3.5.1",
+  "upstream": "https://www.glfw.org/",
+  "linkage": "DLL",
+  "toolchain": "Official lib-vc2022 binaries; project v143",
+  "packages": [
+    {
+      "platform": "Win32",
+      "url": "https://github.com/glfw/glfw/releases/download/3.5.1/glfw-3.5.1.bin.WIN32.zip",
+      "archive_sha256": "47ee7ce5307e11f8515a2bb2d6ace6d88ffd6dbcd614b87da21969261f3d0ffe"
+    },
+    {
+      "platform": "x64",
+      "url": "https://github.com/glfw/glfw/releases/download/3.5.1/glfw-3.5.1.bin.WIN64.zip",
+      "archive_sha256": "34c6766043e09ad9c6e88b5636a5f34d1f2857aae828768c5bf2016dc8821a93"
+    }
+  ],
+  "files_sha256": {
+    "include/GLFW/glfw3.h": "95ecc16e4875bca18cff863232d5dbb623f3457b05f07efd26fe8bc8a06345b6",
+    "include/GLFW/glfw3native.h": "d301085c2a998345c0f80127d8e67d4394f1c7b12ca9c2cf3b73b7fa15c804ae",
+    "lib/Win32/glfw3.dll": "9786284799c368cc4de33205022c5f03aeac3d79614c798a1f35b2e1fb83fcd2",
+    "lib/Win32/glfw3dll.lib": "d4055225bd75428c003f17e990782fc031cb0c557d1532a1321ecb1fce21f230",
+    "lib/x64/glfw3.dll": "6544607ab346dc836ef1f9fd18bdc87fda80691d13bfac8e3d2dd032eba42139",
+    "lib/x64/glfw3dll.lib": "c1373216a5f4a19936f07c95828ca9baa6f5a969418941c0edf9563cc0f3e1c0",
+    "LICENSE": "149704059b5d0bf551637e50042dd4de9c2cae921021f6636298911e3a5f9462"
+  }
+}

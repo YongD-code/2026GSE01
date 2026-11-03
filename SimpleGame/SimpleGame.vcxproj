@@ -69,7 +69,9 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <GlfwRoot>$(ProjectDir)Dependencies\GLFW\</GlfwRoot>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
@@ -94,8 +96,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>.\Dependencies;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);opengl32.lib;freeglut.lib;glew32.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(GlfwRoot)lib\Win32;$(ProjectDir)Dependencies;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);opengl32.lib;glfw3dll.lib;glew32.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -109,8 +111,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>.\Dependencies\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);freeglut.lib;glew32.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(GlfwRoot)lib\x64;$(ProjectDir)Dependencies\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);glfw3dll.lib;glew32.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -128,8 +130,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>.\Dependencies;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);freeglut.lib;glew32.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(GlfwRoot)lib\Win32;$(ProjectDir)Dependencies;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);glfw3dll.lib;glew32.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -147,8 +149,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);freeglut.lib;glew32.lib;</AdditionalDependencies>
-      <AdditionalLibraryDirectories>.\Dependencies\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);glfw3dll.lib;glew32.lib;</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(GlfwRoot)lib\x64;$(ProjectDir)Dependencies\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -246,6 +248,8 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GlfwRoot)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>GLFW_DLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Label="ExtensionTargets">
@@ -257,6 +261,24 @@
     <None Include="Data\Monitoring.ini" />
     <None Include="Assets\Characters\protagonist.png" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Dependencies\GLFW\include\GLFW\glfw3.h" />
+    <ClInclude Include="Dependencies\GLFW\include\GLFW\glfw3native.h" />
+    <None Include="Dependencies\GLFW\LICENSE" />
+    <None Include="Dependencies\GLFW\manifest.json" />
+    <None Include="Dependencies\GLFW\lib\Win32\glfw3.dll" />
+    <None Include="Dependencies\GLFW\lib\Win32\glfw3dll.lib" />
+    <None Include="Dependencies\GLFW\lib\x64\glfw3.dll" />
+    <None Include="Dependencies\GLFW\lib\x64\glfw3dll.lib" />
+  </ItemGroup>
+  <Target Name="ValidateGlfwDependencies" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Platform)'!='Win32' and '$(Platform)'!='x64'"
+           Text="GLFW 배포 파일은 Win32와 x64 구성에 포함되어 있습니다." />
+    <Error Condition="!Exists('$(GlfwRoot)include\GLFW\glfw3.h')"
+           Text="GLFW 헤더가 없습니다. Dependencies/GLFW 폴더 전체를 체크아웃하세요." />
+    <Error Condition="!Exists('$(GlfwRoot)lib\$(Platform)\glfw3dll.lib') or !Exists('$(GlfwRoot)lib\$(Platform)\glfw3.dll')"
+           Text="현재 플랫폼의 GLFW 라이브러리 또는 DLL이 없습니다. Dependencies/GLFW/lib/$(Platform)을 확인하세요." />
+  </Target>
   <Target Name="CopySpriteAssets" AfterTargets="Build">
     <!-- Collect deployment-only files during the build, outside IDE project items. -->
     <ItemGroup>
@@ -268,10 +290,11 @@
       <SpiritExports Include="..\Art\Blender\MobCollection\**\*.glb;..\Art\Blender\MobCollection\**\*.gltf;..\Art\Blender\MobCollection\**\*.bin;..\Art\Blender\MobCollection\**\*.json;..\Art\Blender\MobCollection\**\*.png;..\Art\Blender\MobCollection\**\*.jpg;..\Art\Blender\MobCollection\**\*.jpeg" />
       <StoryExports Include="..\Art\Blender\StoryCharacters\**\*.glb;..\Art\Blender\StoryCharacters\**\character.json" />
       <ModelLicenses Include="ThirdParty\*.LICENSE" />
-      <RuntimeDependencies Include="Dependencies\freeglut.dll;Dependencies\glew32.dll" Condition="'$(Platform)'=='Win32'" />
-      <RuntimeDependencies Include="Dependencies\x64\freeglut.dll;Dependencies\x64\glew32.dll" Condition="'$(Platform)'=='x64'" />
+      <RuntimeDependencies Include="$(GlfwRoot)lib\Win32\glfw3.dll;$(ProjectDir)Dependencies\glew32.dll" Condition="'$(Platform)'=='Win32'" />
+      <RuntimeDependencies Include="$(GlfwRoot)lib\x64\glfw3.dll;$(ProjectDir)Dependencies\x64\glew32.dll" Condition="'$(Platform)'=='x64'" />
     </ItemGroup>
     <Copy SourceFiles="@(RuntimeDependencies)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(GlfwRoot)LICENSE" DestinationFiles="$(OutDir)Licenses\GLFW.LICENSE" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(GameData)"
           DestinationFiles="@(GameData->'$(OutDir)Data\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />

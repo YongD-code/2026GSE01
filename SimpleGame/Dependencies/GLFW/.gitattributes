@@ -1,0 +1,5 @@
+# Preserve upstream headers, license and binary bytes across Windows checkouts.
+include/** -text -whitespace
+lib/** -text
+LICENSE -text -whitespace
+manifest.json text eol=lf

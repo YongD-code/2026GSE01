@@ -108,15 +108,25 @@ class FrameProfiler
                 s.events << s.startup.str();
                 s.startup.str("");
                 std::ofstream metadata((stem + L"-session.txt").c_str());
-                metadata << "schema=1\npatch=1.0.107v\nbatching="
+                metadata << "schema=1\npatch=1.0.108v\nwindow_backend=GLFW\nbatching="
                          << RenderStorage::Enabled(L"GSE_RENDER_BATCH")
                          << "\ndisk_cache=" << RenderStorage::Enabled(L"GSE_MESH_DISK_CACHE")
                          << "\nGL_VENDOR=" << glGetString(GL_VENDOR)
                          << "\nGL_RENDERER=" << glGetString(GL_RENDERER)
                          << "\nGL_VERSION=" << glGetString(GL_VERSION)
                          << "\nbatch_flush_events=interval_aggregated"
-                         << "\nTimer targets 16ms including update cost; "
+                         << "\nFrame target is 16ms including update, render and swap; "
                             "CPU submission is not GPU execution time.\n";
+#ifdef _DEBUG
+                metadata << "build_configuration=Debug\n";
+#else
+                metadata << "build_configuration=Release\n";
+#endif
+#ifdef _WIN64
+                metadata << "build_platform=x64\n";
+#else
+                metadata << "build_platform=Win32\n";
+#endif
                 std::printf("[성능] 분석 로그: %ls\n", stem.c_str());
                 if (!s.csv || !s.events || !metadata)
                     std::printf(

@@ -45,7 +45,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
     if (!dialoguePending && !journal && !pauseMenu)
         messageTime = (std::max)(0.f, messageTime - dt);
     moving = false;
-    const bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+    const bool ctrl = windowFocused && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
     const bool dodgePressed = ctrl && !dodgeHeld;
     dodgeHeld = ctrl;
     if (ControlsActive())
