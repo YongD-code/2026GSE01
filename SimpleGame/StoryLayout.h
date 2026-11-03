@@ -77,7 +77,7 @@ inline const std::vector<Site>& Sites()
         {"seal", "봉인 흔적", Kind::Evidence, {1320, 70}, "P000", ""},
         {"room", "동생의 물건 상자", Kind::Evidence, {-260, -65}, "P000", ""},
         {"raen_home", "라엔", Kind::Adult, {-365, -40}, "P008_VILLAGER", "C100"},
-        {"sealer", "봉인사", Kind::Adult, {105, -205}, "P000", ""},
+        {"sealer", "봉인사", Kind::Adult, {-300, 45}, "P000", ""},
         {"smith", "대장장이", Kind::Adult, {465, -85}, "P000", ""},
         {"raen_hub", "라엔", Kind::Adult, {280, 105}, "C100", "C102"},
         {"field_record", "봉인 기록대", Kind::Evidence, {1690, 70}, "P000", ""},

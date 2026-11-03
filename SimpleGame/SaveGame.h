@@ -794,10 +794,32 @@ class SaveGame
         {
             return false;
         }
+        const auto currentStory = StoryHash(chapter);
+        // Only accept the known layout with C100's sealer coordinate relocated.
+        // All other quest IDs, triggers, amounts and coordinates must still match.
+        std::uint64_t previousSealerStory = 0;
+        {
+            Chapter previous = chapter;
+            for (auto& quest : previous.quests)
+            {
+                if (quest.id == "C100" && quest.trigger == "talk:sealer" &&
+                    quest.destination.x == -300 && quest.destination.y == 45)
+                {
+                    quest.destination = {105, -205};
+                    previousSealerStory = StoryHash(previous);
+                    break;
+                }
+            }
+        }
+        if (previousSealerStory != 0 && candidate.story == previousSealerStory)
+        {
+            candidate.story = currentStory;
+        }
         // Explicit migration from the authored 36-quest layout through patch 1.0.67.
         // Never accept arbitrary mismatches or silently remap numeric quest indices.
         if (candidate.story == 17577236682408322091ULL &&
-            StoryHash(chapter) == 12606591398302679102ULL)
+            (currentStory == 12606591398302679102ULL ||
+             previousSealerStory == 12606591398302679102ULL))
         {
             candidate.story = StoryHash(chapter);
             if (candidate.chapter.step == chapter.Index("P006"))
