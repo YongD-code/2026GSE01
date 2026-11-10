@@ -184,6 +184,8 @@
     <ClInclude Include="EaterBoss.h" />
     <ClInclude Include="StagSkill.h" />
     <ClInclude Include="PrototypeStagQ.inl" />
+    <ClInclude Include="PrototypeStagW.inl" />
+    <ClInclude Include="StagMeadowMesh.h" />
     <ClInclude Include="EaterBossCombat.inl" />
     <ClInclude Include="EaterBossRendering.inl" />
     <ClInclude Include="SpiritCatalog.h" />

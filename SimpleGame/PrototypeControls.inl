@@ -13,12 +13,18 @@ struct SkillEffect
     float impactAge = -1;
     int caster = -1;
     int species = -1;
+    std::vector<int> meadow;
     std::array<float, 3> branchEnds = {{1, 1, 1}};
 };
 
 bool IsStagQ(const SkillEffect& effect) const
 {
     return effect.species == SpiritCatalog::Stag && effect.slot == 0;
+}
+
+bool IsStagW(const SkillEffect& effect) const
+{
+    return effect.species == SpiritCatalog::Stag && effect.slot == 1;
 }
 
 std::vector<WorldPoint> moveRoute;
@@ -217,6 +223,7 @@ bool PreparingSkill() const
                                                   (e.slot == 1 && e.age < RedCharge) ||
                                                   (e.slot == 2 && e.age < BlueCharge))) ||
                                   (e.set > 0 && e.slot == 3 && e.age < DomainOpening) ||
+                                  (e.species == SpiritCatalog::Stag && e.slot == 1 && e.age < .6f) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 0 &&
                                    e.age < StagSkill::Charge) ||
                                   (e.species != SpiritCatalog::Stag && e.set > 0 && e.slot == 0 &&
@@ -431,6 +438,10 @@ const char* SkillName(int set, int slot) const
         {
             return "길틔움";
         }
+        if (slot == 1)
+        {
+            return "숲의 숨결";
+        }
         set = 3;
     }
     static const char* names[5][4] = {
@@ -460,6 +471,10 @@ const char* SkillDescription(int set, int slot) const
         if (slot == 0)
         {
             return "꽃뿌리로 피해·결박 후 끝에서 덩굴 개화 / 보스 둔화";
+        }
+        if (slot == 1)
+        {
+            return "4초간 꽃밭 안의 아군 체력 회복";
         }
         set = 3;
     }
@@ -680,6 +695,23 @@ void CastSkill(int slot)
             effect.duration = set <= 2 ? 2.f : set == 3 ? 1.5f : 1.f;
         }
     }
+    if (IsStagW(skillEffects.back()))
+    {
+        auto& effect = skillEffects.back();
+        effect.target = origin;
+        effect.duration = 5.25f;
+        skillTimers[cooldownSet][slot] = 12.f;
+        levelOne.skillCooldown = (std::max)(levelOne.skillCooldown, 12.f);
+        spiritCastPose = 1.5f;
+        for (int i = 0; i < int(StagMeadowMesh::Plants.size()); ++i)
+        {
+            const auto at = StagPlantPosition(origin, i);
+            if (StagMeadowReach(origin, at))
+            {
+                effect.meadow.push_back(i);
+            }
+        }
+    }
     if (set > 0 && slot == 0)
     {
         auto& effect = skillEffects.back();
@@ -762,6 +794,7 @@ void CastSkill(int slot)
 #include "PrototypeRed.inl"
 #include "PrototypePolarity.inl"
 #include "PrototypeStagQ.inl"
+#include "PrototypeStagW.inl"
 #include "PrototypeSpiritSkills.inl"
 #include "PrototypeSpiritEffects.inl"
 
@@ -783,6 +816,11 @@ void UpdateSkills(float dt)
     for (auto& effect : skillEffects)
     {
         effect.age += dt;
+        if (IsStagW(effect))
+        {
+            UpdateStagW(effect, dt);
+            continue;
+        }
         if (effect.set > 0 && effect.slot == 3)
         {
             if (effect.age < DomainOpening)

@@ -789,6 +789,26 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
             controlling && PreparingSkill() ? .45f : 1.f - (std::min)(1.f, spiritCastPose / .55f);
     }
     const SkillEffect* stagCast = type == SpiritCatalog::Stag ? StagQCast() : nullptr;
+    if (type == SpiritCatalog::Stag)
+    {
+        for (auto it = skillEffects.rbegin(); it != skillEffects.rend(); ++it)
+        {
+            if (it->caster != selectedCompanion || it->species != type)
+            {
+                continue;
+            }
+            if (IsStagW(*it) && it->age < 1.5f)
+            {
+                castProgress = it->age >= .6f && companionAnimation.moving ? -1.f : it->age / 1.5f;
+                animation = companionAnimation;
+                if (castProgress >= 0)
+                {
+                    animation.facing = spiritCastFacing;
+                }
+            }
+            break;
+        }
+    }
     if (stagCast)
     {
         if (stagCast->age >= StagSkill::Charge && companionAnimation.moving)

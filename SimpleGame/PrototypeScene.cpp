@@ -826,6 +826,24 @@ void Prototype::SynchronizeScene()
          });
     for (const auto& effect : skillEffects)
     {
+        if (IsStagW(effect) && effect.age >= .6f)
+        {
+            for (const int index : effect.meadow)
+            {
+                const auto at = StagPlantPosition(effect.origin, index);
+                const float age = effect.age;
+                if (!CharacterInView(at, 28) || age <= StagMeadowMesh::Plants[index].delay)
+                {
+                    continue;
+                }
+                bind("effects/stag-meadow/" + std::to_string(effect.id) + "/" + std::to_string(index),
+                     "effects", at, ActorLayer::World,
+                     [this, at, index, age](const Actor&)
+                     {
+                         DrawStagPlant(at, index, age);
+                     });
+            }
+        }
         if (IsStagQ(effect))
         {
             const double length = (std::max)(1., Distance(effect.origin, effect.target));

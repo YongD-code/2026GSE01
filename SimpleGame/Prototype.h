@@ -14,6 +14,7 @@
 #include "StoryLayout.h"
 #include "StoryEvent.h"
 #include "StagSkill.h"
+#include "StagMeadowMesh.h"
 #include "ClickNavigation.h"
 #include "Monitoring.h"
 #include "Population.h"
