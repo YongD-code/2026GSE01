@@ -5,6 +5,7 @@
 #include "SpiritCatalog.h"
 #include "StoryEncounter.h"
 #include "EaterBoss.h"
+#include "StagSkill.h"
 #include <algorithm>
 #include <random>
 #include <string>
@@ -197,6 +198,25 @@ class LevelOne
         }
     }
 
+    struct Sanctuary
+    {
+        bool active = false;
+        WorldPoint origin = {0, 0};
+        WorldPoint player = {0, 0};
+        WorldPoint companion = {0, 0};
+    } sanctuary;
+
+    float SanctuaryFactor(WorldPoint at) const
+    {
+        return sanctuary.active && Distance(sanctuary.origin, at) <= StagSkill::SanctuaryRadius
+                   ? StagSkill::SanctuaryScale : 1.f;
+    }
+
+    float EnemyMovementFactor(const Enemy& enemy) const
+    {
+        return (std::min)(enemy.slowed > 0 ? .35f : 1.f, SanctuaryFactor(enemy.position));
+    }
+
     void Hurt(float damage)
     {
         if (damageResident >= 0 && damageResident < int(residentCombatants.size()))
@@ -204,7 +224,7 @@ class LevelOne
             auto& person = residentCombatants[damageResident];
             if (person.invulnerability <= 0 && person.health > 0)
             {
-                person.health = (std::max)(0.f, person.health - damage);
+                person.health = (std::max)(0.f, person.health - damage * SanctuaryFactor(person.position));
                 person.invulnerability = .55f;
             }
             return;
@@ -214,14 +234,14 @@ class LevelOne
             if (spiritInvulnerability <= 0)
             {
                 auto& spirit = collection[damageSpirit];
-                spirit.health = (std::max)(0.f, spirit.health - damage);
+                spirit.health = (std::max)(0.f, spirit.health - damage * SanctuaryFactor(sanctuary.companion));
                 spiritInvulnerability = .55f;
             }
             return;
         }
         if (Dead() || invulnerability > 0 || dodgeTime > 0)
             return;
-        health = (std::max)(storyTrial ? 1.f : 0.f, health - damage);
+        health = (std::max)(storyTrial ? 1.f : 0.f, health - damage * SanctuaryFactor(sanctuary.player));
         invulnerability = .55f;
         hurtTime = .22f;
         if (Dead())
@@ -1007,7 +1027,7 @@ class LevelOne
             {
                 const double step = (std::min)(
                     distance - 280,
-                    double(combat.chaseSpeed * .65f * dt * (enemy.slowed > 0 ? .35f : 1.f)));
+                    double(combat.chaseSpeed * .65f * dt * EnemyMovementFactor(enemy)));
                 Move(enemy.position,
                      {(player.x - enemy.position.x) / distance * step,
                       (player.y - enemy.position.y) / distance * step},
@@ -1024,7 +1044,7 @@ class LevelOne
                              dy = (player.y - enemy.position.y) / distance;
                 const double retreat = distance < 200 ? -1. : (distance > 310 ? .5 : 0.);
                 const double side = enemy.slot % 2 ? .65 : -.65;
-                const double speed = combat.chaseSpeed * dt * (enemy.slowed > 0 ? .35 : 1.);
+                const double speed = combat.chaseSpeed * dt * EnemyMovementFactor(enemy);
                 Move(enemy.position,
                      {(dx * retreat - dy * side) * speed, (dy * retreat + dx * side) * speed},
                      blocked,
@@ -1047,8 +1067,8 @@ class LevelOne
 
             const WorldPoint before = enemy.position;
             Move(enemy.position,
-                 {enemy.aim.x * combat.chargeSpeed * dt * (enemy.slowed > 0 ? .35 : 1.),
-                  enemy.aim.y * combat.chargeSpeed * dt * (enemy.slowed > 0 ? .35 : 1.)},
+                 {enemy.aim.x * combat.chargeSpeed * dt * EnemyMovementFactor(enemy),
+                  enemy.aim.y * combat.chargeSpeed * dt * EnemyMovementFactor(enemy)},
                  blocked,
                  &enemy.trail);
             // Swept contact prevents a fast charge passing through the player.
@@ -1120,7 +1140,7 @@ class LevelOne
         if (distance > 62)
         {
             const double step = (std::min)(
-                distance - 62, double(combat.chaseSpeed * dt * (enemy.slowed > 0 ? .35f : 1.f)));
+                distance - 62, double(combat.chaseSpeed * dt * EnemyMovementFactor(enemy)));
             Move(enemy.position,
                  {(player.x - enemy.position.x) / distance * step,
                   (player.y - enemy.position.y) / distance * step},
@@ -1339,7 +1359,7 @@ class LevelOne
                     const double step =
                         (std::min)(travel,
                                    double(enemy.returning ? 90 : 48 + enemy.type * 5) * enemyDt *
-                                       (enemy.slowed > 0 ? .35 : 1.));
+                                       EnemyMovementFactor(enemy));
                     const WorldPoint delta = {(target.x - enemy.position.x) / travel * step,
                                               (target.y - enemy.position.y) / travel * step};
                     if (enemy.returning)

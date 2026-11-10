@@ -826,6 +826,32 @@ void Prototype::SynchronizeScene()
          });
     for (const auto& effect : skillEffects)
     {
+        if (IsStagR(effect) && effect.age >= StagSkill::SanctuaryOpening)
+        {
+            if (CharacterInView(effect.origin, 360))
+            {
+                bind("effects/stag-sanctuary-roots/" + std::to_string(effect.id), "effects",
+                     effect.origin, ActorLayer::Warning,
+                     [this, origin = effect.origin, age = effect.age](const Actor&)
+                     {
+                         DrawStagRoots(origin, age);
+                     });
+            }
+            for (int i = 0; i < 5; ++i)
+            {
+                const WorldPoint at = StagTreePosition(effect.origin, i);
+                if (!CharacterInView(at, 165))
+                {
+                    continue;
+                }
+                bind("effects/stag-sanctuary/" + std::to_string(effect.id) + "/" + std::to_string(i),
+                     "effects", at, ActorLayer::World,
+                     [this, at, i, age = effect.age](const Actor&)
+                     {
+                         DrawStagTree(at, i, age);
+                     });
+            }
+        }
         if (IsStagW(effect) && effect.age >= .6f)
         {
             for (const int index : effect.meadow)

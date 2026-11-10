@@ -715,14 +715,16 @@ void CharacterModel::ResumeLocomotion(State& state)
     state.imported.fromMorph = state.imported.morph;
 }
 
-void CharacterModel::AnimateGltf(State& state, float dt, Motion kind, float phase)
+void CharacterModel::AnimateGltf(State& state, float dt, Motion kind, float phase,
+                                 const char* clipName)
 {
     if (state.namedClip)
     {
         imported->Update(state.imported, dt);
         return;
     }
-    const int clip = importedClips[static_cast<size_t>(kind)];
+    const int named = clipName ? imported->FindClip(clipName) : -1;
+    const int clip = named >= 0 ? named : importedClips[static_cast<size_t>(kind)];
     state.imported.ambientSeconds = std::fmod(state.imported.ambientSeconds + dt, 86400.f);
     const bool loop = kind == Motion::Idle || kind == Motion::Walk || kind == Motion::Run;
     const float fraction =
@@ -958,7 +960,8 @@ void CharacterModel::Animate(float dt, Motion kind, float phase, float facing)
     Animate(defaultState, dt, kind, phase, facing);
 }
 
-void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, float facing)
+void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, float facing,
+                             const char* clipName)
 {
     FrameProfiler::Scope timing(FrameProfiler::Stage::AnimationSample);
     if (state.owner != this ||
@@ -1007,7 +1010,7 @@ void CharacterModel::Animate(State& state, float dt, Motion kind, float phase, f
     state.yaw = std::atan2(std::sin(state.yaw), std::cos(state.yaw));
     if (imported)
     {
-        AnimateGltf(state, dt, kind, phase);
+        AnimateGltf(state, dt, kind, phase, clipName);
         return;
     }
     for (size_t i = 0; i < state.pose.size(); ++i)

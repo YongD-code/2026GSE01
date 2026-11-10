@@ -3,7 +3,7 @@ void DrawDomain(const SkillEffect& effect, bool behind)
 {
     for (auto it = skillEffects.rbegin(); it != skillEffects.rend(); ++it)
     {
-        if (it->slot == 3 && it->age >= DomainOpening && it->age < it->duration)
+        if (it->slot == 3 && it->age >= RealmOpening(*it) && it->age < it->duration)
         {
             if (it->id != effect.id)
                 return;
@@ -112,7 +112,7 @@ const SkillEffect* ActiveSpiritRealm() const
     if (titleScreen || width < 1 || height < 1)
         return nullptr;
     for (auto it = skillEffects.rbegin(); it != skillEffects.rend(); ++it)
-        if (it->slot == 3 && it->age >= DomainOpening && it->age < it->duration)
+        if (it->slot == 3 && it->age >= RealmOpening(*it) && it->age < it->duration)
             return it->set >= 1 && it->set <= 4 ? &*it : nullptr;
     return nullptr;
 }
@@ -126,6 +126,11 @@ Color SpiritRealmTint(int set) const
     return colors[set - 1];
 }
 
+Color SpiritRealmTint(const SkillEffect& effect) const
+{
+    return IsStagR(effect) ? Color(.64f, .95f, .58f) : SpiritRealmTint(effect.set);
+}
+
 float SpiritRealmCollapse(const SkillEffect& effect) const
 {
     return (std::max)(0.f, (std::min)(1.f, (effect.age - effect.duration + .65f) / .65f));
@@ -133,7 +138,7 @@ float SpiritRealmCollapse(const SkillEffect& effect) const
 
 float SpiritRealmRadius(const SkillEffect& effect, Point center) const
 {
-    const float elapsed = effect.age - DomainOpening;
+    const float elapsed = effect.age - RealmOpening(effect);
     const float t = (std::max)(0.f, (std::min)(1.f, elapsed / .38f));
     const float growth = t * t * (3 - 2 * t);
     const float dx = (std::max)(std::abs(center.x), std::abs(width - center.x));
@@ -149,12 +154,13 @@ void DrawSpiritRealm()
     if (!realm)
         return;
     const auto& effect = *realm;
-    const float elapsed = effect.age - DomainOpening;
+    const float elapsed = effect.age - RealmOpening(effect);
     const Point center = Screen(effect.origin.x, effect.origin.y, 36);
     const float radius = SpiritRealmRadius(effect, center);
     const float collapse = SpiritRealmCollapse(effect);
     const float phase = collapse > 0 ? -1 - collapse : elapsed;
-    spiritRealms[effect.set - 1].DrawRealm(
+    auto& backdrop = IsStagR(effect) ? stagRealm : spiritRealms[effect.set - 1];
+    backdrop.DrawRealm(
         r, center, radius, radius / 1.2f, 1 - collapse * .25f, phase);
 }
 
@@ -165,13 +171,13 @@ void DrawSpiritRealmShell()
     if (!realm)
         return;
     const auto& effect = *realm;
-    const float elapsed = effect.age - DomainOpening;
+    const float elapsed = effect.age - RealmOpening(effect);
     const float collapse = SpiritRealmCollapse(effect);
     const float fade = 1 - collapse;
     const float enter = (std::min)(1.f, elapsed / .38f);
     const Point center = Screen(effect.origin.x, effect.origin.y, 36);
     const float radius = SpiritRealmRadius(effect, center);
-    const Color tint = SpiritRealmTint(effect.set);
+    const Color tint = SpiritRealmTint(effect);
     // The dome's visible edge breaks into wisps, never a latitude/longitude wire frame.
     for (int i = 0; i < 28; ++i)
     {
@@ -199,7 +205,10 @@ void DrawSpiritRealmShell()
         if (dx * dx + dy * dy > .96f)
             continue;
         const float alpha = enter * fade * (.18f + .22f * std::sin(phase * 3.14159f));
-        if (effect.set == 1)
+        if (IsStagR(effect))
+            r.EnergyParticle(p, 2.2f, 1.3f, elapsed + i,
+                             Color(.94f, 1.f, .51f, alpha), elapsed, false);
+        else if (effect.set == 1)
             r.EnergyParticle(p, 1.6f + i % 3, 1.4f, 0, Color(.8f, .95f, 1, alpha), 0, false);
         else if (effect.set == 2)
         {
@@ -239,33 +248,35 @@ void DrawDomainPortrait()
     }
     if (const auto* realm = ActiveSpiritRealm())
     {
-        const float elapsed = realm->age - DomainOpening;
+        const float elapsed = realm->age - RealmOpening(*realm);
         const float alpha =
             (std::max)(0.f, (std::min)(1.f, (std::min)(elapsed / .2f, (1.35f - elapsed) / .3f)));
         if (alpha > .001f)
         {
             const char* names[] = {
                 "눈에 묻힌 이름", "돌아오지 못한 길", "응답하는 천 개의 손", "기도가 끊긴 종탑"};
-            const Color tint = SpiritRealmTint(realm->set);
+            const Color tint = SpiritRealmTint(*realm);
             const float x = width * .5f - 135, y = height * .17f;
             r.Rect(x, y, 270, 54, Color(.015f, .02f, .035f, alpha * .7f));
             r.Text(x + 103, y + 19, "영역 전개", Color(tint.r, tint.g, tint.b, alpha));
-            r.Text(x + 25, y + 41, names[realm->set - 1], Color(.95f, .95f, 1, alpha));
+            r.Text(x + 25, y + 41, (IsStagR(*realm) ? "길지기의 성역" : names[realm->set - 1]), Color(.95f, .95f, 1, alpha));
         }
     }
     for (const auto& effect : skillEffects)
     {
-        if (effect.slot != 3 || effect.age > DomainOpening + .18f)
+        const float opening = RealmOpening(effect);
+        if (effect.slot != 3 || effect.age > opening + .18f)
         {
             continue;
         }
-        SpriteSheet& portrait = effect.set == 0 ? domainPortrait : spiritPortraits[effect.set - 1];
+        SpriteSheet& portrait = IsStagR(effect) ? stagPortrait
+                                : effect.set == 0 ? domainPortrait : spiritPortraits[effect.set - 1];
         if (!portrait.Ready())
             continue;
         const float age = effect.age;
         const float enter = (std::min)(1.f, age / .18f);
         const float ease = 1.f - std::pow(1.f - enter, 3.f);
-        const float alpha = (std::max)(0.f, (std::min)(enter, (DomainOpening - age) / .24f));
+        const float alpha = (std::max)(0.f, (std::min)(enter, (opening - age) / .24f));
         const float scale = 1.f + .035f * (std::min)(1.f, age);
         const float w = (std::min)(float(width) * .70f, float(height) * 1.12f) * scale;
         const float h = w * (359.f / 640.f);
@@ -291,7 +302,7 @@ void DrawDomainPortrait()
             r.Ellipse(p.x, p.y, w * .018f, h * .024f, Color(.1f, .8f, 1, gleam * .35f));
             r.Line({p.x - w * .026f, p.y}, {p.x + w * .026f, p.y}, 1.4f, Color(.55f, 1, 1, gleam));
         }
-        const float flash = (std::max)(0.f, 1.f - std::abs(age - DomainOpening) / .12f);
+        const float flash = (std::max)(0.f, 1.f - std::abs(age - opening) / .12f);
         r.Rect(0, 0, float(width), float(height), Color(.55f, .85f, 1, flash * .26f));
         break;
     }

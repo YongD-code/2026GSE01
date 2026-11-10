@@ -70,7 +70,8 @@ class CharacterModel
     void Animate(float dt, Motion motion, float phase, float facing);
     bool Draw(Renderer& renderer, Point feet, Color tint);
     void Reset(State& state, float facing);
-    void Animate(State& state, float dt, Motion motion, float phase, float facing);
+    void Animate(State& state, float dt, Motion motion, float phase, float facing,
+                 const char* clipName = nullptr);
     bool Draw(Renderer& renderer,
               Point feet,
               Color tint,
@@ -127,7 +128,7 @@ class CharacterModel
 
     bool CreateTargets();
     bool CreatePrograms(bool gltf);
-    void AnimateGltf(State& state, float dt, Motion kind, float phase);
+    void AnimateGltf(State& state, float dt, Motion kind, float phase, const char* clipName);
     void DrawGltf(const State& state, const Parts* selection);
     void Release();
     Pose Sample(Motion motion, size_t bone, float phase) const;

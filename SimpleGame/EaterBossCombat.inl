@@ -123,7 +123,7 @@ void AttackEaterBoss(Enemy& enemy, WorldPoint target, float dt, Collision blocke
             if (state.pattern == EaterBoss::Pattern::Rush)
             {
                 const auto before = enemy.position;
-                const double travel = state.plan.speed * step * (enemy.slowed > 0 ? .35 : 1.);
+                const double travel = state.plan.speed * step * EnemyMovementFactor(enemy);
                 const int slices = (std::max)(1, static_cast<int>(std::ceil(travel / 5)));
                 for (int i = 0; i < slices; ++i)
                 {
@@ -214,7 +214,7 @@ void AttackEaterBoss(Enemy& enemy, WorldPoint target, float dt, Collision blocke
     if (distance > 132)
     {
         const double step = (std::min)(
-            distance - 132, double(combat.chaseSpeed * dt * (enemy.slowed > 0 ? .35 : 1.)));
+            distance - 132, double(combat.chaseSpeed * dt * EnemyMovementFactor(enemy)));
         Move(enemy.position,
              {(target.x - enemy.position.x) / distance * step,
               (target.y - enemy.position.y) / distance * step},

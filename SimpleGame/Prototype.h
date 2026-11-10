@@ -74,6 +74,7 @@ class Prototype
     Renderer& r;
     SpriteSheet protagonistSheet, domainPortrait, spiritPortraits[4], ghostFace, ghostScreamPoses,
         ghostVariants[3], spiritSpellArt[3], spiritRealms[4];
+    SpriteSheet stagRealm, stagPortrait, stagSanctuaryTrees[5];
     SpriteSheet storyNpcSheets[StoryLayout::NpcCount];
     SpriteAnimation protagonistAnimation;
     CharacterModel protagonistModel;
@@ -534,7 +535,8 @@ class Prototype
                         CharacterModel::Motion motion,
                         float phase,
                         CharacterModel::State* state,
-                        const CharacterModel::Parts* parts = nullptr);
+                        const CharacterModel::Parts* parts = nullptr,
+                        const char* clipName = nullptr);
 
     struct EnemyVisual
     {
@@ -857,6 +859,13 @@ class Prototype
         for (int i = 0; i < 4; ++i)
             if (!spiritRealms[i].Load(realmFiles[i], lootLayout))
                 std::cerr << "주령 영역 이미지 로드 실패: " << i << std::endl;
+        stagRealm.Load(L"Assets/Effects/Realms/waykeeper_sanctuary.png", lootLayout);
+        stagPortrait.Load(L"Assets/Effects/stag_ultimate.png", lootLayout);
+        for (int i = 0; i < 5; ++i)
+        {
+            stagSanctuaryTrees[i].Load(
+                L"Assets/Effects/StagSanctuary/tree_" + std::to_wstring(i + 1) + L".png", lootLayout);
+        }
         const wchar_t* ghostFiles[] = {L"Assets/Effects/ghost_binding.png",
                                        L"Assets/Effects/ghost_drift.png",
                                        L"Assets/Effects/ghost_choir.png"};

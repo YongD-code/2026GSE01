@@ -32,6 +32,11 @@ bool IsStagE(const SkillEffect& effect) const
     return effect.species == SpiritCatalog::Stag && effect.slot == 2;
 }
 
+bool IsStagR(const SkillEffect& effect) const
+{
+    return effect.species == SpiritCatalog::Stag && effect.slot == 3;
+}
+
 std::vector<WorldPoint> moveRoute;
 size_t routeIndex = 0;
 WorldPoint moveDestination = {0, 0};
@@ -185,6 +190,11 @@ static constexpr float RedCharge = .4f, RedFlight = .18f, RedFade = .95f;
 static constexpr float BlueCharge = .4f, BlueActive = 2.5f, BlueFade = .45f;
 static constexpr float RedRadius = 105.f, BlueRadius = 145.f;
 
+float RealmOpening(const SkillEffect& effect) const
+{
+    return IsStagR(effect) ? StagSkill::SanctuaryOpening : DomainOpening;
+}
+
 bool InsideDomain(WorldPoint at) const
 {
     for (const auto& effect : skillEffects)
@@ -222,12 +232,12 @@ bool PreparingSkill() const
     return ChargingPurple() ||
            std::any_of(skillEffects.begin(),
                        skillEffects.end(),
-                       [](const SkillEffect& e)
+                       [this](const SkillEffect& e)
                        {
                            return (e.set == 0 && ((e.slot == 3 && e.age < DomainOpening) ||
                                                   (e.slot == 1 && e.age < RedCharge) ||
                                                   (e.slot == 2 && e.age < BlueCharge))) ||
-                                  (e.set > 0 && e.slot == 3 && e.age < DomainOpening) ||
+                                  (e.set > 0 && e.slot == 3 && e.age < RealmOpening(e)) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 1 && e.age < .6f) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 2 &&
                                    e.age < StagSkill::LeapAnimation) ||
@@ -453,6 +463,10 @@ const char* SkillName(int set, int slot) const
         {
             return "꽃길 도약";
         }
+        if (slot == 3)
+        {
+            return "길지기의 성역";
+        }
         set = 3;
     }
     static const char* names[5][4] = {
@@ -490,6 +504,10 @@ const char* SkillDescription(int set, int slot) const
         if (slot == 2)
         {
             return "전방으로 도약해 착지 주변의 적을 1초 둔화";
+        }
+        if (slot == 3)
+        {
+            return "6초간 아군 받는 피해·적 이동 속도 25% 감소";
         }
         set = 3;
     }
@@ -698,8 +716,18 @@ void CastSkill(int slot)
         effect.species = capturedSpirit;
         if (slot == 3)
         {
-            effect.duration += DomainOpening;
-            effect.nextPulse = DomainOpening;
+            if (IsStagR(effect))
+            {
+                effect.target = origin;
+                effect.duration = StagSkill::SanctuaryOpening + StagSkill::SanctuaryActive +
+                                  StagSkill::SanctuaryFade;
+                spiritCastPose = StagSkill::SanctuaryOpening;
+            }
+            else
+            {
+                effect.duration += DomainOpening;
+                effect.nextPulse = DomainOpening;
+            }
         }
         if (slot == 1)
         {
@@ -818,6 +846,7 @@ void CastSkill(int slot)
 #include "PrototypeStagQ.inl"
 #include "PrototypeStagW.inl"
 #include "PrototypeStagE.inl"
+#include "PrototypeStagR.inl"
 #include "PrototypeSpiritSkills.inl"
 #include "PrototypeSpiritEffects.inl"
 
@@ -839,6 +868,11 @@ void UpdateSkills(float dt)
     for (auto& effect : skillEffects)
     {
         effect.age += dt;
+        if (IsStagR(effect))
+        {
+            UpdateStagR(effect);
+            continue;
+        }
         if (IsStagE(effect))
         {
             UpdateStagE(effect);
@@ -1153,6 +1187,11 @@ void DrawPurpleEffect(const SkillEffect& effect)
 
 void DrawSkillEffect(const SkillEffect& effect)
 {
+    if (IsStagR(effect))
+    {
+        DrawStagR(effect);
+        return;
+    }
     if (effect.set > 0)
     {
         if (effect.slot == 3)

@@ -659,7 +659,8 @@ bool Prototype::DrawKeyedModel(CharacterModel& model,
                                CharacterModel::Motion motion,
                                float phase,
                                CharacterModel::State* state,
-                               const CharacterModel::Parts* parts)
+                               const CharacterModel::Parts* parts,
+                               const char* clipName)
 {
     if (!model.Ready())
     {
@@ -674,7 +675,7 @@ bool Prototype::DrawKeyedModel(CharacterModel& model,
     }
     const float dt = pose.clock < 0 ? .05f : (std::max)(0.f, (std::min)(.05f, time - pose.clock));
     pose.clock = time;
-    model.Animate(pose, pauseMenu || journal ? 0 : dt, motion, phase, facing);
+    model.Animate(pose, pauseMenu || journal ? 0 : dt, motion, phase, facing, clipName);
     return model.Draw(r, feet, tint, pose, size, parts);
 }
 
@@ -820,6 +821,32 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
         {
             castProgress = (std::min)(1.f, stagCast->age / StagSkill::Animation);
             animation.facing = spiritCastFacing;
+        }
+    }
+    if (captured && controlling && type == SpiritCatalog::Stag &&
+        UsingSpiritModel(type) && spiritMeshes[type].Ready())
+    {
+        for (auto it = skillEffects.rbegin(); it != skillEffects.rend(); ++it)
+        {
+            if (it->caster != selectedCompanion || it->species != type)
+            {
+                continue;
+            }
+            constexpr float firstKey = 1.f / 24.f;
+            constexpr float clipDuration = 32.f / 24.f;
+            if (IsStagR(*it) && it->age < clipDuration &&
+                (it->age < StagSkill::SanctuaryOpening || !companionAnimation.moving))
+            {
+                animation.facing = spiritCastFacing;
+                if (DrawKeyedModel(spiritMeshes[type], p, SpiritCatalog::Get(type).size,
+                                   animation, Color(1, 1, 1), CharacterModel::Motion::Cast,
+                                   (it->age + firstKey) / (clipDuration + firstKey),
+                                   state, nullptr, "MOB_STAG_R_SANCTUARY"))
+                {
+                    return;
+                }
+            }
+            break;
         }
     }
     const auto* leap = captured && type == SpiritCatalog::Stag ? StagECast() : nullptr;

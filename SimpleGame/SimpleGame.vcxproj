@@ -186,6 +186,7 @@
     <ClInclude Include="PrototypeStagQ.inl" />
     <ClInclude Include="PrototypeStagW.inl" />
     <ClInclude Include="PrototypeStagE.inl" />
+    <ClInclude Include="PrototypeStagR.inl" />
     <ClInclude Include="StagMeadowMesh.h" />
     <ClInclude Include="EaterBossCombat.inl" />
     <ClInclude Include="EaterBossRendering.inl" />

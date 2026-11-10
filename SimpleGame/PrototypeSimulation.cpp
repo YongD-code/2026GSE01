@@ -238,6 +238,10 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                 }
             }
             FrameProfiler::Scope timing(FrameProfiler::Stage::Combat);
+            if (const auto* sanctuary = StagSanctuary())
+            {
+                levelOne.sanctuary = {true, sanctuary->origin, player, spirit};
+            }
             levelOne.Update(
                 dt,
                 player,
@@ -255,6 +259,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                     return DomainTimeScale(p, kind);
                 },
                 SimulationRadius());
+            levelOne.sanctuary = {};
         }
         SyncPopulationHealth();
         // Resolve a simultaneous final hit before showing the defeat screen.

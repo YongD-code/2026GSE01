@@ -5,6 +5,12 @@
 
 namespace StagSkill
 {
+constexpr float SanctuaryOpening = .8f;
+constexpr float SanctuaryActive = 6.f;
+constexpr float SanctuaryFade = .65f;
+constexpr float SanctuaryRadius = 180.f;
+constexpr float SanctuaryScale = .75f;
+
 constexpr float LeapCharge = .16f;
 constexpr float LeapLand = .60f;
 constexpr float LeapAnimation = .76f;
