@@ -1,4 +1,4 @@
-"""Render the five in-game tree sprites and the stag's realm cut-in."""
+"""Render the five in-game tree sprites and the stag model reference."""
 import sys
 from pathlib import Path
 import bpy
@@ -37,4 +37,4 @@ for ob in effects:
 scene.render.film_transparent = False
 scene.render.resolution_x, scene.render.resolution_y = 640, 359
 aim(Vector((0,-.60,1.64)), Vector((4,-8,1.65)), 3.4)
-review.render(OUT/'stag_ultimate.png')
+review.render(HERE/'cutin_model_reference.png')
