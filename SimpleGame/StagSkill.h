@@ -5,6 +5,14 @@
 
 namespace StagSkill
 {
+constexpr float LeapCharge = .16f;
+constexpr float LeapLand = .60f;
+constexpr float LeapAnimation = .76f;
+constexpr float LeapDuration = 1.18f;
+constexpr float LeapReach = 160.f;
+constexpr float LeapRadius = 72.f;
+constexpr float LeapCooldown = 8.f;
+
 constexpr float Charge = .62f;
 constexpr float Travel = .58f;
 constexpr float Fade = .8f;

@@ -27,6 +27,11 @@ bool IsStagW(const SkillEffect& effect) const
     return effect.species == SpiritCatalog::Stag && effect.slot == 1;
 }
 
+bool IsStagE(const SkillEffect& effect) const
+{
+    return effect.species == SpiritCatalog::Stag && effect.slot == 2;
+}
+
 std::vector<WorldPoint> moveRoute;
 size_t routeIndex = 0;
 WorldPoint moveDestination = {0, 0};
@@ -224,6 +229,8 @@ bool PreparingSkill() const
                                                   (e.slot == 2 && e.age < BlueCharge))) ||
                                   (e.set > 0 && e.slot == 3 && e.age < DomainOpening) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 1 && e.age < .6f) ||
+                                  (e.species == SpiritCatalog::Stag && e.slot == 2 &&
+                                   e.age < StagSkill::LeapAnimation) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 0 &&
                                    e.age < StagSkill::Charge) ||
                                   (e.species != SpiritCatalog::Stag && e.set > 0 && e.slot == 0 &&
@@ -442,6 +449,10 @@ const char* SkillName(int set, int slot) const
         {
             return "숲의 숨결";
         }
+        if (slot == 2)
+        {
+            return "꽃길 도약";
+        }
         set = 3;
     }
     static const char* names[5][4] = {
@@ -475,6 +486,10 @@ const char* SkillDescription(int set, int slot) const
         if (slot == 1)
         {
             return "4초간 꽃밭 안의 아군 체력 회복";
+        }
+        if (slot == 2)
+        {
+            return "전방으로 도약해 착지 주변의 적을 1초 둔화";
         }
         set = 3;
     }
@@ -768,6 +783,13 @@ void CastSkill(int slot)
         skillEffects.back().nextPulse = DomainOpening;
         domainShake = .10f;
     }
+    if (IsStagE(skillEffects.back()))
+    {
+        StartStagE(skillEffects.back());
+        skillTimers[cooldownSet][slot] = StagSkill::LeapCooldown;
+        spiritCastPose = StagSkill::LeapAnimation;
+        return;
+    }
     if (set > 0 && slot == 2)
     {
         spiritHasteTime = set <= 2 ? 2.f : 0.f;
@@ -795,6 +817,7 @@ void CastSkill(int slot)
 #include "PrototypePolarity.inl"
 #include "PrototypeStagQ.inl"
 #include "PrototypeStagW.inl"
+#include "PrototypeStagE.inl"
 #include "PrototypeSpiritSkills.inl"
 #include "PrototypeSpiritEffects.inl"
 
@@ -816,6 +839,11 @@ void UpdateSkills(float dt)
     for (auto& effect : skillEffects)
     {
         effect.age += dt;
+        if (IsStagE(effect))
+        {
+            UpdateStagE(effect);
+            continue;
+        }
         if (IsStagW(effect))
         {
             UpdateStagW(effect, dt);

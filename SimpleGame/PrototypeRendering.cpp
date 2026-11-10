@@ -822,6 +822,12 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
             animation.facing = spiritCastFacing;
         }
     }
+    const auto* leap = captured && type == SpiritCatalog::Stag ? StagECast() : nullptr;
+    if (leap)
+    {
+        castProgress = leap->age / StagSkill::LeapAnimation;
+        animation.facing = spiritCastFacing;
+    }
     if (DrawSpiritModel(type,
                         p,
                         SpiritCatalog::Get(type).size,
@@ -831,6 +837,7 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
                         castProgress,
                         state,
                         controlling && requestedSprint,
+                        leap ? CharacterModel::Motion::Jump :
                         stagCast ? CharacterModel::Motion::Attack : CharacterModel::Motion::Cast))
     {
         return;

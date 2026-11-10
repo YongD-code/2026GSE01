@@ -162,6 +162,11 @@ void DrawForgottenSkill(const SkillEffect& effect)
 // Each species has four authored silhouettes, animated on its actual gameplay timeline.
 void DrawSpiritSkill(const SkillEffect& effect)
 {
+    if (IsStagE(effect))
+    {
+        DrawStagE(effect);
+        return;
+    }
     if (IsStagW(effect))
     {
         DrawStagW(effect);
