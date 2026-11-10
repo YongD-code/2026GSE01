@@ -943,7 +943,7 @@ void CharacterModel::Reset(State& state, float facing)
     {
         imported->Reset(state.imported);
         state.imported.layers = importedAmbient;
-        AnimateGltf(state, 0, Motion::Idle, 0);
+        AnimateGltf(state, 0, Motion::Idle, 0, nullptr);
         return;
     }
     if (joints.empty())
