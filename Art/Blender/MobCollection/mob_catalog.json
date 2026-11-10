@@ -379,6 +379,17 @@
           "radius": 72,
           "slow": 1,
           "cooldown": 8
+        },
+        "R": {
+          "name": "길지기의 성역",
+          "animation": "MOB_STAG_R_SANCTUARY",
+          "opening": 0.8,
+          "active": 6,
+          "fade": 0.65,
+          "radius": 180,
+          "damageMultiplier": 0.75,
+          "enemyMovementMultiplier": 0.75,
+          "cooldown": 40
         }
       }
     },
