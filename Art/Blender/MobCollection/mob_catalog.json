@@ -294,8 +294,9 @@
           "loop": true
         },
         "jump": {
+          "name": "MOB_STAG_JUMP",
           "firstFrame": 1,
-          "lastFrame": 25,
+          "lastFrame": 20,
           "loop": false
         },
         "turn_left": {
@@ -367,6 +368,17 @@
           "pulse": 0.5,
           "healPerPulse": 3.0,
           "cooldown": 12.0
+        },
+        "E": {
+          "name": "꽃길 도약",
+          "animation": "MOB_STAG_JUMP",
+          "reach": 160,
+          "charge": 0.16,
+          "land": 0.6,
+          "animationDuration": 0.76,
+          "radius": 72,
+          "slow": 1,
+          "cooldown": 8
         }
       }
     },
