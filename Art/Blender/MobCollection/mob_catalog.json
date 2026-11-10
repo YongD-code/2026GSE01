@@ -317,7 +317,7 @@
         "cast": {
           "name": "MOB_STAG_CAST",
           "firstFrame": 1,
-          "lastFrame": 19,
+          "lastFrame": 36,
           "loop": false
         }
       },
@@ -356,6 +356,17 @@
             "BloomPoints": 8,
             "Duration": 2.2800000000000002
           }
+        },
+        "W": {
+          "name": "숲의 숨결",
+          "animation": "MOB_STAG_CAST",
+          "charge": 0.6,
+          "active": 4.0,
+          "fade": 0.65,
+          "radius": 100.0,
+          "pulse": 0.5,
+          "healPerPulse": 3.0,
+          "cooldown": 12.0
         }
       }
     },
