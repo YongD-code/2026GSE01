@@ -183,18 +183,7 @@ void ActivateMenu(int item)
         Say("기본 공격", "좌클릭으로 커서 방향을 공격합니다. 누르고 있으면 연속 공격합니다.");
         break;
     case 12:
-        if (captured)
-        {
-            controlling = !controlling;
-            movementWasControlling = controlling;
-            Say("조종 전환",
-                controlling ? "주령을 조종하고 주령 QWER을 사용합니다."
-                            : "방랑자의 몸으로 돌아와 기본 QWER을 사용합니다.");
-        }
-        else
-        {
-            Say("조종 전환", "봉인한 주령이 있어야 조종할 수 있습니다.");
-        }
+        ToggleCompanionControl();
         break;
     case 14:
         ChangeMenuPage(-1);

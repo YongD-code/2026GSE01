@@ -207,13 +207,12 @@ bool LoadProgress(bool startup = false, int slot = 0)
                                   state.level.enemies.end());
     }
     const bool recallSavedCompanion =
-        !state.level.collection.empty() &&
+        !state.controlling && !state.level.collection.empty() &&
         Distance(state.player, state.spirit) > CompanionRecallDistance;
     if (recallSavedCompanion)
     {
-        // Recover old distant-vessel saves before validating the obsolete spirit location.
+        // Restore a distant follower near the body before checking its saved position.
         state.spirit = state.player;
-        state.controlling = state.spiritEquipped = false;
     }
     if (blocked(state.player) || (!state.level.collection.empty() && blocked(state.spirit)))
     {

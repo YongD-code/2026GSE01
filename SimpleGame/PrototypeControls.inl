@@ -371,7 +371,7 @@ bool RecallCompanion(bool force = false, bool notify = true)
 {
     if (!captured || selectedCompanion < 0 ||
         selectedCompanion >= static_cast<int>(levelOne.collection.size()) ||
-        (!force && Distance(player, spirit) <= CompanionRecallDistance))
+        (!force && (controlling || Distance(player, spirit) <= CompanionRecallDistance)))
     {
         return false;
     }
@@ -415,11 +415,17 @@ bool RecallCompanion(bool force = false, bool notify = true)
     }
     spirit = destination;
     spiritHasteTime = spiritCastPose = 0;
-    // A moving spirit hit area must not teleport to the new location with its caster.
+    // Grounded stag fields remain at their cast position after the spirit returns.
     skillEffects.erase(std::remove_if(skillEffects.begin(),
                                       skillEffects.end(),
                                       [this](const SkillEffect& effect)
                                       {
+                                          if ((IsStagW(effect) && effect.age >= .6f) ||
+                                              (IsStagR(effect) &&
+                                               effect.age >= StagSkill::SanctuaryOpening))
+                                          {
+                                              return false;
+                                          }
                                           return effect.set > 0 &&
                                                  effect.caster == selectedCompanion;
                                       }),
@@ -436,6 +442,43 @@ bool RecallCompanion(bool force = false, bool notify = true)
         messageTime = 2.5f;
     }
     return true;
+}
+
+void ToggleCompanionControl()
+{
+    if (!captured || selectedCompanion < 0 ||
+        selectedCompanion >= static_cast<int>(levelOne.collection.size()))
+    {
+        Say("조종 전환", "라엔에게 봉인을 배운 뒤 약화된 주령에게 봉인권을 사용하세요.");
+        return;
+    }
+    if (controlling)
+    {
+        if (RecallCompanion(true, false))
+        {
+            Say("조종 전환", "본체로 돌아왔습니다. 주령도 본체 곁으로 복귀했습니다.");
+        }
+        else
+        {
+            Say("주령 복귀", "본체 주변에 복귀할 수 있는 위치가 없습니다.");
+        }
+        return;
+    }
+    if (PreparingSkill())
+    {
+        return;
+    }
+    if (levelOne.collection[selectedCompanion].health < 25.f)
+    {
+        Say("조종 전환", "주령 체력이 25 이상 회복되면 조종할 수 있습니다.");
+        return;
+    }
+    controlling = true;
+    ClearInput();
+    movementWasControlling = true;
+    Say("조종 전환",
+        "주령을 조종합니다. 우클릭으로 이동하고 주령 QWER을 사용합니다. "
+        "B로 본체에 돌아갑니다.");
 }
 
 int SkillSet() const

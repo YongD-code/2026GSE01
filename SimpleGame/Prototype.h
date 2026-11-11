@@ -1214,25 +1214,7 @@ class Prototype
         }
         if (key == 'b')
         {
-            if (PreparingSkill())
-                return;
-            if (captured)
-            {
-                if (!controlling && levelOne.collection[selectedCompanion].health < 25.f)
-                {
-                    Say("조종 전환", "주령 체력이 25 이상 회복되면 조종할 수 있습니다.");
-                    return;
-                }
-                controlling = !controlling;
-                ClearInput();
-                movementWasControlling = controlling;
-                Say("조종 전환",
-                    controlling ? "주령을 조종합니다. 우클릭으로 이동하고 주령 QWER을 사용합니다. "
-                                  "B로 본체에 돌아갑니다."
-                                : "방랑자의 몸으로 돌아와 기본 QWER을 사용합니다.");
-            }
-            else
-                Say("조종 전환", "라엔에게 봉인을 배운 뒤 약화된 주령에게 봉인권을 사용하세요.");
+            ToggleCompanionControl();
         }
     }
 
