@@ -15,6 +15,9 @@
 class LevelOne
 {
   public:
+    static constexpr int SaintSealRecoveryPhase = 5;
+    static constexpr float SaintSealRecovery = 2.6f;
+
     struct Enemy
     {
         WorldPoint position;
@@ -34,7 +37,7 @@ class LevelOne
         int remnantRarity = 1;
         int boss = 0;
         float slowed = 0;
-        // 0: approach, 1: committed windup, 2: active attack, 3: recovery, 4: boss transition.
+        // 0: approach, 1: windup, 2: active, 3: recovery, 4: transition, 5: saint seal recovery.
         int phase = 0;
         float phaseTime = 0, stagger = 0, staggerGuard = 0;
         WorldPoint aim = {0, 0};
@@ -45,9 +48,15 @@ class LevelOne
         float simulationTime = 0;
         float saintSightTime = 0;
         bool saintSightClear = false;
+        bool saintSealBroken = false;
         WorldPoint saintSightTarget = {0, 0};
         int ritualCount = 0;
         EaterBoss::State eater;
+
+        bool SaintSealExposed() const
+        {
+            return !saintSealBroken && alerted && !returning && phase == 1;
+        }
     };
 
     struct Projectile
@@ -465,6 +474,10 @@ class LevelOne
         if (enemy.boss == EaterBoss::Encounter && enemy.phase == 3)
         {
             damage *= combat.eaterRecoveryBonus;
+        }
+        if (enemy.boss == StoryEncounter::SaintBoss && enemy.phase == SaintSealRecoveryPhase)
+        {
+            damage *= 1.35f;
         }
         enemy.health -= enemy.boss == 12 ? .05f : damage;
         if (enemy.boss == 12)
@@ -965,7 +978,7 @@ class LevelOne
         const double distance = Distance(enemy.position, player);
         if (attackType == 3)
         {
-            if (enemy.phase == 3)
+            if (enemy.phase == 3 || enemy.phase == SaintSealRecoveryPhase)
             {
                 if (enemy.phaseTime <= 0)
                 {

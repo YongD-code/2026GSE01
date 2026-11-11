@@ -436,6 +436,40 @@ void Prototype::SynchronizeScene()
              DrawPlayer({p.x, p.y});
          });
     scene.Ensure("story", "world");
+    const auto seal = StoryLayout::SaintSeal;
+    if (inView(seal, 50, 55, 30))
+    {
+        if (const auto* saint = SaintAtSeal())
+        {
+            const bool broken = saint->saintSealBroken;
+            const bool charging = saint->SaintSealExposed();
+            bind("story/saint-seal",
+                 "story",
+                 seal,
+                 ActorLayer::World,
+                 [this, broken, charging](const Actor& node)
+                 {
+                     const auto at = node.WorldPosition();
+                     DrawSaintSeal({at.x, at.y}, broken, charging);
+                 });
+            if (!broken)
+            {
+                bind("story/saint-seal/label",
+                     "story/saint-seal",
+                     seal,
+                     ActorLayer::WorldLabel,
+                     [this, charging](const Actor& node)
+                     {
+                         const auto at = node.WorldPosition();
+                         DrawWorldLabel({at.x, at.y},
+                                        34,
+                                        charging ? "의식의 봉인 · 파훼 가능" : "의식의 봉인",
+                                        charging ? Color(1.f, .87f, .47f)
+                                                 : Color(.78f, .72f, .57f));
+                     });
+            }
+        }
+    }
     for (auto site : StoryLayout::Sites())
     {
         site.position = StoryPosition(site);
@@ -679,6 +713,11 @@ void Prototype::SynchronizeScene()
                 {
                     name += " · 봉인 붕괴";
                 }
+            }
+            else if (enemy.boss == StoryEncounter::SaintBoss &&
+                     enemy.phase == LevelOne::SaintSealRecoveryPhase)
+            {
+                name += " · 반격 기회";
             }
             const float elevation = enemy.weakened ? 78.f : encounter.size + 27;
             bind(id + "/label",

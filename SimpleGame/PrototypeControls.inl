@@ -1007,17 +1007,26 @@ void UpdateSkills(float dt)
         effect.nextPulse += .5f;
         effect.impacts.clear();
         const WorldPoint areaCenter = SkillAreaCenter(effect);
+        constexpr double skillAreaRadius = 105;
+        if (effect.set == 1 && effect.slot == 1 && effect.species == SpiritCatalog::Forgotten &&
+            Distance(StoryLayout::SaintSeal, areaCenter) < skillAreaRadius)
+        {
+            if (auto* saint = SaintAtSeal())
+            {
+                BreakSaintSeal(*saint, effect.origin);
+            }
+        }
         for (auto& enemy : levelOne.enemies)
         {
             if (enemy.health <= 0 || enemy.weakened || enemy.returning)
             {
                 continue;
             }
-            const double radius = effect.slot == 3
-                                      ? (effect.set == 0   ? DomainRadius
-                                         : effect.set == 2 ? 105
-                                                           : 180)
-                                      : (effect.set == 1 && effect.slot == 0 ? 28 : 105);
+            const double radius =
+                effect.slot == 3 ? (effect.set == 0   ? DomainRadius
+                                    : effect.set == 2 ? 105
+                                                      : 180)
+                                 : (effect.set == 1 && effect.slot == 0 ? 28 : skillAreaRadius);
             bool hit = Distance(enemy.position, areaCenter) < radius;
             if (effect.slot == 0 && effect.set != 1)
             {

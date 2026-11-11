@@ -6,6 +6,8 @@
 namespace StoryLayout
 {
 constexpr int NpcCount = 8;
+inline constexpr WorldPoint SaintSeal = {3095, 30};
+constexpr double SaintSealInteractRange = 55;
 
 struct NpcSprite
 {

@@ -6,6 +6,7 @@
 namespace StoryEncounter
 {
 constexpr int SpriteCount = 4;
+constexpr int SaintBoss = 4;
 
 struct Definition
 {

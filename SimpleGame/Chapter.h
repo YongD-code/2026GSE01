@@ -21,6 +21,7 @@ class Chapter
     int step = 0, baselineKills = 0, baselineCaptures = 0;
     bool rewardPending = true;
     bool choicePending = false;
+    bool saintSealUnderstood = false;
     int empathy = 0, indifference = 0, greed = 0;
 
     bool Load()

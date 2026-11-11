@@ -13,6 +13,8 @@
 class SaveGame
 {
   public:
+    static constexpr int CurrentVersion = 9;
+
     struct State
     {
         std::uint64_t seed = 0, story = 0;
@@ -20,7 +22,7 @@ class SaveGame
         LevelOne level;
         std::vector<Population::Person> residents;
         Population::Society society;
-        int formatVersion = 8;
+        int formatVersion = CurrentVersion;
         Chapter chapter;
         int companion = 0, facing = 0;
         bool controlling = false, dialogue = false;
@@ -153,7 +155,7 @@ class SaveGame
         a.Fields(news.serial, news.origin, news.created, news.safety, news.jobs, news.wages);
     }
 
-    static bool Transfer(Archive& a, State& s, int version = 8)
+    static bool Transfer(Archive& a, State& s, int version = CurrentVersion)
     {
         s.formatVersion = version;
         auto& l = s.level;
@@ -207,6 +209,10 @@ class SaveGame
                  c.empathy,
                  c.indifference,
                  c.greed);
+        if (version >= 9)
+        {
+            a.Field(c.saintSealUnderstood);
+        }
         std::string rng;
         if (!a.reading)
         {
@@ -330,6 +336,10 @@ class SaveGame
             if (version >= 4)
             {
                 a.Fields(e.remnantTime, e.remnantRarity);
+            }
+            if (version >= 9 && e.boss == StoryEncounter::SaintBoss)
+            {
+                a.Field(e.saintSealBroken);
             }
             // Snapshots are accepted only outside combat. Resume idle actors without attack phases.
             if (a.reading)
@@ -653,6 +663,7 @@ class SaveGame
             (l.collection.empty() ? s.companion != 0
                                   : static_cast<size_t>(s.companion) >= l.collection.size()) ||
             (s.controlling && l.collection.empty()) ||
+            (c.saintSealUnderstood && c.step <= authored.Index("C106_RECORD")) ||
             (c.choicePending && c.step != authored.Index("P001_WITNESS")))
         {
             return false;
@@ -718,7 +729,7 @@ class SaveGame
             if (e.boss)
             {
                 if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
-                    !bosses.insert(e.boss).second)
+                    (e.saintSealBroken && !c.saintSealUnderstood) || !bosses.insert(e.boss).second)
                 {
                     return false;
                 }
@@ -771,9 +782,8 @@ class SaveGame
         std::string magic;
         int version = 0;
         std::uint64_t checksum = 0;
-        if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" ||
-            (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 &&
-             version != 6 && version != 7 && version != 8))
+        if (!(header >> magic >> version >> checksum) || magic != "GSE_SAVE" || version < 1 ||
+            version > CurrentVersion)
         {
             return false;
         }
@@ -881,7 +891,8 @@ class SaveGame
             return false;
         }
         const std::string payload = archive.stream.str();
-        const std::string bytes = "GSE_SAVE 8 " + std::to_string(Hash(payload)) + "\n" + payload;
+        const std::string bytes = "GSE_SAVE " + std::to_string(CurrentVersion) + " " +
+                                  std::to_string(Hash(payload)) + "\n" + payload;
         if (bytes.size() > MaximumBytes)
         {
             return false;

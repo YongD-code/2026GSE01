@@ -1,4 +1,57 @@
 // Authored story props use the existing story actors and cached static meshes.
+void Prototype::DrawSaintSeal(WorldPoint at, bool broken, bool charging)
+{
+    const Point ground = Screen(at.x, at.y);
+    static const std::string intactKey = "saint-seal:intact";
+    static const std::string brokenKey = "saint-seal:broken";
+    const auto& key = broken ? brokenKey : intactKey;
+    if (r.BeginCachedMesh(key, ground))
+    {
+        Box(at.x - 18,
+            at.y - 14,
+            36,
+            28,
+            5,
+            Color(.25f, .26f, .26f),
+            Color(.15f, .16f, .18f),
+            Color(.1f, .11f, .13f));
+        const Point left = Screen(at.x - 11, at.y - 8, 6);
+        const Point right = Screen(at.x + 11, at.y + 8, 6);
+        if (broken)
+        {
+            const Point split = Screen(at.x + 2, at.y - 4, 6);
+            r.Line(left, split, 2, Color(.07f, .06f, .08f));
+            r.Line(split, right, 2, Color(.07f, .06f, .08f));
+        }
+        else
+        {
+            r.Line(left, right, 3, Color(.48f, .29f, .17f));
+            r.Line(Screen(at.x - 8, at.y + 8, 6),
+                   Screen(at.x + 8, at.y - 8, 6),
+                   2,
+                   Color(.55f, .35f, .2f));
+        }
+        r.EndCachedMesh();
+    }
+    r.DrawCachedMesh(key, ground);
+    if (charging)
+    {
+        const Point core = Screen(at.x, at.y, 9);
+        const float pulse = .65f + .35f * std::sin(time * 16);
+        r.Ellipse(core.x, core.y, 23, 10, Color(1.f, .63f, .22f, .28f + pulse * .24f));
+        r.Line(Screen(at.x - 10, at.y - 7, 7),
+               Screen(at.x + 10, at.y + 7, 7),
+               3,
+               Color(1.f, .9f, .56f));
+        for (int i = 0; i < 6; ++i)
+        {
+            const float rise = std::fmod(time * 1.6f + i / 6.f, 1.f);
+            const Point spark = Screen(at.x + (i - 2.5) * 4, at.y, 9 + rise * 24);
+            r.Ellipse(spark.x, spark.y, 2, 2, Color(1.f, .76f, .38f, 1.f - rise));
+        }
+    }
+}
+
 void Prototype::StoryFacade(const Object& building)
 {
     const auto& o = building;
@@ -88,8 +141,10 @@ void Prototype::StoryFacade(const Object& building)
 void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
 {
     const Point origin = Screen(at.x, at.y);
+    const char* cachePrefix =
+        site.id == "cell" || site.id == "ledger" ? "story-detail-v7:" : "story-detail-v6:";
     const std::string key =
-        "story-detail-v6:" + site.id + (StoryCharacterModel(site.id) ? ":workstation" : "") +
+        cachePrefix + site.id + (StoryCharacterModel(site.id) ? ":workstation" : "") +
         (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
                                                                         : ":present");
     if (r.BeginCachedMesh(key, origin))
@@ -277,6 +332,8 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
                 r.Ellipse(cuff.x, cuff.y, 7, 5, metal);
                 r.Ellipse(cuff.x, cuff.y, 4, 3, edge);
             }
+            line(6, 1, 10, 14, 9, 10, 1, red);
+            line(6, 9, 10, 14, 1, 10, 1, red);
             sheet(-8, 7, 1, 16, 11);
         }
         else if (site.id == "room")
@@ -313,6 +370,8 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             }
             else
             {
+                line(6, -27, 29, 14, -19, 29, 2, red);
+                line(6, -19, 29, 14, -27, 29, 2, red);
                 box(27, -31, 20, 18, 17, wood);
                 sheet(29, -28, 18, 15, 11);
             }

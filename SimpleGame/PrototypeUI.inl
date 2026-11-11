@@ -145,6 +145,18 @@ std::vector<std::string> JournalEntries()
             add("보관 중인 사건 물증 · 검은 파편 / 특수 봉인 파편");
             add("같은 문양이 새겨진 두 파편. 판매·소모되지 않으며 이야기 진행과 함께 저장됩니다.");
         }
+        if (CanCompareSaintSeal())
+        {
+            add("선택 조사 · 운송 장부 앞에서 F로 감금실의 결박 문양 대조");
+        }
+        else if (chapter.saintSealUnderstood)
+        {
+            add("수도원 단서 · 예배당 앞 의식의 봉인이 성자의 기도에 주력을 공급한다.");
+            if (levelOne.resolvedBosses.count(StoryEncounter::SaintBoss) == 0)
+            {
+                add("봉인이 빛날 때 본체는 가까이서 F · 남겨진 자는 봉인을 조준해 W 기억의 결박");
+            }
+        }
         add("M으로 미니맵을 열어 초록색 목표를 확인하세요. 범위 밖 목표는 화살표로 표시됩니다.");
         add("완료한 이벤트 · " + std::to_string(chapter.step) + " / " +
             std::to_string(chapter.quests.size()));
@@ -783,9 +795,24 @@ void HUD()
 
     std::string heading, body;
     const auto* nearbyStory = NearbyStory();
-    const int weak =
-        dialoguePending || IsStoryObjective(nearbyStory) ? -1 : levelOne.Capturable(player);
-    if (weak >= 0)
+    const auto* saint = dialoguePending ? nullptr : NearbySaintSeal();
+    const bool compareLedger =
+        !dialoguePending && nearbyStory && nearbyStory->id == "ledger" && CanCompareSaintSeal();
+    const int weak = dialoguePending || saint || compareLedger || IsStoryObjective(nearbyStory)
+                         ? -1
+                         : levelOne.Capturable(player);
+    if (saint)
+    {
+        heading = "의식의 봉인";
+        body =
+            saint->SaintSealExposed() ? "F · 봉인 끊기" : "성자가 기도를 시작하면 봉인이 빛납니다.";
+    }
+    else if (compareLedger)
+    {
+        heading = nearbyStory->name;
+        body = "F · 감금실의 결박 문양과 대조";
+    }
+    else if (weak >= 0)
     {
         const char* tickets[] = {"낡은 봉인권", "봉인권", "고급 봉인권"};
         const float chance = levelOne.enemies[weak].boss == 5 ? 1.f

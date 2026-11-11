@@ -281,6 +281,11 @@ class Prototype
         {
             return;
         }
+        if (auto* saint = NearbySaintSeal())
+        {
+            BreakSaintSeal(*saint, player);
+            return;
+        }
         if (InteractStoryEvent())
         {
             return;
@@ -288,6 +293,11 @@ class Prototype
         const auto* quest = chapter.Current();
         const auto* site = NearbyStory();
         const bool storyObjective = IsStoryObjective(site);
+        if (site && site->id == "ledger" && CanCompareSaintSeal())
+        {
+            CompareSaintSeal();
+            return;
+        }
         if (!storyObjective && levelOne.Capturable(player) >= 0)
         {
             levelOne.Capture(player, false);
@@ -1270,6 +1280,12 @@ class Prototype
     WorldPoint StoryPosition(const StoryLayout::Site& site) const;
     WorldPoint StoryObjectivePosition(const Chapter::Quest& quest) const;
     std::string StoryObjectiveText(const Chapter::Quest& quest) const;
+    bool CanCompareSaintSeal() const;
+    void CompareSaintSeal();
+    LevelOne::Enemy* SaintAtSeal();
+    LevelOne::Enemy* NearbySaintSeal();
+    void BreakSaintSeal(LevelOne::Enemy& saint, WorldPoint source);
+    void DrawSaintSeal(WorldPoint at, bool broken, bool charging);
     bool UpdateStoryEvent();
     bool InteractStoryEvent();
     void EnterCemetery();

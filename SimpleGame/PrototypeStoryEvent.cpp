@@ -40,7 +40,78 @@ std::string Prototype::StoryObjectiveText(const Chapter::Quest& quest) const
     {
         return "묘역 북동쪽 석벽의 봉인 흔적을 조사해 두 파편 확보하기";
     }
+    if (quest.id == "C108" && chapter.saintSealUnderstood)
+    {
+        return "성자 격파 · 기도 중 빛나는 봉인은 F 또는 기억의 결박으로 파훼";
+    }
     return quest.objective;
+}
+
+bool Prototype::CanCompareSaintSeal() const
+{
+    return !chapter.saintSealUnderstood && chapter.step > chapter.Index("C106_RECORD") &&
+           chapter.step <= chapter.Index("C108") &&
+           levelOne.resolvedBosses.count(StoryEncounter::SaintBoss) == 0;
+}
+
+void Prototype::CompareSaintSeal()
+{
+    chapter.saintSealUnderstood = true;
+    ClearInput();
+    Say("결박 문양 대조",
+        "장부의 봉인 문양이 감금실의 결박과 일치한다. 장부 여백에는 ‘기도가 시작되면 "
+        "예배당 앞 봉인으로 주력을 보낼 것’이라고 적혀 있다.\n"
+        "빛나는 봉인에 접근해 F로 끊거나, 남겨진 자를 조종해 봉인에 W 기억의 결박을 써 보자.");
+    dialoguePending = true;
+    autoSaveTime = 30;
+}
+
+LevelOne::Enemy* Prototype::SaintAtSeal()
+{
+    const auto* quest = chapter.Current();
+    if (!chapter.saintSealUnderstood || !quest || quest->id != "C108")
+    {
+        return nullptr;
+    }
+    const auto saint =
+        std::find_if(levelOne.enemies.begin(),
+                     levelOne.enemies.end(),
+                     [](const LevelOne::Enemy& enemy)
+                     {
+                         return enemy.boss == StoryEncounter::SaintBoss && enemy.health > 0 &&
+                                !enemy.weakened &&
+                                Distance(enemy.position, StoryLayout::SaintSeal) <= 360;
+                     });
+    return saint == levelOne.enemies.end() ? nullptr : &*saint;
+}
+
+LevelOne::Enemy* Prototype::NearbySaintSeal()
+{
+    if (controlling ||
+        Distance(player, StoryLayout::SaintSeal) > StoryLayout::SaintSealInteractRange)
+    {
+        return nullptr;
+    }
+    auto* saint = SaintAtSeal();
+    return saint && !saint->saintSealBroken ? saint : nullptr;
+}
+
+void Prototype::BreakSaintSeal(LevelOne::Enemy& saint, WorldPoint source)
+{
+    if (!saint.SaintSealExposed() || !LevelOne::ClearLine(source,
+                                                          StoryLayout::SaintSeal,
+                                                          [this](WorldPoint p)
+                                                          {
+                                                              return Blocked(p);
+                                                          }))
+    {
+        return;
+    }
+    saint.saintSealBroken = true;
+    saint.phase = LevelOne::SaintSealRecoveryPhase;
+    saint.phaseTime = LevelOne::SaintSealRecovery;
+    Say("봉인 파훼", "성자의 기도가 끊겼다. 지금 공격하면 더 큰 피해를 줄 수 있다.");
+    messageTime = LevelOne::SaintSealRecovery;
 }
 
 bool Prototype::UpdateStoryEvent()
