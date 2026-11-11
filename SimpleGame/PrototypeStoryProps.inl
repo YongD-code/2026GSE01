@@ -258,6 +258,37 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             const Point bowl = p(10, 17, 4);
             r.Ellipse(bowl.x, bowl.y, 6, 3, metal);
         }
+        else if (site.id == "order_barricade")
+        {
+            for (int i = -1; i <= 1; i += 2)
+            {
+                box(i * 24 - 8, -8, 16, 16, 7, stone);
+                line(i * 24, 0, 7, i * 24, 0, 58, 4, wood);
+            }
+            line(-27, 0, 56, 27, 0, 56, 4, timber);
+            r.Quad(p(-19, 0, 55), p(19, 0, 55), p(15, 0, 20), p(-17, 0, 24), red);
+            line(-7, 0, 46, 7, 0, 31, 2, paper);
+            line(-7, 0, 31, 7, 0, 46, 2, paper);
+        }
+        else if (site.id == "exit_ledger")
+        {
+            box(-24, -28, 48, 30, 8, stone);
+            box(-18, -24, 36, 24, 17, stone);
+            sheet(-15, -22, 18, 17, 16);
+            sheet(3, -22, 18, 13, 16);
+            line(0, -22, 19, 0, -6, 19, 2, red);
+            lantern(-35, -15);
+        }
+        else if (site.id == "raen_exit")
+        {
+            box(-44, -43, 79, 20, 12, stone);
+            box(-44, -48, 15, 24, 32, stone);
+            box(20, -48, 15, 24, 32, stone);
+            box(-44, -48, 79, 12, 40, stone);
+            r.Quad(p(-29, -35, 13), p(20, -35, 13), p(20, -35, 33), p(-29, -35, 33), ink);
+            r.Quad(
+                p(-22, -31, 1), p(13, -31, 1), p(4, -5, 1), p(-27, -5, 1), Color(.19f, .31f, .31f));
+        }
         else if (site.id == "seal" || site.id == "relic")
         {
             if (site.id == "relic")

@@ -1,6 +1,7 @@
 #pragma once
 #include "Chapter.h"
 #include "NpcAppearance.h"
+#include "StoryEncounter.h"
 #include <array>
 
 namespace StoryLayout
@@ -8,6 +9,17 @@ namespace StoryLayout
 constexpr int NpcCount = 8;
 inline constexpr WorldPoint SaintSeal = {3095, 30};
 constexpr double SaintSealInteractRange = 55;
+
+struct OrderGuard
+{
+    int encounter;
+    WorldPoint position;
+};
+
+inline constexpr std::array<OrderGuard, 2> OrderGuards = {{
+    {StoryEncounter::OrderSwordsman, {2920, 0}},
+    {StoryEncounter::OrderArcher, {2820, 35}},
+}};
 
 struct NpcSprite
 {
@@ -86,7 +98,10 @@ inline const std::vector<Site>& Sites()
         {"cell", "감금실의 결박", Kind::Evidence, {1980, -55}, "P000", ""},
         {"ledger", "운송 장부", Kind::Evidence, {2570, 70}, "P000", ""},
         {"relic", "검은 성유물", Kind::Evidence, {3290, 65}, "C108", ""},
-        {"raen_chapel", "라엔", Kind::Adult, {3320, 0}, "C109_RELIC", ""}};
+        {"raen_chapel", "라엔", Kind::Adult, {3320, 0}, "C109_RELIC", "C200"},
+        {"order_barricade", "성흔회 봉쇄선", Kind::Evidence, {3005, 86}, "C200", "C201_RAEN"},
+        {"raen_exit", "라엔", Kind::Adult, {2640, 108}, "C201_RAEN", ""},
+        {"exit_ledger", "운송 장부 사본", Kind::Evidence, {2510, 148}, "C201_LEDGER", ""}};
     return sites;
 }
 

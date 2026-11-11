@@ -34,11 +34,23 @@ void WrappedText(
         r.Text(x, y, line, color);
 }
 
+const char* CompletedStoryTitle() const
+{
+    if (chapter.quests.empty())
+    {
+        return "퀘스트 데이터 없음";
+    }
+    return chapter.step > chapter.Index("C201_LEDGER") ? "2장 초반 완료" : "1장 완료";
+}
+
 std::string ObjectiveHint() const
 {
     const auto* quest = chapter.Current();
     if (!quest)
-        return chapter.quests.empty() ? "퀘스트 데이터를 읽지 못했습니다." : "1장 완료 · 자유 탐험";
+    {
+        return chapter.quests.empty() ? "퀘스트 데이터를 읽지 못했습니다."
+                                      : std::string(CompletedStoryTitle()) + " · 자유 탐험";
+    }
     return StoryObjectiveText(*quest);
 }
 
@@ -138,8 +150,12 @@ std::vector<std::string> JournalEntries()
     else if (menuTab == 3)
     {
         const auto* quest = chapter.Current();
-        add(quest ? "현재 목표 · " + quest->title : "현재 목표 · 1장 완료");
+        add(std::string("현재 목표 · ") + (quest ? quest->title.c_str() : CompletedStoryTitle()));
         add(ObjectiveHint());
+        if (chapter.step > chapter.Index("C201_LEDGER"))
+        {
+            add("다음 목적지 · 폐수문 중계 창고");
+        }
         if (chapter.step > chapter.Index("P007_SEAL"))
         {
             add("보관 중인 사건 물증 · 검은 파편 / 특수 봉인 파편");
@@ -591,6 +607,13 @@ void DrawQuestTracker()
         progress = chapter.rewardPending ? 0.f : (std::min)(1.f, storyTrialTime / 5.f);
         counter = std::to_string(int(progress * 100)) + "%";
     }
+    else if (quest->id == "C201")
+    {
+        const int defeated = DefeatedOrderGuards();
+        const auto total = StoryLayout::OrderGuards.size();
+        progress = float(defeated) / total;
+        counter = std::to_string(defeated) + " / " + std::to_string(total);
+    }
     else
     {
         const bool encounter = quest->trigger == "fight" || quest->trigger == "first_capture";
@@ -608,8 +631,7 @@ void DrawQuestTracker()
                 box.w - 24,
                 quest && (quest->id == "P007" || quest->id == "P007_SEAL") ? "묘지의 인위적인 봉인"
                 : quest                                                    ? quest->title
-                : chapter.quests.empty()                                   ? "퀘스트 데이터 없음"
-                                                                           : "1장 완료",
+                                                                           : CompletedStoryTitle(),
                 text,
                 1);
     WrappedText(box.x + 12, box.y + 66, box.w - 24, ObjectiveHint(), muted, 2);

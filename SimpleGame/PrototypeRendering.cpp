@@ -936,7 +936,25 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
     const auto& encounter = StoryEncounter::Get(enemy.boss);
     const float size = enemy.boss ? encounter.size : SpiritCatalog::Get(enemy.type).size;
     r.Ellipse(p.x, p.y, 20, 7, Color(0, 0, 0, .3f));
-    if (encounter.sprite >= 0)
+    if (encounter.humanAttack >= 0)
+    {
+        const bool archer = enemy.boss == StoryEncounter::OrderArcher;
+        const CharacterModel::Parts parts =
+            archer ? CharacterModel::Parts{1, 6, 4, 1} : CharacterModel::Parts{0, 0, 3, 6};
+        const Color tint(.95f, .86f, .81f);
+        const auto motion = enemy.castPose > 0       ? CharacterModel::Motion::Attack
+                            : enemy.animation.moving ? CharacterModel::Motion::Walk
+                                                     : CharacterModel::Motion::Idle;
+        const float phase = enemy.castPose > 0       ? enemy.castPose
+                            : enemy.animation.moving ? enemy.animation.phase / 8.f
+                                                     : time * .75f;
+        if (!DrawKeyedModel(npcModel, p, size, enemy.animation, tint, motion, phase, state, &parts))
+        {
+            populationWalkSheets[Population::Hunter].Draw(
+                r, p, size, enemy.animation, tint, width, height);
+        }
+    }
+    else if (encounter.sprite >= 0)
     {
         if (storyEnemySheets[encounter.sprite].Ready())
             storyEnemySheets[encounter.sprite].Draw(
@@ -1014,7 +1032,7 @@ void Prototype::DrawCombatWarnings()
         {
             continue;
         }
-        const int attackType = SpiritCatalog::Get(enemy.type).combatType;
+        const int attackType = StoryEncounter::AttackType(enemy.boss, enemy.type);
         if (attackType == 3 && enemy.alerted && !enemy.weakened && enemy.health > 0)
         {
             const bool preparing = enemy.phase == 1;
@@ -1120,7 +1138,8 @@ void Prototype::DrawCombatWarnings()
         }
         else
         {
-            for (int i = -1; i <= 1; ++i)
+            const int spread = StoryEncounter::RangedSpreadSteps(enemy.boss);
+            for (int i = -spread; i <= spread; ++i)
             {
                 const double a = i * combat.rangedSpread, c = std::cos(a), s = std::sin(a);
                 const double reach =

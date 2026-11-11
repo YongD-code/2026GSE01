@@ -15,6 +15,14 @@ class Chapter
         std::string id, title, objective, trigger, dialogue;
         WorldPoint destination;
         int amount;
+
+        const std::string& Briefing() const
+        {
+            return trigger == "fight" || trigger == "first_capture" || trigger == "survive" ||
+                           trigger == "skill" || trigger == "travel"
+                       ? dialogue
+                       : objective;
+        }
     };
 
     std::vector<Quest> quests;

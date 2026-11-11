@@ -55,11 +55,17 @@ class SaveGame
 
     static std::uint64_t StoryHash(const Chapter& chapter)
     {
+        return StoryHash(chapter, static_cast<int>(chapter.quests.size()));
+    }
+
+    static std::uint64_t StoryHash(const Chapter& chapter, int questCount)
+    {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << std::setprecision(17) << "chapter1-structure-v1\n";
-        for (const auto& q : chapter.quests)
+        for (int i = 0; i < questCount; ++i)
         {
+            const auto& q = chapter.quests[i];
             // Editorial changes do not invalidate progress; ordering and logic still must match.
             out << std::quoted(q.id) << std::quoted(q.trigger) << q.destination.x << ' '
                 << q.destination.y << ' ' << q.amount << '\n';
@@ -254,7 +260,7 @@ class SaveGame
             }
         }
         count = l.resolvedBosses.size();
-        if (!a.Count(count, 12))
+        if (!a.Count(count, StoryEncounter::MaxId))
         {
             return false;
         }
@@ -264,7 +270,7 @@ class SaveGame
             {
                 int id = 0;
                 a.Field(id);
-                if (id < 1 || id > 12 || !l.resolvedBosses.insert(id).second)
+                if (id < 1 || id > StoryEncounter::MaxId || !l.resolvedBosses.insert(id).second)
                 {
                     return false;
                 }
@@ -648,6 +654,10 @@ class SaveGame
         }
         const auto& l = s.level;
         const auto& c = s.chapter;
+        const int orderFight = authored.Index("C201");
+        const bool beforeOrderFight = c.step < orderFight;
+        const auto defeatedGuards = l.resolvedBosses.count(StoryEncounter::OrderSwordsman) +
+                                    l.resolvedBosses.count(StoryEncounter::OrderArcher);
         if (authored.quests.empty() || s.story != StoryHash(authored) || !Point(s.player) ||
             !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
             !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
@@ -664,6 +674,8 @@ class SaveGame
                                   : static_cast<size_t>(s.companion) >= l.collection.size()) ||
             (s.controlling && l.collection.empty()) ||
             (c.saintSealUnderstood && c.step <= authored.Index("C106_RECORD")) ||
+            (beforeOrderFight && defeatedGuards != 0) ||
+            (c.step > orderFight && defeatedGuards != 2) ||
             (c.choicePending && c.step != authored.Index("P001_WITNESS")))
         {
             return false;
@@ -720,7 +732,7 @@ class SaveGame
         {
             if (!Point(e.position) || !Point(e.home) || !Key(e.camp) ||
                 !Number(e.type, 0, SpiritCatalog::Count - 1) || !Number(e.slot, 0, 3) ||
-                !Number(e.boss, 0, 12) || !Number(e.maximum, 1, 1000000) ||
+                !Number(e.boss, 0, StoryEncounter::MaxId) || !Number(e.maximum, 1, 1000000) ||
                 !Number(e.health, .001, e.maximum) || !Number(e.slowed, 0, 1000) ||
                 !Number(e.remnantTime, -2, 60) || !Number(e.remnantRarity, 1, 4))
             {
@@ -729,6 +741,8 @@ class SaveGame
             if (e.boss)
             {
                 if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
+                    (StoryEncounter::Get(e.boss).humanAttack >= 0 &&
+                     (beforeOrderFight || e.weakened)) ||
                     (e.saintSealBroken && !c.saintSealUnderstood) || !bosses.insert(e.boss).second)
                 {
                     return false;
@@ -750,6 +764,60 @@ class SaveGame
             if (!Point(item.position) || !Number(item.age, 0, 90))
             {
                 return false;
+            }
+        }
+        return true;
+    }
+
+    static bool RestoreStoryLayout(State& candidate, const Chapter& chapter)
+    {
+        const auto currentStory = StoryHash(chapter);
+        if (candidate.story == currentStory)
+        {
+            return true;
+        }
+
+        // Chapter 2 appends objectives. The old last index is now its first objective.
+        const int chapterOneEnd = chapter.Index("C200");
+        const auto chapterOneStory = StoryHash(chapter, chapterOneEnd);
+        std::uint64_t previousSealerStory = 0;
+        Chapter previous = chapter;
+        for (auto& quest : previous.quests)
+        {
+            if (quest.id == "C100" && quest.trigger == "talk:sealer" &&
+                quest.destination.x == -300 && quest.destination.y == 45)
+            {
+                quest.destination = {105, -205};
+                previousSealerStory = StoryHash(previous, chapterOneEnd);
+                break;
+            }
+        }
+        // These earlier 36-objective layouts share the same indices.
+        const bool knownChapterOne = chapterOneStory == 11189463987859809500ULL ||
+                                     chapterOneStory == 12606591398302679102ULL;
+        const bool oldNpcLayout = knownChapterOne && candidate.story == 12606591398302679102ULL;
+        const bool oldTutorial = candidate.story == 17577236682408322091ULL && knownChapterOne;
+        if (candidate.chapter.step > chapterOneEnd ||
+            (candidate.story != chapterOneStory &&
+             (previousSealerStory == 0 || candidate.story != previousSealerStory) &&
+             !oldNpcLayout && !oldTutorial))
+        {
+            return false;
+        }
+        candidate.story = currentStory;
+        if (oldTutorial && candidate.chapter.step == chapter.Index("P006"))
+        {
+            candidate.level.skillsUsed = 0;
+        }
+        if (candidate.chapter.step == chapterOneEnd && chapterOneEnd < int(chapter.quests.size()))
+        {
+            candidate.chapter.rewardPending = true;
+            if (candidate.speaker == "1장 완료 · 저주를 보는 자")
+            {
+                candidate.dialogue = false;
+                candidate.speaker.clear();
+                candidate.message.clear();
+                candidate.messageTime = 0;
             }
         }
         return true;
@@ -804,38 +872,9 @@ class SaveGame
         {
             return false;
         }
-        const auto currentStory = StoryHash(chapter);
-        // Only accept the known layout with C100's sealer coordinate relocated.
-        // All other quest IDs, triggers, amounts and coordinates must still match.
-        std::uint64_t previousSealerStory = 0;
+        if (!RestoreStoryLayout(candidate, chapter))
         {
-            Chapter previous = chapter;
-            for (auto& quest : previous.quests)
-            {
-                if (quest.id == "C100" && quest.trigger == "talk:sealer" &&
-                    quest.destination.x == -300 && quest.destination.y == 45)
-                {
-                    quest.destination = {105, -205};
-                    previousSealerStory = StoryHash(previous);
-                    break;
-                }
-            }
-        }
-        if (previousSealerStory != 0 && candidate.story == previousSealerStory)
-        {
-            candidate.story = currentStory;
-        }
-        // Explicit migration from the authored 36-quest layout through patch 1.0.67.
-        // Never accept arbitrary mismatches or silently remap numeric quest indices.
-        if (candidate.story == 17577236682408322091ULL &&
-            (currentStory == 12606591398302679102ULL ||
-             previousSealerStory == 12606591398302679102ULL))
-        {
-            candidate.story = StoryHash(chapter);
-            if (candidate.chapter.step == chapter.Index("P006"))
-            {
-                candidate.level.skillsUsed = 0;
-            }
+            return false;
         }
         archive.stream >> std::ws;
         if (!archive.stream.eof() || !Validate(candidate, chapter))

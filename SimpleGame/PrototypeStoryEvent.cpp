@@ -26,6 +26,20 @@ WorldPoint Prototype::StoryObjectivePosition(const Chapter::Quest& quest) const
     {
         return CemeteryRoom::Seal();
     }
+    if (quest.id == "C201")
+    {
+        const LevelOne::Enemy* closest = nullptr;
+        const WorldPoint focus = controlling ? spirit : player;
+        for (const auto& enemy : levelOne.enemies)
+        {
+            if (enemy.health > 0 && StoryEncounter::Get(enemy.boss).humanAttack >= 0 &&
+                (!closest || Distance(focus, enemy.position) < Distance(focus, closest->position)))
+            {
+                closest = &enemy;
+            }
+        }
+        return closest ? closest->position : quest.destination;
+    }
     return quest.trigger == "skill" ? player : quest.destination;
 }
 
@@ -45,6 +59,67 @@ std::string Prototype::StoryObjectiveText(const Chapter::Quest& quest) const
         return "성자 격파 · 기도 중 빛나는 봉인은 F 또는 기억의 결박으로 파훼";
     }
     return quest.objective;
+}
+
+int Prototype::DefeatedOrderGuards() const
+{
+    int defeated = 0;
+    for (const auto& guard : StoryLayout::OrderGuards)
+    {
+        defeated += levelOne.resolvedBosses.count(guard.encounter) != 0;
+    }
+    return defeated;
+}
+
+bool Prototype::UpdateMonasteryEscape(const Chapter::Quest& quest)
+{
+    if (quest.id == "C200")
+    {
+        if (chapter.rewardPending)
+        {
+            return false;
+        }
+        if (Distance(player, quest.destination) < 85)
+        {
+            AdvanceChapter();
+            autoSaveTime = 30;
+        }
+        return true;
+    }
+    if (quest.id == "C201_RAEN" || quest.id == "C201_LEDGER")
+    {
+        chapter.rewardPending = false;
+        return true;
+    }
+    if (quest.id != "C201")
+    {
+        return false;
+    }
+    if (chapter.rewardPending)
+    {
+        chapter.rewardPending = false;
+        Say(quest.title, quest.dialogue);
+    }
+    if (DefeatedOrderGuards() == int(StoryLayout::OrderGuards.size()))
+    {
+        AdvanceChapter();
+        autoSaveTime = 30;
+        return true;
+    }
+    if (Distance(player, quest.destination) < 380)
+    {
+        for (const auto& guard : StoryLayout::OrderGuards)
+        {
+            levelOne.EnsureBoss(guard.encounter,
+                                guard.position,
+                                player,
+                                [this](WorldPoint p)
+                                {
+                                    return Blocked(p);
+                                });
+        }
+    }
+    return true;
 }
 
 bool Prototype::CanCompareSaintSeal() const

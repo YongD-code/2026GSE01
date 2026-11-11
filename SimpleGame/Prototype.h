@@ -369,6 +369,8 @@ class Prototype
         if (site.id == "child")
             return forgotten ? "동생이라니? 난 네가 혼자 다니는 모습만 기억하는데."
                              : "공동묘지로 가는 길은 무서워. 물어볼 게 있으면 이야기해.";
+        if (site.id == "raen_exit")
+            return "폐수문 중계 창고를 확인하자. 성흔회도 그 운송 경로를 추적하고 있을 거야.";
         if (site.id.compare(0, 5, "raen_") == 0)
             return forgotten
                        ? "나도 네 동생을 기억해. 사람들이 잊었다고 해서 남은 흔적까지 사라지진 "
@@ -379,6 +381,8 @@ class Prototype
                              : "동생이 이웃 몫까지 챙겼더구나. 둘이 길을 조심해서 다니렴.";
         if (site.id == "stranger")
             return "집에 가야 하는데…. 돌아가는 길이 기억나지 않아….";
+        if (site.id == "order_barricade")
+            return "성흔회의 깃발 너머로 서쪽 길이 이어진다. 검병과 궁수가 길을 지키고 있다.";
         const auto* quest = chapter.Current();
         for (int i = 0; i < chapter.step && i < int(chapter.quests.size()); ++i)
         {
@@ -420,30 +424,28 @@ class Prototype
         {
             return;
         }
+        if (!levelOne.complete && chapter.step > chapter.Index("C109"))
+        {
+            levelOne.complete = true;
+            levelOne.tickets[1] += 3;
+            ++levelOne.tickets[2];
+            ++levelOne.tickets[3];
+            ++levelOne.stones;
+            autoSaveTime = 30;
+        }
         if (!quest)
         {
-            if (chapter.rewardPending && !chapter.quests.empty())
-            {
-                chapter.rewardPending = false;
-                levelOne.complete = true;
-                levelOne.tickets[1] += 3;
-                ++levelOne.tickets[2];
-                ++levelOne.tickets[3];
-                ++levelOne.stones;
-                Say("1장 완료 · 저주를 보는 자",
-                    "성유물을 확보했다. 수도원 밖을 성흔회가 포위한다. 여기까지가 이번 여정이다. "
-                    "자유 탐험과 저장을 계속할 수 있다.");
-                dialoguePending = true;
-                ClearInput();
-            }
+            chapter.rewardPending = false;
+            return;
+        }
+        if (UpdateMonasteryEscape(*quest))
+        {
             return;
         }
         if (chapter.rewardPending)
         {
             chapter.rewardPending = false;
-            const bool battle = quest->trigger == "fight" || quest->trigger == "first_capture" ||
-                                quest->trigger == "survive" || quest->trigger == "skill";
-            Say(quest->title, battle ? quest->dialogue : quest->objective);
+            Say(quest->title, quest->Briefing());
             dialoguePending = true;
             ClearInput();
             if (quest->id == "P005")
@@ -1280,6 +1282,8 @@ class Prototype
     WorldPoint StoryPosition(const StoryLayout::Site& site) const;
     WorldPoint StoryObjectivePosition(const Chapter::Quest& quest) const;
     std::string StoryObjectiveText(const Chapter::Quest& quest) const;
+    bool UpdateMonasteryEscape(const Chapter::Quest& quest);
+    int DefeatedOrderGuards() const;
     bool CanCompareSaintSeal() const;
     void CompareSaintSeal();
     LevelOne::Enemy* SaintAtSeal();

@@ -7,6 +7,9 @@ namespace StoryEncounter
 {
 constexpr int SpriteCount = 4;
 constexpr int SaintBoss = 4;
+constexpr int OrderSwordsman = 13;
+constexpr int OrderArcher = 14;
+constexpr int MaxId = OrderArcher;
 
 struct Definition
 {
@@ -15,11 +18,12 @@ struct Definition
     float size;
     bool capturable;
     float walkFrameDistance = 0;
+    int humanAttack = -1;
 };
 
 inline const Definition& Get(int id)
 {
-    static const std::array<Definition, 13> definitions = {
+    static const std::array<Definition, MaxId + 1> definitions = {
         {{"배회 주령", SpiritCatalog::Forgotten, -1, 72, true},
          {"울음 먹는 자", SpiritCatalog::Eater, -1, 125, false, 16},
          {"수도원 수호자", SpiritCatalog::Forgotten, 2, 112, false, 15},
@@ -32,8 +36,21 @@ inline const Definition& Get(int id)
          {"목 없는 순례자", SpiritCatalog::Pilgrim, -1, 86, true},
          {"기도하는 손", SpiritCatalog::Hands, -1, 86, true},
          {"결박된 순례자", SpiritCatalog::Pilgrim, -1, 94, true},
-         {"돌아가지 못한 사람", SpiritCatalog::Forgotten, -1, 88, false}}};
+         {"돌아가지 못한 사람", SpiritCatalog::Forgotten, -1, 88, false},
+         {"성흔회 검병", SpiritCatalog::Forgotten, -1, 78, false, 10, 0},
+         {"성흔회 궁수", SpiritCatalog::Forgotten, -1, 74, false, 10, 2}}};
     return definitions[id >= 0 && id < int(definitions.size()) ? id : 0];
+}
+
+inline int AttackType(int id, int species)
+{
+    const int humanAttack = Get(id).humanAttack;
+    return humanAttack >= 0 ? humanAttack : SpiritCatalog::Get(species).combatType;
+}
+
+inline int RangedSpreadSteps(int id)
+{
+    return id == OrderArcher ? 0 : 1;
 }
 
 inline const wchar_t* SpritePath(int index)

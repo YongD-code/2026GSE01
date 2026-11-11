@@ -67,6 +67,7 @@ class LevelOne
         bool hostile = false;
         unsigned long long actorId = 0;
         bool residentBattle = false;
+        bool arrow = false;
     };
 
     enum class LootKind
@@ -351,16 +352,20 @@ class LevelOne
         }
         if (!purified)
             return;
-        ++kills;
-        gold += 8;
+        const bool human = StoryEncounter::Get(enemy.boss).humanAttack >= 0;
+        if (!human)
+        {
+            ++kills;
+        }
+        gold += human ? 12 : 8;
         ++spoils;
         const size_t firstDrop = loot.size();
         loot.push_back({enemy.position, LootKind::Experience});
-        if (kills == 1 || Roll() < .35f)
+        if ((!human && kills == 1) || Roll() < .35f)
             loot.push_back({enemy.position, LootKind::Weapon});
         if (Roll() < .25f)
             loot.push_back({enemy.position, LootKind::Healing});
-        if (Roll() < .12f)
+        if (!human && Roll() < .12f)
             loot.push_back({enemy.position, LootKind::Stone});
         if (Roll() < captureRules.ticketDrop || enemy.boss == 2)
             loot.push_back({enemy.position, LootKind::Ticket});
@@ -589,6 +594,10 @@ class LevelOne
         if (id >= 5)
         {
             enemy.maximum = id == 12 ? 200.f : 55.f;
+        }
+        if (id == StoryEncounter::OrderSwordsman || id == StoryEncounter::OrderArcher)
+        {
+            enemy.maximum = id == StoryEncounter::OrderSwordsman ? 110.f : 85.f;
         }
         enemy.health = enemy.maximum;
         enemies.push_back(enemy);
@@ -964,7 +973,7 @@ class LevelOne
     template <class Collision>
     void AttackEnemy(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
     {
-        const int attackType = SpiritCatalog::Get(enemy.type).combatType;
+        const int attackType = StoryEncounter::AttackType(enemy.boss, enemy.type);
         enemy.stagger = (std::max)(0.f, enemy.stagger - dt);
         enemy.staggerGuard = (std::max)(0.f, enemy.staggerGuard - dt);
         if (enemy.stagger > 0)
@@ -1120,7 +1129,8 @@ class LevelOne
             }
             else
             {
-                for (int i = -1; i <= 1; ++i)
+                const int spread = StoryEncounter::RangedSpreadSteps(enemy.boss);
+                for (int i = -spread; i <= spread; ++i)
                 {
                     const double angle = i * combat.rangedSpread, c = std::cos(angle),
                                  s = std::sin(angle);
@@ -1132,6 +1142,7 @@ class LevelOne
                          combat.rangedDamage,
                          false,
                          true});
+                    projectiles.back().arrow = enemy.boss == StoryEncounter::OrderArcher;
                 }
             }
             enemy.phase = 3;
@@ -1144,6 +1155,12 @@ class LevelOne
             const double length = (std::max)(.001, distance);
             enemy.aim = {(player.x - enemy.position.x) / length,
                          (player.y - enemy.position.y) / length};
+            if (StoryEncounter::Get(enemy.boss).humanAttack >= 0)
+            {
+                SpriteAnimation attackFacing;
+                attackFacing.UpdateWorld(enemy.aim.x, enemy.aim.y, 0, false, 0);
+                enemy.animation.facing = attackFacing.facing;
+            }
             enemy.phase = 1;
             enemy.phaseTime = attackType == 0
                                   ? combat.meleeWindup

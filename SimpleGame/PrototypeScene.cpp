@@ -776,6 +776,18 @@ void Prototype::SynchronizeScene()
                  const Point p = Screen(pos.x, pos.y, 32);
                  const Point tail =
                      Screen(pos.x - visual.velocity.x * .03, pos.y - visual.velocity.y * .03, 32);
+                 if (visual.arrow)
+                 {
+                     const float length = (std::max)(.001f, std::hypot(p.x - tail.x, p.y - tail.y));
+                     const float dx = (p.x - tail.x) / length, dy = (p.y - tail.y) / length;
+                     const Point base = {p.x - dx * 5, p.y - dy * 5};
+                     r.Line(tail, base, 2, Color(.65f, .39f, .21f));
+                     r.Triangle(p,
+                                {base.x - dy * 2, base.y + dx * 2},
+                                {base.x + dy * 2, base.y - dx * 2},
+                                Color(1.f, .84f, .52f));
+                     return;
+                 }
                  const Color color = visual.hostile     ? Color(3.f, .35f, .15f)
                                      : visual.companion ? Color(1.8f, .5f, 2.f)
                                                         : Color(.4f, 1.5f, 3.f);

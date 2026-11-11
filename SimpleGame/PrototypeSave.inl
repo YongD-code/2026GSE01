@@ -121,9 +121,7 @@ void RefreshSavedStoryDialogue()
          (current->id == "P006" && speaker == "붙잡는 손")))
     {
         speaker = current->title;
-        const bool battle = current->trigger == "fight" || current->trigger == "first_capture" ||
-                            current->trigger == "survive" || current->trigger == "skill";
-        message = battle ? current->dialogue : current->objective;
+        message = current->Briefing();
         return;
     }
     if (chapter.step <= 0 || chapter.step > int(chapter.quests.size()))
