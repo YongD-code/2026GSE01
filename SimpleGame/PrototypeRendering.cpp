@@ -939,10 +939,13 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
     if (encounter.humanAttack >= 0)
     {
         const bool archer = enemy.boss == StoryEncounter::OrderArcher;
-        const CharacterModel::Parts parts =
-            archer ? CharacterModel::Parts{1, 6, 4, 1} : CharacterModel::Parts{0, 0, 3, 6};
-        const Color tint(.95f, .86f, .81f);
-        const auto motion = enemy.castPose > 0       ? CharacterModel::Motion::Attack
+        const bool sealer = enemy.boss == StoryEncounter::OrderSealer;
+        const CharacterModel::Parts parts = sealer   ? CharacterModel::Parts{0, 4, 5, 3}
+                                            : archer ? CharacterModel::Parts{1, 6, 4, 1}
+                                                     : CharacterModel::Parts{0, 0, 3, 6};
+        const Color tint = sealer ? Color(.95f, .83f, 1.f) : Color(.95f, .86f, .81f);
+        const auto attack = sealer ? CharacterModel::Motion::Cast : CharacterModel::Motion::Attack;
+        const auto motion = enemy.castPose > 0       ? attack
                             : enemy.animation.moving ? CharacterModel::Motion::Walk
                                                      : CharacterModel::Motion::Idle;
         const float phase = enemy.castPose > 0       ? enemy.castPose
@@ -950,7 +953,7 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
                                                      : time * .75f;
         if (!DrawKeyedModel(npcModel, p, size, enemy.animation, tint, motion, phase, state, &parts))
         {
-            populationWalkSheets[Population::Hunter].Draw(
+            populationWalkSheets[sealer ? Population::Artisan : Population::Hunter].Draw(
                 r, p, size, enemy.animation, tint, width, height);
         }
     }
@@ -1033,6 +1036,29 @@ void Prototype::DrawCombatWarnings()
             continue;
         }
         const int attackType = StoryEncounter::AttackType(enemy.boss, enemy.type);
+        if (enemy.phase == LevelOne::OrderSealWindupPhase && enemy.alerted && enemy.health > 0)
+        {
+            const WorldPoint at = enemy.ritualTarget;
+            const float progress = 1.f - enemy.phaseTime / LevelOne::OrderSealWindup;
+            const Color rim(1.f, .74f, .25f, .4f + .5f * progress);
+            for (int i = 0; i < 24; ++i)
+            {
+                const double a = i * 6.2831853 / 24, b = (i + 1) * 6.2831853 / 24;
+                const double radius = LevelOne::OrderSealRadius;
+                r.Line(Screen(at.x + std::cos(a) * radius, at.y + std::sin(a) * radius, 2),
+                       Screen(at.x + std::cos(b) * radius, at.y + std::sin(b) * radius, 2),
+                       2,
+                       rim);
+            }
+            const Point center = Screen(at.x, at.y, 2);
+            const float size = 8.f + 17.f * progress;
+            r.Quad({center.x - size, center.y},
+                   {center.x, center.y - size * .5f},
+                   {center.x + size, center.y},
+                   {center.x, center.y + size * .5f},
+                   Color(.9f, .55f, .18f, .24f + .42f * progress));
+            continue;
+        }
         if (attackType == 3 && enemy.alerted && !enemy.weakened && enemy.health > 0)
         {
             const bool preparing = enemy.phase == 1;

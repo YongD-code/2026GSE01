@@ -3,7 +3,7 @@ bool CanSaveProgress() const
 {
     if (titleScreen || openingPlaying || storyScene != StoryScene::None || cemeteryEngaged ||
         levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
-        levelOne.invulnerability > 0 || !skillEffects.empty())
+        levelOne.invulnerability > 0 || levelOne.orderSeal.remaining > 0 || !skillEffects.empty())
     {
         return false;
     }

@@ -219,6 +219,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         }
         levelOne.damageSpirit = controlling ? selectedCompanion : -1;
         const float previousCompanionCooldown = levelOne.companionCooldown;
+        const bool orderSealWasActive = levelOne.orderSeal.remaining > 0;
         if (!dialoguePending && !levelOne.Dead())
         {
             FrameProfiler::Scope timing(FrameProfiler::Stage::Population);
@@ -258,7 +259,8 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                 {
                     return DomainTimeScale(p, kind);
                 },
-                SimulationRadius());
+                SimulationRadius(),
+                captured ? selectedCompanion : -1);
             levelOne.sanctuary = {};
         }
         SyncPopulationHealth();
@@ -290,6 +292,20 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             Say("기록", levelOne.notice);
             messageTime = 3;
             levelOne.notice.clear();
+        }
+        if (!orderSealWasActive && levelOne.orderSeal.Blocks(selectedCompanion))
+        {
+            if (controlling)
+            {
+                if (!RecallCompanion(true, false))
+                {
+                    ReturnToBody();
+                    ResetCompanionRecallState();
+                }
+                previousSpirit = spirit;
+            }
+            Say("주령 봉쇄", "5초간 봉쇄됐습니다. 본체로 싸우거나 Tab에서 다른 주령을 선택하세요.");
+            messageTime = LevelOne::OrderSealDuration;
         }
     }
     double actualX = player.x - previousPlayer.x, actualY = player.y - previousPlayer.y;

@@ -17,6 +17,21 @@ class LevelOne
   public:
     static constexpr int SaintSealRecoveryPhase = 5;
     static constexpr float SaintSealRecovery = 2.6f;
+    static constexpr int OrderSealWindupPhase = 6;
+    static constexpr float OrderSealWindup = 1.05f;
+    static constexpr float OrderSealDuration = 5.f;
+    static constexpr double OrderSealRadius = 64.;
+
+    struct OrderSeal
+    {
+        int companion = -1;
+        float remaining = 0;
+
+        bool Blocks(int index) const
+        {
+            return remaining > 0 && companion == index;
+        }
+    } orderSeal;
 
     struct Enemy
     {
@@ -37,7 +52,7 @@ class LevelOne
         int remnantRarity = 1;
         int boss = 0;
         float slowed = 0;
-        // 0: approach, 1: windup, 2: active, 3: recovery, 4: transition, 5: saint seal recovery.
+        // 0: approach, 1: windup, 2: active, 3: recovery, 4: transition, 5/6: special rituals.
         int phase = 0;
         float phaseTime = 0, stagger = 0, staggerGuard = 0;
         WorldPoint aim = {0, 0};
@@ -51,6 +66,8 @@ class LevelOne
         bool saintSealBroken = false;
         WorldPoint saintSightTarget = {0, 0};
         int ritualCount = 0;
+        int orderSealTarget = -1;
+        float orderSealCooldown = 0;
         EaterBoss::State eater;
 
         bool SaintSealExposed() const
@@ -350,6 +367,10 @@ class LevelOne
             camps[enemy.camp].defeated |= 1u << enemy.slot;
             camps[enemy.camp].health[enemy.slot] = 0;
         }
+        if (enemy.boss == StoryEncounter::OrderSealer)
+        {
+            orderSeal = {};
+        }
         if (!purified)
             return;
         const bool human = StoryEncounter::Get(enemy.boss).humanAttack >= 0;
@@ -598,6 +619,10 @@ class LevelOne
         if (id == StoryEncounter::OrderSwordsman || id == StoryEncounter::OrderArcher)
         {
             enemy.maximum = id == StoryEncounter::OrderSwordsman ? 110.f : 85.f;
+        }
+        else if (id == StoryEncounter::OrderSealer)
+        {
+            enemy.maximum = 155.f;
         }
         enemy.health = enemy.maximum;
         enemies.push_back(enemy);
@@ -971,11 +996,54 @@ class LevelOne
 #include "EaterBossCombat.inl"
 
     template <class Collision>
-    void AttackEnemy(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
+    bool UpdateOrderSeal(Enemy& enemy, WorldPoint companion, int equipped, Collision blocked)
+    {
+        if (enemy.phase == OrderSealWindupPhase)
+        {
+            if (enemy.phaseTime > 0)
+            {
+                return true;
+            }
+            if (equipped >= 0 && equipped == enemy.orderSealTarget &&
+                Distance(companion, enemy.ritualTarget) < OrderSealRadius &&
+                ClearLine(enemy.position, companion, blocked))
+            {
+                orderSeal = {equipped, OrderSealDuration};
+            }
+            enemy.phase = 3;
+            enemy.phaseTime = 1.1f;
+            return true;
+        }
+        if (enemy.phase != 0 || equipped < 0 || orderSeal.remaining > 0 ||
+            enemy.orderSealCooldown > 0 || Distance(enemy.position, companion) >= 300 ||
+            !ClearLine(enemy.position, companion, blocked))
+        {
+            return false;
+        }
+        enemy.orderSealTarget = equipped;
+        enemy.ritualTarget = companion;
+        enemy.phase = OrderSealWindupPhase;
+        enemy.phaseTime = OrderSealWindup;
+        enemy.orderSealCooldown = 8.f;
+        return true;
+    }
+
+    template <class Collision>
+    void AttackEnemy(Enemy& enemy,
+                     WorldPoint player,
+                     float dt,
+                     Collision blocked,
+                     WorldPoint companion,
+                     int equipped)
     {
         const int attackType = StoryEncounter::AttackType(enemy.boss, enemy.type);
         enemy.stagger = (std::max)(0.f, enemy.stagger - dt);
         enemy.staggerGuard = (std::max)(0.f, enemy.staggerGuard - dt);
+        const bool orderSealer = enemy.boss == StoryEncounter::OrderSealer;
+        if (orderSealer)
+        {
+            enemy.orderSealCooldown = (std::max)(0.f, enemy.orderSealCooldown - dt);
+        }
         if (enemy.stagger > 0)
             return;
         if (enemy.boss == EaterBoss::Encounter)
@@ -984,6 +1052,10 @@ class LevelOne
             return;
         }
         enemy.phaseTime -= dt;
+        if (orderSealer && UpdateOrderSeal(enemy, companion, equipped, blocked))
+        {
+            return;
+        }
         const double distance = Distance(enemy.position, player);
         if (attackType == 3)
         {
@@ -1265,10 +1337,12 @@ class LevelOne
                 std::uint64_t worldSeed,
                 Collision blocked,
                 TimeScale timeScale,
-                double fullRateRadius = 1400)
+                double fullRateRadius = 1400,
+                int equipped = -1)
     {
         if (Dead())
             return;
+        orderSeal.remaining = (std::max)(0.f, orderSeal.remaining - dt);
         invulnerability = (std::max)(0.f, invulnerability - dt);
         hurtTime = (std::max)(0.f, hurtTime - dt);
         castTime = (std::max)(0.f, castTime - dt);
@@ -1411,7 +1485,7 @@ class LevelOne
 
             const size_t previousProjectiles = projectiles.size();
             if (enemy.alerted)
-                AttackEnemy(enemy, enemyTarget, enemyDt, blocked);
+                AttackEnemy(enemy, enemyTarget, enemyDt, blocked, companion, equipped);
             if (damageResident >= 0)
                 for (size_t i = previousProjectiles; i < projectiles.size(); ++i)
                     projectiles[i].residentBattle = true;
@@ -1426,10 +1500,11 @@ class LevelOne
                                         : enemy.type == 0  ? 7.f
                                         : enemy.type == 1  ? 11.f
                                                            : 9.f);
-            if (enemy.phase == 1 || enemy.phase == 2)
+            if (enemy.phase == 1 || enemy.phase == 2 || enemy.phase == OrderSealWindupPhase)
             {
                 const WorldPoint direction =
-                    SpiritCatalog::Get(enemy.type).combatType == 3
+                    (enemy.phase == OrderSealWindupPhase ||
+                     SpiritCatalog::Get(enemy.type).combatType == 3)
                         ? WorldPoint{enemy.ritualTarget.x - enemy.position.x,
                                      enemy.ritualTarget.y - enemy.position.y}
                         : enemy.aim;
@@ -1458,7 +1533,8 @@ class LevelOne
         for (const Enemy& enemy : enemies)
             if (enemy.boss == 3 && enemy.alerted && enemy.health > 0)
                 summonBlocked = true;
-        if (!summonBlocked && captured && companionCooldown <= 0 && Shoot(companion, true, blocked))
+        if (!summonBlocked && captured && !orderSeal.Blocks(equipped) && companionCooldown <= 0 &&
+            Shoot(companion, true, blocked))
             companionCooldown = (std::max)(.45f, 1.5f - spiritRank * .08f);
         for (Projectile& shot : projectiles)
         {

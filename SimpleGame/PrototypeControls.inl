@@ -367,6 +367,54 @@ bool ControlsActive() const
 
 static constexpr double CompanionRecallDistance = 500.;
 
+void ReturnToBody()
+{
+    controlling = false;
+    levelOne.damageSpirit = -1;
+    movementWasControlling = false;
+    ClearInput();
+    moving = false;
+    camera = player;
+}
+
+void ResetCompanionRecallState()
+{
+    spiritHasteTime = spiritCastPose = 0;
+    // Grounded stag fields remain at their cast position after the spirit returns.
+    skillEffects.erase(
+        std::remove_if(skillEffects.begin(),
+                       skillEffects.end(),
+                       [this](const SkillEffect& effect)
+                       {
+                           if ((IsStagW(effect) && effect.age >= .6f) ||
+                               (IsStagR(effect) && effect.age >= StagSkill::SanctuaryOpening))
+                           {
+                               return false;
+                           }
+                           return effect.set > 0 && effect.caster == selectedCompanion;
+                       }),
+        skillEffects.end());
+    companionAnimation = SpriteAnimation();
+    companionAnimation.facing = protagonistAnimation.facing;
+    if (auto* actor = dynamic_cast<ModelActor*>(scene.Find("characters/companion")))
+    {
+        actor->modelState = CharacterModel::State();
+    }
+}
+
+bool SelectCompanion(int index)
+{
+    if (controlling || index < 0 || index >= int(levelOne.collection.size()) ||
+        levelOne.orderSeal.Blocks(index))
+    {
+        return false;
+    }
+    selectedCompanion = index;
+    capturedSpirit = levelOne.collection[index].species;
+    captured = true;
+    return true;
+}
+
 bool RecallCompanion(bool force = false, bool notify = true)
 {
     if (!captured || selectedCompanion < 0 ||
@@ -406,36 +454,10 @@ bool RecallCompanion(bool force = false, bool notify = true)
     }
     if (controlling)
     {
-        controlling = false;
-        levelOne.damageSpirit = -1;
-        movementWasControlling = false;
-        ClearInput();
-        moving = false;
-        camera = player;
+        ReturnToBody();
     }
     spirit = destination;
-    spiritHasteTime = spiritCastPose = 0;
-    // Grounded stag fields remain at their cast position after the spirit returns.
-    skillEffects.erase(std::remove_if(skillEffects.begin(),
-                                      skillEffects.end(),
-                                      [this](const SkillEffect& effect)
-                                      {
-                                          if ((IsStagW(effect) && effect.age >= .6f) ||
-                                              (IsStagR(effect) &&
-                                               effect.age >= StagSkill::SanctuaryOpening))
-                                          {
-                                              return false;
-                                          }
-                                          return effect.set > 0 &&
-                                                 effect.caster == selectedCompanion;
-                                      }),
-                       skillEffects.end());
-    companionAnimation = SpriteAnimation();
-    companionAnimation.facing = protagonistAnimation.facing;
-    if (auto* actor = dynamic_cast<ModelActor*>(scene.Find("characters/companion")))
-    {
-        actor->modelState = CharacterModel::State();
-    }
+    ResetCompanionRecallState();
     if (notify && ControlsActive())
     {
         Say("주령 복귀", "주령이 너무 멀어져 주인공 곁으로 돌아왔습니다.");
@@ -466,6 +488,11 @@ void ToggleCompanionControl()
     }
     if (PreparingSkill())
     {
+        return;
+    }
+    if (levelOne.orderSeal.Blocks(selectedCompanion))
+    {
+        Say("주령 봉쇄", "봉쇄가 풀릴 때까지 본체로 싸우거나 다른 주령을 선택하세요.");
         return;
     }
     if (levelOne.collection[selectedCompanion].health < 25.f)

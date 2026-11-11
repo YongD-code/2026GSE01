@@ -658,6 +658,8 @@ class SaveGame
         const bool beforeOrderFight = c.step < orderFight;
         const auto defeatedGuards = l.resolvedBosses.count(StoryEncounter::OrderSwordsman) +
                                     l.resolvedBosses.count(StoryEncounter::OrderArcher);
+        const int sealerFight = authored.Index("C202");
+        const bool defeatedSealer = l.resolvedBosses.count(StoryEncounter::OrderSealer) != 0;
         if (authored.quests.empty() || s.story != StoryHash(authored) || !Point(s.player) ||
             !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
             !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
@@ -676,6 +678,7 @@ class SaveGame
             (c.saintSealUnderstood && c.step <= authored.Index("C106_RECORD")) ||
             (beforeOrderFight && defeatedGuards != 0) ||
             (c.step > orderFight && defeatedGuards != 2) ||
+            (c.step < sealerFight && defeatedSealer) || (c.step > sealerFight && !defeatedSealer) ||
             (c.choicePending && c.step != authored.Index("P001_WITNESS")))
         {
             return false;
@@ -741,6 +744,7 @@ class SaveGame
             if (e.boss)
             {
                 if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
+                    (e.boss == StoryEncounter::OrderSealer && c.step < sealerFight) ||
                     (StoryEncounter::Get(e.boss).humanAttack >= 0 &&
                      (beforeOrderFight || e.weakened)) ||
                     (e.saintSealBroken && !c.saintSealUnderstood) || !bosses.insert(e.boss).second)
@@ -774,6 +778,22 @@ class SaveGame
         const auto currentStory = StoryHash(chapter);
         if (candidate.story == currentStory)
         {
+            return true;
+        }
+
+        const int warehouseStart = chapter.Index("C202_MARK");
+        if (warehouseStart < int(chapter.quests.size()) &&
+            candidate.story == StoryHash(chapter, warehouseStart))
+        {
+            if (candidate.chapter.step > warehouseStart)
+            {
+                return false;
+            }
+            candidate.story = currentStory;
+            if (candidate.chapter.step == warehouseStart)
+            {
+                candidate.chapter.rewardPending = true;
+            }
             return true;
         }
 

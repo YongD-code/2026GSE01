@@ -40,6 +40,10 @@ const char* CompletedStoryTitle() const
     {
         return "퀘스트 데이터 없음";
     }
+    if (chapter.step > chapter.Index("C202_SEAL"))
+    {
+        return "성흔회 봉인사 제압 완료";
+    }
     return chapter.step > chapter.Index("C201_LEDGER") ? "2장 초반 완료" : "1장 완료";
 }
 
@@ -152,7 +156,16 @@ std::vector<std::string> JournalEntries()
         const auto* quest = chapter.Current();
         add(std::string("현재 목표 · ") + (quest ? quest->title.c_str() : CompletedStoryTitle()));
         add(ObjectiveHint());
-        if (chapter.step > chapter.Index("C201_LEDGER"))
+        if (chapter.step > chapter.Index("C202_SEAL"))
+        {
+            add("보관 중인 사건 물증 · 부서진 성흔 봉인");
+            add("다음 목적지 · 숲 사당 / 종을 듣는 자");
+        }
+        else if (chapter.step > chapter.Index("C202_MARK"))
+        {
+            add("수도원 단서 · 폐수문 중계 창고에서 실종자 이송 표식 확인");
+        }
+        else if (chapter.step > chapter.Index("C201_LEDGER"))
         {
             add("다음 목적지 · 폐수문 중계 창고");
         }
@@ -309,9 +322,19 @@ void DrawJournalSlot(int index, int local)
         }
         info =
             "등급 " + std::to_string(entry.rarity) + " / 체력 " + std::to_string(int(entry.health));
-        action = selected ? "동행 중" : "클릭하여 동행";
-        if (entry.memory)
-            action += " · 기억";
+        if (levelOne.orderSeal.Blocks(index))
+        {
+            action =
+                "봉쇄 · " + std::to_string(int(std::ceil(levelOne.orderSeal.remaining))) + "초";
+        }
+        else
+        {
+            action = selected ? "동행 중" : "클릭하여 동행";
+            if (entry.memory)
+            {
+                action += " · 기억";
+            }
+        }
     }
     else
     {
@@ -387,11 +410,9 @@ void JournalClick(int x, int y)
                 levelOne.UsePotion();
             else if (menuTab == 1 && index >= 4 && index <= 6)
                 levelOne.selectedTicket = index - 4;
-            else if (menuTab == 2 && !controlling)
+            else if (menuTab == 2)
             {
-                selectedCompanion = index;
-                capturedSpirit = levelOne.collection[index].species;
-                captured = true;
+                SelectCompanion(index);
             }
             return;
         }
@@ -768,11 +789,15 @@ void HUD()
         const float shownHealth =
             controlling ? levelOne.collection[selectedCompanion].health : levelOne.health;
         const float shownMaximum = controlling ? 100.f : levelOne.MaximumHealth();
+        const bool companionSealed = levelOne.orderSeal.Blocks(selectedCompanion);
+        const std::string status =
+            companionSealed
+                ? "동행 주령 봉쇄 · " +
+                      std::to_string(int(std::ceil(levelOne.orderSeal.remaining))) + "초"
+            : controlling ? "주령 조종 · 본체 무적"
+                          : "성장 " + std::to_string(levelOne.level);
         Panel(20, 20, hpw, 112);
-        r.Text(34,
-               43,
-               controlling ? "주령 조종 · 본체 무적" : "성장 " + std::to_string(levelOne.level),
-               gold);
+        r.Text(34, 43, status, gold);
         r.Text(34,
                67,
                (controlling ? "주령 체력 " : "체력 ") + std::to_string(int(shownHealth)) + " / " +

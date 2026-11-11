@@ -101,7 +101,14 @@ inline const std::vector<Site>& Sites()
         {"raen_chapel", "라엔", Kind::Adult, {3320, 0}, "C109_RELIC", "C200"},
         {"order_barricade", "성흔회 봉쇄선", Kind::Evidence, {3005, 86}, "C200", "C201_RAEN"},
         {"raen_exit", "라엔", Kind::Adult, {2640, 108}, "C201_RAEN", ""},
-        {"exit_ledger", "운송 장부 사본", Kind::Evidence, {2510, 148}, "C201_LEDGER", ""}};
+        {"exit_ledger", "운송 장부 사본", Kind::Evidence, {2510, 148}, "C201_LEDGER", ""},
+        {"warehouse_manifest",
+         "운송 표식이 찍힌 화물",
+         Kind::Evidence,
+         {2250, -82},
+         "C202_MARK",
+         ""},
+        {"order_seal_fragment", "부서진 성흔 봉인", Kind::Evidence, {2060, 100}, "C202_SEAL", ""}};
     return sites;
 }
 

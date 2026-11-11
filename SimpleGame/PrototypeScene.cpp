@@ -637,6 +637,10 @@ void Prototype::SynchronizeScene()
                           : enemy.phase == 2 ? 1.f
                           : enemy.phase == 3 ? .25f
                                              : 0.f;
+        if (enemy.phase == LevelOne::OrderSealWindupPhase)
+        {
+            visual.castPose = .15f + .7f * (1.f - enemy.phaseTime / LevelOne::OrderSealWindup);
+        }
         if (enemy.boss == EaterBoss::Encounter)
         {
             const auto& attack = enemy.eater;
@@ -718,6 +722,10 @@ void Prototype::SynchronizeScene()
                      enemy.phase == LevelOne::SaintSealRecoveryPhase)
             {
                 name += " · 반격 기회";
+            }
+            else if (enemy.phase == LevelOne::OrderSealWindupPhase)
+            {
+                name += " · 주령 봉쇄 준비";
             }
             const float elevation = enemy.weakened ? 78.f : encounter.size + 27;
             bind(id + "/label",

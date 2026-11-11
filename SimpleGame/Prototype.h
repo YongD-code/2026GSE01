@@ -1147,11 +1147,14 @@ class Prototype
             }
             if (key == '[' || key == ']')
                 ChangeJournalPage(key == ']' ? 1 : -1);
-            if (menuTab == 2 && key == 'n' && !levelOne.collection.empty())
+            if (menuTab == 2 && key == 'n' && !controlling && !levelOne.collection.empty())
             {
-                selectedCompanion =
-                    (selectedCompanion + 1) % static_cast<int>(levelOne.collection.size());
-                capturedSpirit = levelOne.collection[selectedCompanion].species;
+                const int count = static_cast<int>(levelOne.collection.size());
+                const int next = (selectedCompanion + 1) % count;
+                if (!SelectCompanion(next) && count > 1)
+                {
+                    SelectCompanion((next + 1) % count);
+                }
             }
             return;
         }

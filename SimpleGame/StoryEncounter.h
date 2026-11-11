@@ -9,7 +9,8 @@ constexpr int SpriteCount = 4;
 constexpr int SaintBoss = 4;
 constexpr int OrderSwordsman = 13;
 constexpr int OrderArcher = 14;
-constexpr int MaxId = OrderArcher;
+constexpr int OrderSealer = 15;
+constexpr int MaxId = OrderSealer;
 
 struct Definition
 {
@@ -38,7 +39,8 @@ inline const Definition& Get(int id)
          {"결박된 순례자", SpiritCatalog::Pilgrim, -1, 94, true},
          {"돌아가지 못한 사람", SpiritCatalog::Forgotten, -1, 88, false},
          {"성흔회 검병", SpiritCatalog::Forgotten, -1, 78, false, 10, 0},
-         {"성흔회 궁수", SpiritCatalog::Forgotten, -1, 74, false, 10, 2}}};
+         {"성흔회 궁수", SpiritCatalog::Forgotten, -1, 74, false, 10, 2},
+         {"성흔회 봉인사", SpiritCatalog::Forgotten, -1, 78, false, 10, 2}}};
     return definitions[id >= 0 && id < int(definitions.size()) ? id : 0];
 }
 
@@ -50,7 +52,7 @@ inline int AttackType(int id, int species)
 
 inline int RangedSpreadSteps(int id)
 {
-    return id == OrderArcher ? 0 : 1;
+    return id == OrderArcher || id == OrderSealer ? 0 : 1;
 }
 
 inline const wchar_t* SpritePath(int index)

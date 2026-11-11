@@ -143,10 +143,13 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
     const Point origin = Screen(at.x, at.y);
     const char* cachePrefix =
         site.id == "cell" || site.id == "ledger" ? "story-detail-v7:" : "story-detail-v6:";
-    const std::string key =
-        cachePrefix + site.id + (StoryCharacterModel(site.id) ? ":workstation" : "") +
-        (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL") ? ":collected"
-                                                                        : ":present");
+    const bool fragmentCollected =
+        site.id == "order_seal_fragment" && chapter.step > chapter.Index("C202_SEAL");
+    const bool collected =
+        fragmentCollected || (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL"));
+    const std::string key = cachePrefix + site.id +
+                            (StoryCharacterModel(site.id) ? ":workstation" : "") +
+                            (collected ? ":collected" : ":present");
     if (r.BeginCachedMesh(key, origin))
     {
         const Color wood(.27f, .18f, .11f), edge(.12f, .10f, .085f), timber(.46f, .32f, .19f);
@@ -289,6 +292,27 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             r.Quad(
                 p(-22, -31, 1), p(13, -31, 1), p(4, -5, 1), p(-27, -5, 1), Color(.19f, .31f, .31f));
         }
+        else if (site.id == "warehouse_manifest")
+        {
+            box(-28, -23, 38, 27, 26, wood);
+            box(12, -14, 26, 20, 16, timber);
+            line(-22, 4, 1, -22, 4, 27, 3, edge);
+            line(4, 4, 1, 4, 4, 27, 3, edge);
+            sheet(-21, -18, 27, 23, 16);
+            line(-8, -10, 28, 0, -3, 28, 2, red);
+            line(-8, -3, 28, 0, -10, 28, 2, red);
+        }
+        else if (site.id == "order_seal_fragment")
+        {
+            box(-24, -18, 48, 34, 8, stone);
+            box(-17, -11, 34, 22, 13, ink);
+            sheet(3, -7, 14, 13, 12);
+            if (!fragmentCollected)
+            {
+                r.Triangle(p(-13, 2, 14), p(-4, -7, 21), p(0, 2, 14), Color(.74f, .46f, .23f));
+                r.Triangle(p(-4, -7, 21), p(2, -6, 14), p(0, 2, 14), Color(.42f, .21f, .14f));
+            }
+        }
         else if (site.id == "seal" || site.id == "relic")
         {
             if (site.id == "relic")
@@ -312,7 +336,6 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
                 if (CemeteryCleared())
                 {
                     // Small fragments rest at the wall foot, without a raised platform.
-                    const bool collected = chapter.step > chapter.Index("P007_SEAL");
                     if (!collected)
                     {
                         for (int i = 0; i < 2; ++i)
