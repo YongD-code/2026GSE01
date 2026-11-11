@@ -35,7 +35,7 @@ PauseBounds MenuBounds() const
 const PauseColumn* PauseColumns() const
 {
     static const PauseEntry character[] = {
-        {"능력치", 4}, {"기본 화면", 13}, {"주인공 외형 전환 · M", 16}};
+        {"능력치", 4}, {"기본 화면", 13}, {"주인공 외형 전환", 16}};
     static const PauseEntry inventory[] = {{"인벤토리", 1}, {"주령석 강화", 9}};
     static const PauseEntry combat[] = {
         {"기본 공격 안내", 10}, {"주령 조종·스킬 전환", 12}, {"주령 외형 전환", 18}};

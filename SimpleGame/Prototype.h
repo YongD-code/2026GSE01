@@ -34,6 +34,7 @@ class Prototype
     Chapter chapter;
     int menuTab = 0, collectionPage = 0, selectedCompanion = 0;
     bool hudVisible = true;
+    bool minimapVisible = false;
     bool dodgeHeld = false, screenShake = true;
     bool dialoguePending = false;
     bool windowFocused = true;
@@ -962,7 +963,8 @@ class Prototype
         {
             return;
         }
-        if (MinimapBounds().Contains(x, y) || SkillBarBounds().Contains(x, y) ||
+        if ((minimapVisible && MinimapBounds().Contains(x, y)) ||
+            SkillBarBounds().Contains(x, y) ||
             (hudVisible && QuestTrackerBounds().Contains(x, y)))
         {
             return;
@@ -1197,7 +1199,10 @@ class Prototype
         if (key == 'k')
             screenShake = !screenShake;
         if (key == 'm')
-            ToggleProtagonistModel();
+        {
+            minimapVisible = !minimapVisible;
+            return;
+        }
         if (key == 'n')
             ToggleGathererStudy();
         const std::string skillKeys = "qwer";

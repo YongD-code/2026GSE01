@@ -89,7 +89,7 @@ std::vector<std::string> JournalEntries()
         add("기본 공격 · 좌클릭 / 커서 방향 연사");
         add(std::string("주인공 외형 · ") +
             (useProtagonistModel && protagonistModel.Ready() ? "입체 모델" : "기존 외형") +
-            " / M 전환");
+            " / ESC 캐릭터 메뉴에서 전환");
         add(std::string("채집꾼 외형 · ") +
             (useGathererStudy && gathererSheet.Ready() ? "1차 보행 후보" : "기존 외형") +
             " / 게임 중 N 전환");
@@ -145,7 +145,7 @@ std::vector<std::string> JournalEntries()
             add("보관 중인 사건 물증 · 검은 파편 / 특수 봉인 파편");
             add("같은 문양이 새겨진 두 파편. 판매·소모되지 않으며 이야기 진행과 함께 저장됩니다.");
         }
-        add("초록색 목표 표시는 미니맵을 확인하세요. 범위 밖 목표는 화살표로 표시됩니다.");
+        add("M으로 미니맵을 열어 초록색 목표를 확인하세요. 범위 밖 목표는 화살표로 표시됩니다.");
         add("완료한 이벤트 · " + std::to_string(chapter.step) + " / " +
             std::to_string(chapter.quests.size()));
         for (int i = 0; i < chapter.step && i < static_cast<int>(chapter.quests.size()); ++i)
@@ -163,7 +163,7 @@ std::vector<std::string> JournalEntries()
         add("주령 · B 조종과 QWER 전환 / 봉인사 강화 / 도감 N 동행 변경");
         add("기록 · Tab 기록창 / J 주령 / 1~5 탭 / [ ] 페이지");
         add("화면 · U HUD / K 피격 흔들림 / P 후처리 / O 블룸");
-        add("주인공 외형 · M 입체 모델과 기존 외형 비교 / ESC 캐릭터 메뉴에서도 전환");
+        add("화면 · M 미니맵 열기와 닫기 / ESC 캐릭터 메뉴에서 주인공 외형 전환");
         add("채집꾼 외형 · 게임 중 N 기존 외형과 1차 보행 후보 비교 / 도감의 N은 동행 변경");
         add("저장 · F5 저장 / F9 불러오기 / 안전할 때 자동 저장");
         add("저장 슬롯 · 최대 3개 / 현재 슬롯 " + std::to_string(activeSlot));
@@ -431,10 +431,12 @@ void DrawMinimap()
     const float cy = box.y + box.h * .55f;
     const float radius = box.w * .5f - 12;
     const float scale = radius / 460.f;
+    const WorldPoint focus = controlling ? spirit : player;
     auto project = [&](WorldPoint at)
     {
-        return Point{cx + float((at.x - player.x - at.y + player.y) * .85) * scale,
-                     cy + float((at.x - player.x + at.y - player.y) * .43) * scale};
+        const double dx = at.x - focus.x, dy = at.y - focus.y;
+        return Point{cx + float((dx - dy) * .85) * scale,
+                     cy + float((dx + dy) * .43) * scale};
     };
     auto inside = [&](Point p)
     {
@@ -442,8 +444,8 @@ void DrawMinimap()
                p.y < box.y + box.h - 20;
     };
     // The same road predicate used by world terrain; no distance text.
-    const auto tx = static_cast<World::Coordinate>(std::floor(player.x / 64));
-    const auto ty = static_cast<World::Coordinate>(std::floor(player.y / 64));
+    const auto tx = static_cast<World::Coordinate>(std::floor(focus.x / 64));
+    const auto ty = static_cast<World::Coordinate>(std::floor(focus.y / 64));
     for (int y = -12; y <= 12; ++y)
     {
         for (int x = -12; x <= 12; ++x)
@@ -532,17 +534,25 @@ void DrawMinimap()
                        green);
         }
     }
+    if (captured)
+    {
+        const auto other = project(controlling ? player : spirit);
+        if (inside(other))
+        {
+            r.Ellipse(other.x, other.y, 3, 3, Color(.45f, .8f, 1.f));
+        }
+    }
     r.Triangle({cx, cy - 5}, {cx - 4, cy + 4}, {cx + 4, cy + 4}, Color(1, 1, 1));
     r.Text(box.x + 10,
            box.y + 20,
-           CemeteryRoom::Contains(player) ? "공동묘지 · 봉인 묘역" : world.Region(player),
+           CemeteryRoom::Contains(focus) ? "공동묘지 · 봉인 묘역" : world.Region(focus),
            Color(.85f, .83f, .72f));
     r.Text(box.x + 8, box.y + box.h - 5, "초록: 목표", Color(.2f, 1.f, .36f));
 }
 
 UIRect QuestTrackerBounds() const
 {
-    const float available = MinimapBounds().x - 32;
+    const float available = (minimapVisible ? MinimapBounds().x : float(width)) - 32;
     return {20, 144, (std::min)(height < 550 ? 200.f : 340.f, available), 126};
 }
 
@@ -613,8 +623,9 @@ UIRect MessageBounds() const
     const bool beside = hudVisible && height < 550;
     const float left = beside ? QuestTrackerBounds().x + QuestTrackerBounds().w + 12 : 20;
     const float w = (std::min)(760.f, width - left - 20);
-    const float y = beside ? (std::max)(height - 262.f, MinimapBounds().y + MinimapBounds().h + 12)
-                           : height - 262.f;
+    const float y = beside && minimapVisible
+                        ? (std::max)(height - 262.f, MinimapBounds().y + MinimapBounds().h + 12)
+                        : height - 262.f;
     return {beside ? left : (width - w) / 2, y, w, 130};
 }
 
@@ -753,7 +764,10 @@ void HUD()
     {
         DrawQuestTracker();
     }
-    DrawMinimap();
+    if (minimapVisible)
+    {
+        DrawMinimap();
+    }
     DrawSkillBar();
     const float dockW = (std::min)(850.f, sw - 40), dockX = (sw - dockW) / 2;
     if (saveStatusTime > 0)
@@ -765,7 +779,7 @@ void HUD()
         WrappedText(statusX + 14, sh - 97, statusW - 28, "저장 · " + saveStatus, muted, 1);
     }
     if (hudVisible)
-        r.Text(20, sh - 12, "ESC 메뉴 · Ctrl 회피 · 아이템 자동 흡수 · Tab 기록", muted);
+        r.Text(20, sh - 12, "ESC 메뉴 · Ctrl 회피 · M 미니맵 · Tab 기록", muted);
 
     std::string heading, body;
     const auto* nearbyStory = NearbyStory();

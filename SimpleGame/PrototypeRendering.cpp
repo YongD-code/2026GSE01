@@ -615,11 +615,8 @@ void Prototype::DrawWorldLabel(WorldPoint position,
         bool blocked = false;
         for (const auto& other : occupiedLabels)
             blocked = blocked || overlaps(box, other);
-        if (hudVisible)
-        {
-            blocked =
-                blocked || overlaps(box, {20, 20, 330, 200}) || overlaps(box, MinimapBounds());
-        }
+        blocked = blocked || (hudVisible && overlaps(box, {20, 20, 330, 200})) ||
+                  (minimapVisible && overlaps(box, MinimapBounds()));
         for (const auto& site : StoryLayout::Sites())
         {
             if (!StoryPersonVisible(site, site.position))
