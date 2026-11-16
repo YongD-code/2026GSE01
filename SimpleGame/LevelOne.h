@@ -21,6 +21,8 @@ class LevelOne
     static constexpr float OrderSealWindup = 1.05f;
     static constexpr float OrderSealDuration = 5.f;
     static constexpr double OrderSealRadius = 64.;
+    static constexpr float PlayerInterventionSeconds = 5.f;
+    static constexpr float TargetSwitchNoticeSeconds = 1.6f;
 
     struct OrderSeal
     {
@@ -60,6 +62,8 @@ class LevelOne
         int npcTarget = -1;
         int residentTargetIndex = -1;
         float targetDecisionTime = 0;
+        float playerInterventionTime = 0;
+        float targetSwitchNoticeTime = 0;
         float simulationTime = 0;
         float saintSightTime = 0;
         bool saintSightClear = false;
@@ -471,12 +475,20 @@ class LevelOne
         }
     }
 
+    enum class DamageSource
+    {
+        Player,
+        AutomaticCompanion,
+        Resident,
+        LegacyRemnant
+    };
+
     void DamageEnemy(Enemy& enemy,
                      float damage,
                      WorldPoint source = {0, 0},
                      bool heavy = false,
                      bool feedback = true,
-                     bool residentOwned = false)
+                     DamageSource owner = DamageSource::Player)
     {
         if (enemy.weakened || enemy.health <= 0)
         {
@@ -510,6 +522,11 @@ class LevelOne
         {
             enemy.health = (std::max)(1.f, enemy.health);
         }
+        if (damage > 0 && enemy.health > 0 && owner == DamageSource::Player && enemy.boss == 0 &&
+            !enemy.returning && (enemy.npcTarget >= 0 || enemy.playerInterventionTime > 0))
+        {
+            enemy.playerInterventionTime = PlayerInterventionSeconds;
+        }
         enemy.alerted = true;
         if (feedback)
             enemy.flash = .15f;
@@ -518,6 +535,7 @@ class LevelOne
             enemy.stagger = .16f;
             enemy.staggerGuard = 1.2f;
         }
+        const bool residentOwned = owner == DamageSource::Resident;
         const bool canCapture =
             !residentOwned && captureUnlocked && StoryEncounter::Get(enemy.boss).capturable;
         if (enemy.health <= 0)
@@ -1251,9 +1269,19 @@ class LevelOne
         }
     }
 
+    static bool OutsidePursuit(const Enemy& enemy, WorldPoint target)
+    {
+        return Distance(target, enemy.home) > 650 || Distance(enemy.position, enemy.home) > 600 ||
+               Distance(target, {0, 0}) <= 210 || enemy.trail.size() >= 2048;
+    }
+
     template <class Collision>
     int ResidentTarget(Enemy& enemy, WorldPoint player, float dt, Collision blocked)
     {
+        if (enemy.boss != 0 || enemy.returning)
+        {
+            return -1;
+        }
         int previous = enemy.residentTargetIndex;
         if (enemy.npcTarget >= 0 && (previous < 0 || previous >= int(residentCombatants.size()) ||
                                      residentCombatants[previous].id != enemy.npcTarget))
@@ -1273,8 +1301,15 @@ class LevelOne
                            residentCombatants[previous].id == enemy.npcTarget &&
                            residentCombatants[previous].health > 0 &&
                            Distance(residentCombatants[previous].position, enemy.position) < 600;
-        // A committed attack keeps its victim. Cancel it if that resident has fallen.
-        if (enemy.boss == 0 && (enemy.phase == 1 || enemy.phase == 2))
+        const bool committed = enemy.phase == 1 || enemy.phase == 2;
+        const bool intervening = enemy.playerInterventionTime > 0;
+        // Keep the full intervention window until a committed resident attack ends or is
+        // interrupted.
+        if (intervening && !(committed && enemy.npcTarget >= 0))
+        {
+            enemy.playerInterventionTime = (std::max)(0.f, enemy.playerInterventionTime - dt);
+        }
+        if (committed)
         {
             if (valid)
                 return previous;
@@ -1286,7 +1321,17 @@ class LevelOne
             enemy.npcTarget = enemy.residentTargetIndex = -1;
             return -1;
         }
-        if (enemy.boss != 0 || Distance(player, enemy.position) <= 380)
+        if (intervening && !OutsidePursuit(enemy, player))
+        {
+            if (valid && enemy.alerted)
+            {
+                enemy.targetSwitchNoticeTime = TargetSwitchNoticeSeconds;
+            }
+            enemy.npcTarget = enemy.residentTargetIndex = -1;
+            enemy.targetDecisionTime = 0;
+            return -1;
+        }
+        if (!valid && Distance(player, enemy.position) <= 380)
         {
             enemy.npcTarget = enemy.residentTargetIndex = -1;
             enemy.targetDecisionTime = 0;
@@ -1367,7 +1412,12 @@ class LevelOne
                 {
                     // Upgrade legacy weakened actors once, awarding their pending kill.
                     enemy.weakened = false;
-                    DamageEnemy(enemy, enemy.maximum + 1, enemy.position, false, false);
+                    DamageEnemy(enemy,
+                                enemy.maximum + 1,
+                                enemy.position,
+                                false,
+                                false,
+                                DamageSource::LegacyRemnant);
                 }
                 if (enemy.remnantTime > 0)
                 {
@@ -1385,6 +1435,7 @@ class LevelOne
             }
             enemy.slowed = (std::max)(0.f, enemy.slowed - dt);
             enemy.flash = (std::max)(0.f, enemy.flash - dt);
+            enemy.targetSwitchNoticeTime = (std::max)(0.f, enemy.targetSwitchNoticeTime - dt);
             const float scaledDt = dt * timeScale(enemy.position, IsCombatBoss(enemy) ? 1 : 0);
             if (scaledDt <= 0)
             {
@@ -1443,13 +1494,14 @@ class LevelOne
                 ClearLine(enemy.position, enemyTarget, blocked))
                 enemy.alerted = true;
             if (enemy.alerted && (arenaBoss == 0 || enemy.boss != arenaBoss) &&
-                (Distance(enemyTarget, enemy.home) > 650 ||
-                 Distance(enemy.position, enemy.home) > 600 ||
-                 Distance(enemyTarget, {0, 0}) <= 210 || enemy.trail.size() >= 2048))
+                OutsidePursuit(enemy, enemyTarget))
             {
                 enemy.alerted = false;
                 enemy.returning = true;
                 enemy.phase = 0;
+                enemy.npcTarget = enemy.residentTargetIndex = -1;
+                enemy.targetDecisionTime = enemy.playerInterventionTime =
+                    enemy.targetSwitchNoticeTime = 0;
             }
             if (enemy.returning)
             {
@@ -1590,7 +1642,10 @@ class LevelOne
                     DamageEnemy(
                         enemy,
                         shot.damage,
-                        {shot.position.x - shot.velocity.x, shot.position.y - shot.velocity.y});
+                        {shot.position.x - shot.velocity.x, shot.position.y - shot.velocity.y},
+                        false,
+                        true,
+                        shot.companion ? DamageSource::AutomaticCompanion : DamageSource::Player);
                     shot.remaining = 0;
                     break;
                 }

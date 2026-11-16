@@ -381,7 +381,8 @@ class Population
                         if (p.attackWait <= 0)
                         {
                             const bool fatal = enemy.health <= 17;
-                            level.DamageEnemy(enemy, 17, p.position, false, false, true);
+                            level.DamageEnemy(
+                                enemy, 17, p.position, false, false, Level::DamageSource::Resident);
                             p.attackWait = 1.1f;
                             p.stamina = (std::max)(0.f, p.stamina - 2);
                             if (fatal)

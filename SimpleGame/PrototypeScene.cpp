@@ -694,6 +694,20 @@ void Prototype::SynchronizeScene()
                       visual.position = {p.x, p.y};
                       DrawEnemy(visual, &static_cast<const ModelActor&>(node).modelState);
                   });
+        if (enemy.health > 0 && !enemy.weakened && enemy.targetSwitchNoticeTime > 0)
+        {
+            const float elevation = SpiritCatalog::Get(enemy.type).size + 28.f;
+            bind(id + "/intervention",
+                 id,
+                 enemy.position,
+                 ActorLayer::WorldLabel,
+                 [this, elevation](const Actor& node)
+                 {
+                     const auto at = node.WorldPosition();
+                     DrawWorldLabel(
+                         {at.x, at.y}, elevation, "주민 추격 저지", Color(.55f, 1.f, .79f));
+                 });
+        }
         if (enemy.boss > 0)
         {
             const auto& encounter = StoryEncounter::Get(enemy.boss);
