@@ -800,15 +800,15 @@ class LevelOne
             break;
         case LootKind::Weapon:
             ++weaponStones;
-            notice = "강화석 획득 · 대장장이에게서 사용·판매할 수 있습니다.";
+            notice = "무기 강화석을 획득했습니다.";
             break;
         case LootKind::Healing:
             ++potions;
-            notice = "회복물약 획득 · H로 필요할 때 사용하세요.";
+            notice = "회복물약을 획득했습니다.";
             break;
         case LootKind::Stone:
             ++stones;
-            notice = "주령석 획득! 봉인사에게서 동행 주령을 강화하세요. 성공 확률 70%.";
+            notice = "주령석을 획득했습니다.";
             break;
         case LootKind::Ticket:
             ++tickets[1];

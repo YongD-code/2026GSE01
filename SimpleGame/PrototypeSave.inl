@@ -74,6 +74,8 @@ bool SaveProgress(bool manual, int slot = 0)
     state.speaker = speaker;
     state.message = message;
     state.messageTime = messageTime;
+    Tutorials::DiscoverInventory(tutorials, levelOne);
+    state.tutorials = tutorials;
     state.hud = hudVisible;
     state.shake = screenShake;
     state.post = r.postProcess.enabled;
@@ -101,6 +103,7 @@ bool SaveProgress(bool manual, int slot = 0)
     }
     automaticSaveAllowed = true;
     activeSlot = slot;
+    tutorialsSeenBySlot[slot - 1] = tutorials.shown;
     autoSaveTime = 0;
     ProgressNotice(manual ? "진행을 저장했습니다." : "진행을 자동 저장했습니다.");
     return true;
@@ -234,6 +237,9 @@ bool LoadProgress(bool startup = false, int slot = 0)
             return CemeteryRoom::Contains(p, 15) || Blocked(p);
         });
     chapter = std::move(state.chapter);
+    tutorials = state.tutorials;
+    tutorials.Remember(tutorialsSeenBySlot[slot - 1]);
+    ResetTutorialDisplay();
     storyTrialTime = 0;
     player = state.player;
     spirit = state.spirit;

@@ -1,6 +1,7 @@
 #pragma once
 #include "LevelOne.h"
 #include "Population.h"
+#include "Tutorials.h"
 #include <iomanip>
 #include <locale>
 #include <limits>
@@ -13,7 +14,7 @@
 class SaveGame
 {
   public:
-    static constexpr int CurrentVersion = 9;
+    static constexpr int CurrentVersion = 10;
 
     struct State
     {
@@ -29,6 +30,7 @@ class SaveGame
         bool hud = true, shake = true, post = true, bloom = true;
         std::string speaker, message;
         float messageTime = 0;
+        Tutorials::History tutorials;
         bool spiritEquipped = true;
         float skillTimers[SpiritCatalog::SkillSetCount][4] = {};
     };
@@ -181,6 +183,10 @@ class SaveGame
                  s.speaker,
                  s.message,
                  s.messageTime);
+        if (version >= 10)
+        {
+            a.Fields(s.tutorials.pending, s.tutorials.shown);
+        }
         a.Fields(l.level,
                  l.experience,
                  l.kills,
@@ -660,9 +666,9 @@ class SaveGame
                                     l.resolvedBosses.count(StoryEncounter::OrderArcher);
         const int sealerFight = authored.Index("C202");
         const bool defeatedSealer = l.resolvedBosses.count(StoryEncounter::OrderSealer) != 0;
-        if (authored.quests.empty() || s.story != StoryHash(authored) || !Point(s.player) ||
-            !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
-            !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
+        if (authored.quests.empty() || s.story != StoryHash(authored) || !s.tutorials.Valid() ||
+            !Point(s.player) || !Point(s.spirit) || !Point(s.keeper) ||
+            !Number(s.messageTime, 0, 60) || !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
             !Number(l.experience, 0, l.RequiredExperience() - 1) ||
             !Number(l.health, .001, l.MaximumHealth()) || !Number(l.weapon, 0, 20) ||
             !Number(l.gold, 0, 100000000) || !Number(l.potions, 0, 1000000) ||
@@ -900,6 +906,11 @@ class SaveGame
         if (!archive.stream.eof() || !Validate(candidate, chapter))
         {
             return false;
+        }
+        if (version < 10)
+        {
+            candidate.tutorials =
+                Tutorials::RestoreLegacy(candidate.level, candidate.chapter, chapter);
         }
         output = std::move(candidate);
         return true;

@@ -51,6 +51,7 @@ void ServiceAction(int action)
         {
             l.gold -= cost;
             ++item;
+            Tutorials::DiscoverInventory(tutorials, l);
             l.notice = "구매했습니다.";
         }
     };

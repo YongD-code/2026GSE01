@@ -70,6 +70,12 @@ class Prototype
     bool automaticSaveAllowed = true;
     float autoSaveTime = 0, saveStatusTime = 0;
     std::string saveStatus = "자동 저장 대기";
+    Tutorials::History tutorials;
+    std::array<Tutorials::Mask, 3> tutorialsSeenBySlot = {};
+    int activeTutorial = -1;
+    float tutorialTime = 0;
+    FrameProfiler::Clock::time_point tutorialClock = {};
+    bool tutorialPainted = false;
     std::vector<Object> villageObjects;
     std::map<World::Key, std::vector<size_t>> villageCollision;
     Renderer& r;
@@ -263,6 +269,11 @@ class Prototype
 
     void AdvanceChapter()
     {
+        const auto* previous = chapter.Current();
+        if (previous && previous->id == "P004")
+        {
+            tutorials.Discover(Tutorials::Techniques);
+        }
         chapter.Advance(levelOne.kills, static_cast<int>(levelOne.collection.size()));
         storyTrialTime = 0;
         const auto* quest = chapter.Current();
@@ -451,6 +462,7 @@ class Prototype
             if (quest->id == "P005")
             {
                 levelOne.captureUnlocked = true;
+                tutorials.Discover(Tutorials::Capture);
                 ++levelOne.tickets[0];
                 levelOne.selectedTicket = 0;
             }
@@ -1182,6 +1194,8 @@ class Prototype
             population.people.clear();
             population.society = Population::Society();
             levelOne = LevelOne();
+            tutorials.pending = 0;
+            ResetTutorialDisplay();
             ResetControls();
             levelOne.captureRules.Load();
             levelOne.LoadCombat();

@@ -262,6 +262,8 @@ void Prototype::NewGame()
     storyTrialTime = 0;
     world = World();
     levelOne = LevelOne();
+    tutorials = {};
+    ResetTutorialDisplay();
     ResetControls();
     population.people.clear();
     population.society = Population::Society();

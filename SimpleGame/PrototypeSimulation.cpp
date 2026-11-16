@@ -18,6 +18,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         return;
     }
     dt = (std::max)(0.f, (std::min)(dt, .05f));
+    UpdateTutorialDisplay();
     if (ControlsActive())
     {
         RecallCompanion();
@@ -295,6 +296,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         }
         if (!orderSealWasActive && levelOne.orderSeal.Blocks(selectedCompanion))
         {
+            tutorials.Discover(Tutorials::OrderSeal);
             if (controlling)
             {
                 if (!RecallCompanion(true, false))
@@ -304,8 +306,8 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
                 }
                 previousSpirit = spirit;
             }
-            Say("주령 봉쇄", "5초간 봉쇄됐습니다. 본체로 싸우거나 Tab에서 다른 주령을 선택하세요.");
-            messageTime = LevelOne::OrderSealDuration;
+            Say("주령 봉쇄", "동행 주령의 술식이 봉쇄됐습니다.");
+            messageTime = 2.f;
         }
     }
     double actualX = player.x - previousPlayer.x, actualY = player.y - previousPlayer.y;
@@ -369,6 +371,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         FrameProfiler::Scope timing(FrameProfiler::Stage::Streaming);
         world.Stream(camera, target, width, height, residents);
     }
+    Tutorials::DiscoverInventory(tutorials, levelOne);
     if (!pauseMenu && !journal && automaticSaveAllowed && autoSaveTime >= 30 && CanSaveProgress())
     {
         SaveProgress(false);

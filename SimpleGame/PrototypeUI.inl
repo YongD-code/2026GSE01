@@ -684,6 +684,84 @@ UIRect MessageBounds() const
     return {beside ? left : (width - w) / 2, y, w, 130};
 }
 
+void ResetTutorialDisplay()
+{
+    activeTutorial = -1;
+    tutorialTime = 0;
+    tutorialClock = {};
+    tutorialPainted = false;
+}
+
+void UpdateTutorialDisplay()
+{
+    if (tutorialPainted && windowFocused && ControlsActive())
+    {
+        const auto now = FrameProfiler::Clock::now();
+        tutorialTime -= std::chrono::duration<float>(now - tutorialClock).count();
+        tutorialClock = now;
+        if (tutorialTime <= 0)
+        {
+            ResetTutorialDisplay();
+        }
+    }
+    else
+    {
+        tutorialClock = {};
+    }
+    tutorialPainted = false;
+}
+
+bool DrawTutorial()
+{
+    if ((activeTutorial < 0 && tutorials.pending == 0) || !windowFocused || openingFade > 0 ||
+        !ControlsActive() ||
+        std::any_of(skillEffects.begin(),
+                    skillEffects.end(),
+                    [this](const SkillEffect& effect)
+                    {
+                        return effect.slot == 3 && effect.age < RealmOpening(effect) + .18f;
+                    }))
+    {
+        return false;
+    }
+    if (activeTutorial < 0)
+    {
+        for (int id = 0; id < Tutorials::Count; ++id)
+        {
+            const auto bit = Tutorials::Mask{1} << id;
+            if ((tutorials.pending & bit) != 0)
+            {
+                activeTutorial = id;
+                tutorialTime = Tutorials::DisplaySeconds;
+                tutorials.Remember(bit);
+                if (activeSlot > 0)
+                {
+                    tutorialsSeenBySlot[activeSlot - 1] |= bit;
+                }
+                break;
+            }
+        }
+    }
+
+    const auto& tip = Tutorials::Tips[activeTutorial];
+    if (tutorialClock == FrameProfiler::Clock::time_point{})
+    {
+        tutorialClock = FrameProfiler::Clock::now();
+    }
+    const auto box = MessageBounds();
+    Panel(box.x, box.y, box.w, box.h);
+    const Color accent(.56f, .85f, 1.f);
+    WrappedText(box.x + 16, box.y + 27, box.w - 32, std::string("안내 · ") + tip.title, accent, 1);
+    WrappedText(box.x + 16, box.y + 54, box.w - 32, tip.instruction, Color(.88f, .85f, .77f), 3);
+    r.Rect(box.x + 16,
+           box.y + box.h - 12,
+           (box.w - 32) * tutorialTime / Tutorials::DisplaySeconds,
+           3,
+           accent);
+    tutorialPainted = true;
+    return true;
+}
+
 std::vector<std::string> DialoguePages() const
 {
     const float limit = (std::max)(16.f, MessageBounds().w - 32);
@@ -876,6 +954,10 @@ void HUD()
                    : std::string("T 선택 · ") + tickets[levelOne.selectedTicket] + " " +
                          std::to_string(levelOne.tickets[levelOne.selectedTicket]) +
                          "장\nF 포획 / X 정화";
+    }
+    else if (DrawTutorial())
+    {
+        return;
     }
     else if (messageTime > 0 || dialoguePending)
     {

@@ -132,6 +132,7 @@ bool Prototype::CanCompareSaintSeal() const
 void Prototype::CompareSaintSeal()
 {
     chapter.saintSealUnderstood = true;
+    tutorials.Discover(Tutorials::SaintSeal);
     ClearInput();
     Say("결박 문양 대조",
         "장부의 봉인 문양이 감금실의 결박과 일치한다. 장부 여백에는 ‘기도가 시작되면 "
