@@ -1,118 +1,221 @@
 {
   "characterId": "skeleton",
-  "stage": "unrigged_review",
+  "stage": "rigged_review",
   "facing": "-Y",
+  "rig": "MOB_SKELETON_RIG",
+  "joints": [
+    "root",
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "head",
+    "jaw",
+    "clavicle.R",
+    "upper_arm.R",
+    "forearm.R",
+    "hand.R",
+    "clavicle.L",
+    "upper_arm.L",
+    "forearm.L",
+    "hand.L",
+    "cloth.front",
+    "talisman",
+    "cloth.back",
+    "thigh.R",
+    "shin.R",
+    "foot.R",
+    "toe.R",
+    "thigh.L",
+    "shin.L",
+    "foot.L",
+    "toe.L"
+  ],
+  "reviewAction": "MOB_SKELETON_RIG_REVIEW",
   "triangles": 8090,
   "parts": [
     {
       "index": 0,
       "name": "MOB_SKELETON_SKULL",
-      "triangles": 706
+      "triangles": 706,
+      "skinJoints": [
+        "head"
+      ]
     },
     {
       "index": 1,
       "name": "MOB_SKELETON_JAW",
-      "triangles": 338
+      "triangles": 338,
+      "skinJoints": [
+        "jaw"
+      ]
     },
     {
       "index": 2,
       "name": "MOB_SKELETON_SOCKET_LIGHTS",
-      "triangles": 96
+      "triangles": 96,
+      "skinJoints": [
+        "head"
+      ]
     },
     {
       "index": 3,
       "name": "MOB_SKELETON_SPINE_AND_NECK",
-      "triangles": 958
+      "triangles": 958,
+      "skinJoints": [
+        "hips",
+        "spine",
+        "chest",
+        "neck"
+      ]
     },
     {
       "index": 4,
       "name": "MOB_SKELETON_RIBS",
-      "triangles": 1180
+      "triangles": 1180,
+      "skinJoints": [
+        "chest"
+      ]
     },
     {
       "index": 5,
       "name": "MOB_SKELETON_SHOULDER_R",
-      "triangles": 60
+      "triangles": 60,
+      "skinJoints": [
+        "clavicle.R"
+      ]
     },
     {
       "index": 6,
       "name": "MOB_SKELETON_SHOULDER_L",
-      "triangles": 60
+      "triangles": 60,
+      "skinJoints": [
+        "clavicle.L"
+      ]
     },
     {
       "index": 7,
       "name": "MOB_SKELETON_PELVIS",
-      "triangles": 264
+      "triangles": 264,
+      "skinJoints": [
+        "hips"
+      ]
     },
     {
       "index": 8,
       "name": "MOB_SKELETON_UPPER_ARM_R",
-      "triangles": 142
+      "triangles": 142,
+      "skinJoints": [
+        "upper_arm.R"
+      ]
     },
     {
       "index": 9,
       "name": "MOB_SKELETON_FOREARM_R",
-      "triangles": 188
+      "triangles": 188,
+      "skinJoints": [
+        "forearm.R"
+      ]
     },
     {
       "index": 10,
       "name": "MOB_SKELETON_HAND_R",
-      "triangles": 638
+      "triangles": 638,
+      "skinJoints": [
+        "hand.R"
+      ]
     },
     {
       "index": 11,
       "name": "MOB_SKELETON_THIGH_R",
-      "triangles": 166
+      "triangles": 166,
+      "skinJoints": [
+        "thigh.R"
+      ]
     },
     {
       "index": 12,
       "name": "MOB_SKELETON_SHIN_R",
-      "triangles": 188
+      "triangles": 188,
+      "skinJoints": [
+        "shin.R"
+      ]
     },
     {
       "index": 13,
       "name": "MOB_SKELETON_FOOT_R",
-      "triangles": 274
+      "triangles": 274,
+      "skinJoints": [
+        "foot.R",
+        "toe.R"
+      ]
     },
     {
       "index": 14,
       "name": "MOB_SKELETON_UPPER_ARM_L",
-      "triangles": 142
+      "triangles": 142,
+      "skinJoints": [
+        "upper_arm.L"
+      ]
     },
     {
       "index": 15,
       "name": "MOB_SKELETON_FOREARM_L",
-      "triangles": 188
+      "triangles": 188,
+      "skinJoints": [
+        "forearm.L"
+      ]
     },
     {
       "index": 16,
       "name": "MOB_SKELETON_HAND_L",
-      "triangles": 638
+      "triangles": 638,
+      "skinJoints": [
+        "hand.L"
+      ]
     },
     {
       "index": 17,
       "name": "MOB_SKELETON_THIGH_L",
-      "triangles": 166
+      "triangles": 166,
+      "skinJoints": [
+        "thigh.L"
+      ]
     },
     {
       "index": 18,
       "name": "MOB_SKELETON_SHIN_L",
-      "triangles": 188
+      "triangles": 188,
+      "skinJoints": [
+        "shin.L"
+      ]
     },
     {
       "index": 19,
       "name": "MOB_SKELETON_FOOT_L",
-      "triangles": 274
+      "triangles": 274,
+      "skinJoints": [
+        "foot.L",
+        "toe.L"
+      ]
     },
     {
       "index": 20,
       "name": "MOB_SKELETON_WAIST_CLOTH",
-      "triangles": 1123
+      "triangles": 1123,
+      "skinJoints": [
+        "hips",
+        "cloth.front",
+        "cloth.back"
+      ]
     },
     {
       "index": 21,
       "name": "MOB_SKELETON_WAIST_TALISMAN",
-      "triangles": 113
+      "triangles": 113,
+      "skinJoints": [
+        "talisman"
+      ]
     }
   ]
 }

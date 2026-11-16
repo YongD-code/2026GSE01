@@ -1,4 +1,4 @@
-"""Build the unrigged skeletal spirit and its orthographic Blender review."""
+"""Build, rig and export the skeletal spirit and render its Blender review."""
 import json
 import math
 import random
@@ -11,7 +11,9 @@ from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
 import render_previews as review
+from rig_skeleton import build_rig, save_review_poses, set_pose
 
 rng = random.Random(21)
 COLORS = {
@@ -312,11 +314,15 @@ skull()
 torso()
 limbs()
 clothing()
+rig = build_rig(collection, parts)
+save_review_poses(rig)
 bpy.context.preferences.filepaths.save_version = 0
 bpy.ops.wm.save_as_mainfile(filepath=str(HERE/'model.blend'))
 bpy.ops.export_scene.gltf(filepath=str(HERE/'model.glb'), export_format='GLB',
                           export_animations=False, export_extras=True)
-metadata = {'characterId':'skeleton', 'stage':'unrigged_review', 'facing':'-Y',
+metadata = {'characterId':'skeleton', 'stage':'rigged_review', 'facing':'-Y',
+            'rig':rig.name, 'joints':[bone.name for bone in rig.data.bones],
+            'reviewAction':'MOB_SKELETON_RIG_REVIEW',
             'triangles': sum(p['triangles'] for p in parts), 'parts':parts}
 (HERE/'model.json').write_text(json.dumps(metadata,indent=2)+'\n',encoding='utf-8')
 print('SKELETON_READY', len(parts), metadata['triangles'], flush=True)
@@ -337,3 +343,16 @@ if '--review' in sys.argv:
         scene.camera.location=center+Vector(offset)
         scene.camera.rotation_euler=(center-scene.camera.location).to_track_quat('-Z','Y').to_euler()
         review.render(HERE/'Previews'/f'{key}.png')
+
+if '--rig-review' in sys.argv:
+    review.set_stage(1.63, 4.18)
+    scene = bpy.context.scene
+    scene.render.resolution_x, scene.render.resolution_y = 620, 760
+    scene.eevee.taa_render_samples = 32
+    center = Vector((0, -.11, 1.58))
+    for key, offset in [('rest', (3, -8, .95)), ('reach', (4, -8, 1.6)),
+                        ('crouch', (6, -6, 1.25))]:
+        set_pose(rig, key)
+        scene.camera.location = center + Vector(offset)
+        scene.camera.rotation_euler = (center-scene.camera.location).to_track_quat('-Z','Y').to_euler()
+        review.render(HERE/'Previews'/f'rig_{key}.png')
