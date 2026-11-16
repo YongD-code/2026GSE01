@@ -14,6 +14,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import render_previews as review
 from rig_skeleton import build_rig, save_review_poses, set_pose
+from animate_skeleton import FPS, bake
 
 rng = random.Random(21)
 COLORS = {
@@ -316,13 +317,20 @@ limbs()
 clothing()
 rig = build_rig(collection, parts)
 save_review_poses(rig)
+clips = bake(rig)
 bpy.context.preferences.filepaths.save_version = 0
 bpy.ops.wm.save_as_mainfile(filepath=str(HERE/'model.blend'))
-bpy.ops.export_scene.gltf(filepath=str(HERE/'model.glb'), export_format='GLB',
-                          export_animations=False, export_extras=True)
-metadata = {'characterId':'skeleton', 'stage':'rigged_review', 'facing':'-Y',
+# Keep the pose-check action in the Blender source, not the runtime GLB.
+bpy.data.actions.remove(bpy.data.actions['MOB_SKELETON_RIG_REVIEW'])
+pending = HERE/'model.pending.glb'
+bpy.ops.export_scene.gltf(filepath=str(pending), export_format='GLB',
+                          export_animations=True, export_animation_mode='ACTIONS',
+                          export_force_sampling=True, export_anim_slide_to_zero=True,
+                          export_extras=True)
+pending.replace(HERE/'model.glb')
+metadata = {'characterId':'skeleton', 'stage':'animated', 'facing':'-Y',
             'rig':rig.name, 'joints':[bone.name for bone in rig.data.bones],
-            'reviewAction':'MOB_SKELETON_RIG_REVIEW',
+            'reviewAction':'MOB_SKELETON_RIG_REVIEW', 'animationFps':FPS, 'clips':clips,
             'triangles': sum(p['triangles'] for p in parts), 'parts':parts}
 (HERE/'model.json').write_text(json.dumps(metadata,indent=2)+'\n',encoding='utf-8')
 print('SKELETON_READY', len(parts), metadata['triangles'], flush=True)

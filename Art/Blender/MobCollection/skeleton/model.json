@@ -1,6 +1,6 @@
 {
   "characterId": "skeleton",
-  "stage": "rigged_review",
+  "stage": "animated",
   "facing": "-Y",
   "rig": "MOB_SKELETON_RIG",
   "joints": [
@@ -32,6 +32,75 @@
     "toe.L"
   ],
   "reviewAction": "MOB_SKELETON_RIG_REVIEW",
+  "animationFps": 24,
+  "clips": {
+    "idle": {
+      "action": "MOB_SKELETON_IDLE",
+      "firstFrame": 1,
+      "lastFrame": 49,
+      "seconds": 2.0,
+      "loop": true,
+      "rootMotion": false
+    },
+    "walk": {
+      "action": "MOB_SKELETON_WALK",
+      "firstFrame": 1,
+      "lastFrame": 33,
+      "seconds": 1.3333333333333333,
+      "loop": true,
+      "rootMotion": false,
+      "strideToHeight": 0.3625
+    },
+    "run": {
+      "action": "MOB_SKELETON_RUN",
+      "firstFrame": 1,
+      "lastFrame": 21,
+      "seconds": 0.8333333333333334,
+      "loop": true,
+      "rootMotion": false,
+      "strideToHeight": 0.5801
+    },
+    "cast": {
+      "action": "MOB_SKELETON_CAST",
+      "firstFrame": 1,
+      "lastFrame": 37,
+      "seconds": 1.5,
+      "loop": false,
+      "rootMotion": false
+    },
+    "jump": {
+      "action": "MOB_SKELETON_JUMP",
+      "firstFrame": 1,
+      "lastFrame": 27,
+      "seconds": 1.0833333333333333,
+      "loop": false,
+      "rootMotion": false
+    },
+    "turn_left": {
+      "action": "MOB_SKELETON_TURN_LEFT",
+      "firstFrame": 1,
+      "lastFrame": 15,
+      "seconds": 0.5833333333333334,
+      "loop": false,
+      "rootMotion": false
+    },
+    "turn_right": {
+      "action": "MOB_SKELETON_TURN_RIGHT",
+      "firstFrame": 1,
+      "lastFrame": 15,
+      "seconds": 0.5833333333333334,
+      "loop": false,
+      "rootMotion": false
+    },
+    "attack": {
+      "action": "MOB_SKELETON_ATTACK",
+      "firstFrame": 1,
+      "lastFrame": 31,
+      "seconds": 1.25,
+      "loop": false,
+      "rootMotion": false
+    }
+  },
   "triangles": 8090,
   "parts": [
     {
