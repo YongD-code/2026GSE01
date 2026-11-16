@@ -1,0 +1,118 @@
+{
+  "characterId": "skeleton",
+  "stage": "unrigged_review",
+  "facing": "-Y",
+  "triangles": 8090,
+  "parts": [
+    {
+      "index": 0,
+      "name": "MOB_SKELETON_SKULL",
+      "triangles": 706
+    },
+    {
+      "index": 1,
+      "name": "MOB_SKELETON_JAW",
+      "triangles": 338
+    },
+    {
+      "index": 2,
+      "name": "MOB_SKELETON_SOCKET_LIGHTS",
+      "triangles": 96
+    },
+    {
+      "index": 3,
+      "name": "MOB_SKELETON_SPINE_AND_NECK",
+      "triangles": 958
+    },
+    {
+      "index": 4,
+      "name": "MOB_SKELETON_RIBS",
+      "triangles": 1180
+    },
+    {
+      "index": 5,
+      "name": "MOB_SKELETON_SHOULDER_R",
+      "triangles": 60
+    },
+    {
+      "index": 6,
+      "name": "MOB_SKELETON_SHOULDER_L",
+      "triangles": 60
+    },
+    {
+      "index": 7,
+      "name": "MOB_SKELETON_PELVIS",
+      "triangles": 264
+    },
+    {
+      "index": 8,
+      "name": "MOB_SKELETON_UPPER_ARM_R",
+      "triangles": 142
+    },
+    {
+      "index": 9,
+      "name": "MOB_SKELETON_FOREARM_R",
+      "triangles": 188
+    },
+    {
+      "index": 10,
+      "name": "MOB_SKELETON_HAND_R",
+      "triangles": 638
+    },
+    {
+      "index": 11,
+      "name": "MOB_SKELETON_THIGH_R",
+      "triangles": 166
+    },
+    {
+      "index": 12,
+      "name": "MOB_SKELETON_SHIN_R",
+      "triangles": 188
+    },
+    {
+      "index": 13,
+      "name": "MOB_SKELETON_FOOT_R",
+      "triangles": 274
+    },
+    {
+      "index": 14,
+      "name": "MOB_SKELETON_UPPER_ARM_L",
+      "triangles": 142
+    },
+    {
+      "index": 15,
+      "name": "MOB_SKELETON_FOREARM_L",
+      "triangles": 188
+    },
+    {
+      "index": 16,
+      "name": "MOB_SKELETON_HAND_L",
+      "triangles": 638
+    },
+    {
+      "index": 17,
+      "name": "MOB_SKELETON_THIGH_L",
+      "triangles": 166
+    },
+    {
+      "index": 18,
+      "name": "MOB_SKELETON_SHIN_L",
+      "triangles": 188
+    },
+    {
+      "index": 19,
+      "name": "MOB_SKELETON_FOOT_L",
+      "triangles": 274
+    },
+    {
+      "index": 20,
+      "name": "MOB_SKELETON_WAIST_CLOTH",
+      "triangles": 1123
+    },
+    {
+      "index": 21,
+      "name": "MOB_SKELETON_WAIST_TALISMAN",
+      "triangles": 113
+    }
+  ]
+}
