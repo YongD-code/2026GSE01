@@ -646,38 +646,48 @@ void Prototype::SynchronizeScene()
             const auto& attack = enemy.eater;
             if (enemy.phase == 1)
             {
-                visual.bossCastProgress =
+                visual.authoredCastProgress =
                     .05f + .4f * EaterBoss::Progress(attack.plan.windup, enemy.phaseTime);
             }
             else if (enemy.phase == 2 && attack.pattern != EaterBoss::Pattern::Rush)
             {
-                visual.bossCastProgress =
+                visual.authoredCastProgress =
                     .45f + .45f * EaterBoss::Progress(attack.plan.active, enemy.phaseTime);
             }
             else if (enemy.phase == 4)
             {
-                visual.bossCastProgress =
+                visual.authoredCastProgress =
                     .15f + .7f * EaterBoss::Progress(EaterBoss::TransitionTime, enemy.phaseTime);
             }
             else if (enemy.phase == 3 && attack.hasAttack &&
                      attack.plan.recovery - enemy.phaseTime < .2f)
             {
-                visual.bossCastProgress =
+                visual.authoredCastProgress =
                     .9f + .1f * (attack.plan.recovery - enemy.phaseTime) / .2f;
             }
             else
             {
                 visual.castPose = 0;
             }
-            if (visual.bossCastProgress >= 0)
+            if (visual.authoredCastProgress >= 0)
             {
-                visual.castPose = visual.bossCastProgress;
+                visual.castPose = visual.authoredCastProgress;
             }
             if (attack.pattern == EaterBoss::Pattern::Sweep &&
                 (enemy.phase == 2 || enemy.phase == 3))
             {
                 visual.action = CharacterModel::Motion::Attack;
             }
+        }
+        if (enemy.type == SpiritCatalog::Skeleton && (enemy.phase == 1 || enemy.phase == 3))
+        {
+            const auto melee = levelOne.MeleeFor(enemy.type);
+            const float segmentEnd = enemy.phase == 1 ? melee.windup : LevelOne::SkeletonSwingDuration;
+            const float elapsed = segmentEnd - enemy.phaseTime;
+            visual.authoredCastProgress =
+                (std::max)(0.f, (std::min)(1.f, elapsed / LevelOne::SkeletonSwingDuration));
+            visual.action = CharacterModel::Motion::Attack;
+            visual.attackAim = enemy.aim;
         }
         visual.animation = enemy.animation;
         visual.boss = enemy.boss;

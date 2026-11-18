@@ -13,6 +13,7 @@ enum Species
     Eater,
     Stag,
     Hound,
+    Skeleton,
     Count
 };
 
@@ -123,6 +124,18 @@ inline const Definition& Get(int species)
           Pilgrim,
           false,
           2,
+          "dangerous"},
+         {"해골형 주령",
+          "해진 부적만 붙든 채 뼈마디를 끌고 다니며 긴 팔을 휘두르는 주령.",
+          L"Assets/Spirits/Models/skeleton.png",
+          72,
+          86,
+          -1,
+          L"Assets/Spirits/Runtime/skeleton.meshbin",
+          0,
+          Hands,
+          false,
+          1,
           "dangerous"}}};
     return definitions[species >= 0 && species < Count ? species : Forgotten];
 }

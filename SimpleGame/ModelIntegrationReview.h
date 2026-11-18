@@ -81,10 +81,13 @@ struct ModelIntegrationReview
                 }
             }
         }
-        if (appeared.size() != SpiritCatalog::Count)
+        for (int species = 0; species < SpiritCatalog::Count; ++species)
         {
-            std::cerr << "MODEL_REVIEW_ERROR species streaming " << appeared.size() << '\n';
-            return 12;
+            if ((appeared.count(species) != 0) == SpiritCatalog::Get(species).bossOnly)
+            {
+                std::cerr << "MODEL_REVIEW_ERROR species streaming " << species << '\n';
+                return 12;
+            }
         }
         LevelOne peaceful;
         LevelOne::Enemy deer;
@@ -172,7 +175,7 @@ struct ModelIntegrationReview
 
         std::array<CharacterModel::State, SpiritCatalog::Count> spirits;
         game.r.Begin(Color(.055f, .075f, .095f), false);
-        game.r.Text(30, 35, "게임 렌더러 · 주령 7종의 실제 스킨 모델", Color(1, .9f, .7f));
+        game.r.Text(30, 35, "게임 렌더러 · 주령 " + std::to_string(SpiritCatalog::Count) + "종의 실제 스킨 모델", Color(1, .9f, .7f));
         for (int species = 0; species < SpiritCatalog::Count; ++species)
         {
             const Point feet = {160.f + (species % 4) * 320, 310.f + (species / 4) * 360};

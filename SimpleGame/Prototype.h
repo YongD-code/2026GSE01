@@ -551,7 +551,8 @@ class Prototype
                          float castProgress = -1.f,
                          CharacterModel::State* state = nullptr,
                          bool running = false,
-                         CharacterModel::Motion action = CharacterModel::Motion::Cast);
+                         CharacterModel::Motion action = CharacterModel::Motion::Cast,
+                         const WorldPoint* attackAim = nullptr);
     bool DrawKeyedModel(CharacterModel& model,
                         Point feet,
                         float size,
@@ -561,7 +562,8 @@ class Prototype
                         float phase,
                         CharacterModel::State* state,
                         const CharacterModel::Parts* parts = nullptr,
-                        const char* clipName = nullptr);
+                        const char* clipName = nullptr,
+                        const WorldPoint* attackAim = nullptr);
 
     struct EnemyVisual
     {
@@ -571,7 +573,8 @@ class Prototype
         WorldPoint hitDirection = {0, 0};
         float hitStrength = 0;
         float castPose = 0;
-        float bossCastProgress = -1;
+        float authoredCastProgress = -1;
+        WorldPoint attackAim = {0, 0};
         CharacterModel::Motion action = CharacterModel::Motion::Cast;
         float remnantTime = -2;
         int type = 0, boss = 0;

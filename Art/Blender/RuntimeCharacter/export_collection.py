@@ -1,7 +1,7 @@
 """Export modular NPC parts and seven keyed spirits for the shared game mesh renderer.
 
 Blender --background --factory-startup --python this_file -- --asset npc
-Other assets: forgotten, pilgrim, hands, saint, eater, stag, hound.
+Other assets: forgotten, pilgrim, hands, saint, eater, stag, hound, skeleton.
 Reads the approved blend sources without saving or simplifying them.
 """
 
@@ -136,7 +136,7 @@ def export(key):
         for frame in range(count):
             sample = first+(last-first)*frame/(count if loop else count-1)
             bpy.context.scene.frame_set(int(sample), subframe=sample-int(sample))
-            if name.startswith('turn_'):
+            if name.startswith('turn_') and key != 'skeleton':
                 # World heading is interpolated by the Actor. Retain anticipation in the
                 # torso/head while avoiding a second 45-degree rotation of the root.
                 rig.pose.bones['root'].rotation_euler.y = 0
@@ -172,6 +172,6 @@ def export(key):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--asset', required=True,
-                        choices=('npc', 'forgotten', 'pilgrim', 'hands', 'saint', 'eater', 'stag', 'hound'))
+                        choices=('npc', 'forgotten', 'pilgrim', 'hands', 'saint', 'eater', 'stag', 'hound', 'skeleton'))
     args = parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
     export(args.asset)

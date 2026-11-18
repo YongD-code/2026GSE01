@@ -657,7 +657,8 @@ bool Prototype::DrawKeyedModel(CharacterModel& model,
                                float phase,
                                CharacterModel::State* state,
                                const CharacterModel::Parts* parts,
-                               const char* clipName)
+                               const char* clipName,
+                               const WorldPoint* attackAim)
 {
     if (!model.Ready())
     {
@@ -665,7 +666,9 @@ bool Prototype::DrawKeyedModel(CharacterModel& model,
     }
     CharacterModel::State preview;
     auto& pose = state ? *state : preview;
-    const float facing = CharacterFacing(animation.facing);
+    const float facing = attackAim && (attackAim->x != 0 || attackAim->y != 0)
+                             ? static_cast<float>(std::atan2(attackAim->y, attackAim->x) + 1.570796327)
+                             : CharacterFacing(animation.facing);
     if (pose.owner != &model)
     {
         model.Reset(pose, facing);
@@ -685,7 +688,8 @@ bool Prototype::DrawSpiritModel(int species,
                                 float castProgress,
                                 CharacterModel::State* state,
                                 bool running,
-                                CharacterModel::Motion action)
+                                CharacterModel::Motion action,
+                                const WorldPoint* attackAim)
 {
     if (!UsingSpiritModel(species))
     {
@@ -696,8 +700,7 @@ bool Prototype::DrawSpiritModel(int species,
     {
         float stridePhase = animation.phase * .25f;
         const auto profile = models.catalog.spirits.find(species);
-        if (state && SpiritCatalog::Get(species).gait == 2 &&
-            profile != models.catalog.spirits.end() && profile->second.walkStrideRatio > 0)
+        if (state && profile != models.catalog.spirits.end() && profile->second.walkStrideRatio > 0)
         {
             auto& model = spiritMeshes[species];
             if (state->owner != &model)
@@ -736,7 +739,8 @@ bool Prototype::DrawSpiritModel(int species,
                             : animation.moving ? stridePhase
                                                : motionClock * .75f;
         return DrawKeyedModel(
-            spiritMeshes[species], feet, size, animation, tint, motion, phase, state);
+            spiritMeshes[species], feet, size, animation, tint, motion, phase, state,
+            nullptr, nullptr, attackAim);
     }
     const int first = casting            ? SpiritAppearance::CastFirst
                       : animation.moving ? SpiritAppearance::GlideFirst
@@ -971,12 +975,14 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
                              enemy.animation,
                              Color(1, 1, 1),
                              time + float(enemy.position.x * .01),
-                             enemy.bossCastProgress >= 0 ? enemy.bossCastProgress
-                             : enemy.castPose > 0        ? .25f + .5f * enemy.castPose
-                                                         : -1.f,
+                             enemy.authoredCastProgress >= 0 ? enemy.authoredCastProgress
+                             : enemy.castPose > 0            ? .25f + .5f * enemy.castPose
+                                                             : -1.f,
                              state,
                              enemy.running,
-                             enemy.action))
+                             enemy.action,
+                             enemy.type == SpiritCatalog::Skeleton &&
+                                     enemy.authoredCastProgress >= 0 ? &enemy.attackAim : nullptr))
     {
         // Health bars and alerts below still belong to the existing enemy Actor.
     }
@@ -1108,7 +1114,8 @@ void Prototype::DrawCombatWarnings()
         if (!enemy.alerted || enemy.weakened || enemy.health <= 0 ||
             (enemy.phase != 1 && enemy.phase != 2))
             continue;
-        const float windup = attackType == 0   ? combat.meleeWindup
+        const auto melee = levelOne.MeleeFor(enemy.type);
+        const float windup = attackType == 0   ? melee.windup
                              : attackType == 1 ? combat.chargeWindup
                                                : combat.rangedWindup;
         const float progress = 1 - (std::max)(0.f, (std::min)(1.f, enemy.phaseTime / windup));
@@ -1147,17 +1154,17 @@ void Prototype::DrawCombatWarnings()
         else if (attackType == 0)
         {
             const double base = std::atan2(enemy.aim.y, enemy.aim.x);
-            const double halfArc = std::acos(combat.meleeFacingDot);
+            const double halfArc = std::acos(melee.facingDot);
             for (int i = 0; i < 16; ++i)
             {
                 const double a = base - halfArc + i * halfArc * 2 / 16;
                 const double b = base - halfArc + (i + 1) * halfArc * 2 / 16;
                 const Point center = Screen(origin.x, origin.y);
                 r.Quad(center,
-                       Screen(origin.x + std::cos(a) * combat.meleeReach,
-                              origin.y + std::sin(a) * combat.meleeReach),
-                       Screen(origin.x + std::cos(b) * combat.meleeReach,
-                              origin.y + std::sin(b) * combat.meleeReach),
+                       Screen(origin.x + std::cos(a) * melee.reach,
+                              origin.y + std::sin(a) * melee.reach),
+                       Screen(origin.x + std::cos(b) * melee.reach,
+                              origin.y + std::sin(b) * melee.reach),
                        center,
                        warning);
             }

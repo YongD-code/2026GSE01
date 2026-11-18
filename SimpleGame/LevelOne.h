@@ -176,6 +176,25 @@ class LevelOne
         float eaterWindupScale = 1, eaterDamageScale = 1, eaterRecoveryBonus = 1.25f;
     } combat;
 
+    struct MeleeProfile
+    {
+        float windup, recovery, reach, facingDot, triggerDistance, approachStop, approachSpeed;
+    };
+
+    static constexpr float SkeletonSwingDuration = 30.f / 24.f;
+    static constexpr float SkeletonHitPhase = .49f;
+
+    MeleeProfile MeleeFor(int species) const
+    {
+        if (species == SpiritCatalog::Skeleton)
+        {
+            return {SkeletonSwingDuration * SkeletonHitPhase,
+                    SkeletonSwingDuration * (1 - SkeletonHitPhase), 52.f, .48f, 47.f, 41.f, 60.f};
+        }
+        return {combat.meleeWindup, .65f, combat.meleeReach, combat.meleeFacingDot,
+                72.f, 62.f, combat.chaseSpeed};
+    }
+
     void LoadCombat()
     {
         wchar_t exe[32768] = {};
@@ -943,8 +962,19 @@ class LevelOne
                 continue;
             CampRecord& record = camps[key];
             const auto hash = World::Hash(key.first, key.second, seed + 712);
-            for (int slot = 0; slot < 2 + int(hash % 3); ++slot)
+            const int regularSlots = 2 + int(hash % 3);
+            // Slot 3 was never used by camps with two or three ordinary enemies.
+            // Adding a skeleton there preserves the species of every existing saved slot.
+            const bool skeletonSlot = regularSlots < 4 &&
+                                      std::hypot(baseX + 256, baseY + 256) > 950 &&
+                                      ((hash >> 32) & 3) == 0;
+            for (int slot = 0; slot < int(record.health.size()); ++slot)
             {
+                const bool skeleton = skeletonSlot && slot == 3;
+                if (slot >= regularSlots && !skeleton)
+                {
+                    continue;
+                }
                 if (enemies.size() >= 480)
                     return;
                 if (record.defeated & (1u << slot))
@@ -996,6 +1026,10 @@ class LevelOne
                 {
                     const int added[] = {SpiritCatalog::Stag, SpiritCatalog::Hound};
                     enemy.type = added[(hash >> (slot * 8 + 16)) % 2];
+                }
+                if (skeleton)
+                {
+                    enemy.type = SpiritCatalog::Skeleton;
                 }
                 if (SpiritCatalog::Get(enemy.type).bossOnly)
                 {
@@ -1075,6 +1109,7 @@ class LevelOne
             return;
         }
         const double distance = Distance(enemy.position, player);
+        const auto melee = MeleeFor(enemy.type);
         if (attackType == 3)
         {
             if (enemy.phase == 3 || enemy.phase == SaintSealRecoveryPhase)
@@ -1212,8 +1247,8 @@ class LevelOne
             if (attackType == 0)
             {
                 const double dx = player.x - enemy.position.x, dy = player.y - enemy.position.y;
-                if (distance < combat.meleeReach &&
-                    (dx * enemy.aim.x + dy * enemy.aim.y) >= distance * combat.meleeFacingDot &&
+                if (distance < melee.reach &&
+                    (dx * enemy.aim.x + dy * enemy.aim.y) >= distance * melee.facingDot &&
                     ClearLine(enemy.position, player, blocked))
                     Hurt(combat.meleeDamage);
             }
@@ -1236,10 +1271,10 @@ class LevelOne
                 }
             }
             enemy.phase = 3;
-            enemy.phaseTime = attackType == 0 ? .65f : 1.35f;
+            enemy.phaseTime = attackType == 0 ? melee.recovery : 1.35f;
             return;
         }
-        const double range = attackType == 0 ? 72 : (attackType == 1 ? 290 : 380);
+        const double range = attackType == 0 ? melee.triggerDistance : (attackType == 1 ? 290 : 380);
         if (distance < range && ClearLine(enemy.position, player, blocked))
         {
             const double length = (std::max)(.001, distance);
@@ -1253,14 +1288,17 @@ class LevelOne
             }
             enemy.phase = 1;
             enemy.phaseTime = attackType == 0
-                                  ? combat.meleeWindup
+                                  ? melee.windup
                                   : (attackType == 1 ? combat.chargeWindup : combat.rangedWindup);
             return;
         }
-        if (distance > 62)
+        if (distance > melee.approachStop)
         {
+            const float speed = enemy.type == SpiritCatalog::Skeleton &&
+                                        distance < melee.triggerDistance + 40.f
+                                    ? 24.f : melee.approachSpeed;
             const double step = (std::min)(
-                distance - 62, double(combat.chaseSpeed * dt * EnemyMovementFactor(enemy)));
+                distance - melee.approachStop, double(speed * dt * EnemyMovementFactor(enemy)));
             Move(enemy.position,
                  {(player.x - enemy.position.x) / distance * step,
                   (player.y - enemy.position.y) / distance * step},

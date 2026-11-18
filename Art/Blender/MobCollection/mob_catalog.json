@@ -458,6 +458,34 @@
         "runStanceFraction": 0.3,
         "method": "planted stance, two-bone IK bake, articulated toes, chest/pelvis weighting"
       }
+    },
+    {
+      "id": 7,
+      "key": "skeleton",
+      "name": "해골형 주령",
+      "disposition": "dangerous",
+      "gait": "biped",
+      "model": "skeleton/model.blend",
+      "export": "skeleton/model.glb",
+      "rig": "MOB_SKELETON_RIG",
+      "meshCount": 22,
+      "boneCount": 26,
+      "triangles": 8090,
+      "clips": {
+        "idle": "MOB_SKELETON_IDLE",
+        "walk": "MOB_SKELETON_WALK",
+        "run": "MOB_SKELETON_RUN",
+        "cast": "MOB_SKELETON_CAST",
+        "jump": "MOB_SKELETON_JUMP",
+        "turn_left": "MOB_SKELETON_TURN_LEFT",
+        "turn_right": "MOB_SKELETON_TURN_RIGHT",
+        "attack": "MOB_SKELETON_ATTACK"
+      },
+      "locomotion": {
+        "walkStrideRatio": 0.3625,
+        "runStrideRatio": 0.5801,
+        "runThresholdRatio": 0.53
+      }
     }
   ]
 }
