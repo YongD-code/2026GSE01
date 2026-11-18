@@ -371,6 +371,7 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
         FrameProfiler::Scope timing(FrameProfiler::Stage::Streaming);
         world.Stream(camera, target, width, height, residents);
     }
+    RefreshBestiary();
     Tutorials::DiscoverInventory(tutorials, levelOne);
     if (!pauseMenu && !journal && automaticSaveAllowed && autoSaveTime >= 30 && CanSaveProgress())
     {

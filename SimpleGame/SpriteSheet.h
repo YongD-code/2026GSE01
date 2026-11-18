@@ -118,6 +118,31 @@ class SpriteSheet
         }
     }
 
+    // Fit an idle atlas frame inside an album card, independent of world anchors.
+    void DrawPortrait(Renderer& renderer, Point center, float w, float h, Color tint)
+    {
+        if (!Ready() || w <= 0 || h <= 0)
+        {
+            return;
+        }
+        const int row = layout.directionRows[static_cast<int>(Facing::South)];
+        const int idle = layout.directionIdleColumns[static_cast<int>(Facing::South)];
+        const int column = idle >= 0 ? idle : layout.idleFrame;
+        const auto& frame = frames[row * layout.columns + column];
+        const float scale = (std::min)(w / frame.width, h / frame.height);
+        const float drawWidth = frame.width * scale, drawHeight = frame.height * scale;
+        renderer.Sprite(texture,
+                        center.x - drawWidth * .5f,
+                        center.y - drawHeight * .5f,
+                        drawWidth,
+                        drawHeight,
+                        frame.u0,
+                        frame.v0,
+                        frame.u1,
+                        frame.v1,
+                        tint);
+    }
+
     // Crop UVs rather than stretching or drawing outside the cinematic frame.
     void DrawCinematic(Renderer& renderer,
                        float x,

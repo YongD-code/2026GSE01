@@ -46,6 +46,7 @@ bool SaveProgress(bool manual, int slot = 0)
         return false;
     }
     FrameProfiler::Scope timing(FrameProfiler::Stage::SaveWrite);
+    RefreshBestiary();
     SaveGame::State state;
     state.seed = world.seed;
     state.story = SaveGame::StoryHash(chapter);
@@ -227,6 +228,7 @@ bool LoadProgress(bool startup = false, int slot = 0)
     state.level.SanitizeFieldEncounters();
     world = std::move(restoredWorld);
     levelOne = std::move(state.level);
+    ResetBestiary();
     population.people = std::move(state.residents);
     population.society = std::move(state.society);
     population.seed = world.seed;

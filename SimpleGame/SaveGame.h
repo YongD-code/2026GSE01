@@ -2,6 +2,7 @@
 #include "LevelOne.h"
 #include "Population.h"
 #include "Tutorials.h"
+#include "Bestiary.h"
 #include <iomanip>
 #include <locale>
 #include <limits>
@@ -14,7 +15,7 @@
 class SaveGame
 {
   public:
-    static constexpr int CurrentVersion = 10;
+    static constexpr int CurrentVersion = 11;
 
     struct State
     {
@@ -186,6 +187,10 @@ class SaveGame
         if (version >= 10)
         {
             a.Fields(s.tutorials.pending, s.tutorials.shown);
+        }
+        if (version >= 11)
+        {
+            a.Field(l.discoveredSpecies);
         }
         a.Fields(l.level,
                  l.experience,
@@ -667,8 +672,9 @@ class SaveGame
         const int sealerFight = authored.Index("C202");
         const bool defeatedSealer = l.resolvedBosses.count(StoryEncounter::OrderSealer) != 0;
         if (authored.quests.empty() || s.story != StoryHash(authored) || !s.tutorials.Valid() ||
-            !Point(s.player) || !Point(s.spirit) || !Point(s.keeper) ||
-            !Number(s.messageTime, 0, 60) || !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
+            (l.discoveredSpecies & ~Bestiary::KnownSpecies) != 0 || !Point(s.player) ||
+            !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
+            !Number(s.facing, 0, 7) || !Number(l.level, 1, 20) ||
             !Number(l.experience, 0, l.RequiredExperience() - 1) ||
             !Number(l.health, .001, l.MaximumHealth()) || !Number(l.weapon, 0, 20) ||
             !Number(l.gold, 0, 100000000) || !Number(l.potions, 0, 1000000) ||
@@ -911,6 +917,21 @@ class SaveGame
         {
             candidate.tutorials =
                 Tutorials::RestoreLegacy(candidate.level, candidate.chapter, chapter);
+        }
+        if (version < 11)
+        {
+            for (const auto& spirit : candidate.level.collection)
+            {
+                candidate.level.discoveredSpecies |= Bestiary::Bit(spirit.species);
+            }
+            for (int id : candidate.level.resolvedBosses)
+            {
+                const auto& encounter = StoryEncounter::Get(id);
+                if (encounter.humanAttack < 0)
+                {
+                    candidate.level.discoveredSpecies |= Bestiary::Bit(encounter.species);
+                }
+            }
         }
         output = std::move(candidate);
         return true;

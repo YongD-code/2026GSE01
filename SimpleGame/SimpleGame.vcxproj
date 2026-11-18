@@ -194,6 +194,8 @@
     <ClInclude Include="SaveGame.h" />
     <ClInclude Include="PrototypeSave.inl" />
     <ClInclude Include="Chapter.h" />
+    <ClInclude Include="Bestiary.h" />
+    <ClInclude Include="PrototypeBestiary.inl" />
     <ClInclude Include="Tutorials.h" />
     <ClInclude Include="CaptureRules.h" />
     <ClInclude Include="PrototypeMenu.inl" />

@@ -348,6 +348,7 @@ class LevelOne
     };
 
     std::vector<SpiritInstance> collection;
+    std::uint64_t discoveredSpecies = 0;
     std::array<int, 4> tickets = {{0, 0, 0, 0}};
     int selectedTicket = 0, saintRemains = 0;
     float skillCooldown = 0;

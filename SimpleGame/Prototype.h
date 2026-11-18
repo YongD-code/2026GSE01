@@ -103,6 +103,12 @@ class Prototype
     SpriteSheet spiritModelSheets[SpiritCatalog::Count];
     CharacterModel spiritMeshes[SpiritCatalog::Count];
     bool useSpiritModels = true;
+    SpriteSheet bestiaryBook;
+    int bestiarySpecies = 0, bestiaryTab = 0, bestiaryDetailPage = 0, bestiarySkill = 0;
+    int bestiarySpecimen = 0;
+    bool bestiaryDetailOpen = false;
+    size_t bestiaryCollectionSize = static_cast<size_t>(-1);
+    std::array<std::vector<int>, SpiritCatalog::Count> bestiarySpecimens;
     SpriteSheet storyEnemySheets[StoryEncounter::SpriteCount];
     SpriteSheet lootSheets[5];
     SpriteAnimation companionAnimation;
@@ -625,6 +631,7 @@ class Prototype
 #include "PrototypeControls.inl"
 #include "PrototypeSave.inl"
 #include "PrototypeMenu.inl"
+#include "PrototypeBestiary.inl"
 #include "PrototypeUI.inl"
 #include "PrototypeServices.inl"
 #include "PrototypeMonitoring.inl"
@@ -868,6 +875,7 @@ class Prototype
         lootLayout.firstWalkFrame = 0;
         lootLayout.walkFrames = 1;
         LoadPresentation(lootLayout);
+        bestiaryBook.Load(L"Assets/UI/bestiary_book.png", lootLayout);
         if (!domainPortrait.Load(L"Assets/Effects/domain_portrait.png", lootLayout))
         {
             std::cerr << "영역 컷인 이미지 로드 실패" << std::endl;
@@ -1170,6 +1178,19 @@ class Prototype
                 {
                     SelectCompanion((next + 1) % count);
                 }
+                bestiarySpecies = capturedSpirit;
+                bestiaryTab = 2;
+                bestiarySpecimen = 0;
+                RefreshBestiary();
+                const auto& specimens = bestiarySpecimens[bestiarySpecies];
+                const auto selected =
+                    std::find(specimens.begin(), specimens.end(), selectedCompanion);
+                if (selected != specimens.end())
+                {
+                    bestiarySpecimen = int(selected - specimens.begin());
+                }
+                bestiaryDetailPage = 0;
+                bestiaryDetailOpen = true;
             }
             return;
         }
@@ -1197,6 +1218,7 @@ class Prototype
             population.people.clear();
             population.society = Population::Society();
             levelOne = LevelOne();
+            ResetBestiary();
             tutorials.pending = 0;
             ResetTutorialDisplay();
             ResetControls();

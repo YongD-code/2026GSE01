@@ -262,6 +262,7 @@ void Prototype::NewGame()
     storyTrialTime = 0;
     world = World();
     levelOne = LevelOne();
+    ResetBestiary();
     tutorials = {};
     ResetTutorialDisplay();
     ResetControls();

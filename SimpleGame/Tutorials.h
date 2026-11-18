@@ -22,6 +22,7 @@ enum Id
     BondTicket,
     SaintSeal,
     OrderSeal,
+    BestiaryBook,
     Count
 };
 
@@ -47,6 +48,7 @@ inline constexpr std::array<Tip, Count> Tips = {{
     {"인연 부적", "이야기에서 사용처가 열릴 때까지 소지품에 보관됩니다."},
     {"성자의 봉인 파훼", "봉인이 빛날 때 가까이서 F를 누르거나 남겨진 자의 W를 맞히세요."},
     {"주령 봉쇄", "5초간 본체로 싸우거나 Tab 주령 탭에서 다른 개체를 고르세요."},
+    {"주령 도감", "J로 도감을 열어 생태와 술식을 읽고 포획 기록에서 동행을 고르세요."},
 }};
 
 struct History
@@ -81,7 +83,10 @@ inline void DiscoverInventory(History& history, const LevelOne& level)
     if (level.stones > 0)
         history.Discover(SpiritStone);
     if (!level.collection.empty())
+    {
         history.Discover(Companion);
+        history.Discover(BestiaryBook);
+    }
     if (level.tickets[1] > 0)
         history.Discover(StandardTicket);
     if (level.tickets[2] > 0)

@@ -137,20 +137,6 @@ std::vector<std::string> JournalEntries()
         if (levelOne.complete || chapter.step > chapter.Index("C109_RELIC"))
             add("성유물 · 일곱 번째 종이 울리는 날, 문이 열린다.");
     }
-    else if (menuTab == 2)
-    {
-        add("수집 · " + std::to_string(levelOne.collection.size()) + "개체 / N으로 동행 변경");
-        add(captured ? std::string("현재 동행 · ") + SpiritName(capturedSpirit) + " / 강화 +" +
-                           std::to_string(levelOne.spiritRank)
-                     : "아직 동행 주령이 없습니다.");
-        add("아이템 · 주령 종류와 관계없이 가까운 전리품을 자동 흡수합니다.");
-        for (size_t i = 0; i < levelOne.collection.size(); ++i)
-        {
-            const auto& entry = levelOne.collection[i];
-            add(std::to_string(i + 1) + " · " + SpiritName(entry.species) + " / 별 " +
-                std::to_string(entry.rarity) + (entry.memory ? " / 다른 기억" : ""));
-        }
-    }
     else if (menuTab == 3)
     {
         const auto* quest = chapter.Current();
@@ -256,7 +242,7 @@ std::vector<std::string> JournalEntries()
 
 bool VisualJournal() const
 {
-    return menuTab == 1 || menuTab == 2;
+    return menuTab == 1;
 }
 
 int JournalColumns() const
@@ -271,9 +257,7 @@ int VisualCapacity() const
 
 int JournalItemCount()
 {
-    return menuTab == 1   ? 11
-           : menuTab == 2 ? int(levelOne.collection.size())
-                          : int(JournalEntries().size());
+    return menuTab == 1 ? 11 : menuTab == 2 ? SpiritCatalog::Count : int(JournalEntries().size());
 }
 
 UIRect JournalSlot(int index) const
@@ -287,10 +271,7 @@ UIRect JournalSlot(int index) const
 void DrawJournalSlot(int index, int local)
 {
     const auto box = JournalSlot(local);
-    const bool spirits = menuTab == 2;
-    const bool selected = spirits
-                              ? captured && index == selectedCompanion
-                              : index >= 4 && index <= 6 && index - 4 == levelOne.selectedTicket;
+    const bool selected = index >= 4 && index <= 6 && index - 4 == levelOne.selectedTicket;
     const Color accents[] = {Color(.85f, .30f, .42f),
                              Color(.26f, .55f, .86f),
                              Color(.55f, .35f, .82f),
@@ -302,76 +283,38 @@ void DrawJournalSlot(int index, int local)
     r.Rect(box.x + 10, box.y + 14, 62, 70, Color(.87f, .91f, .98f));
     SpriteAnimation pose;
     std::string name, info, action;
-    if (spirits)
-    {
-        const auto& entry = levelOne.collection[index];
-        if (!DrawSpiritModel(entry.species, {box.x + 41, box.y + 81}, 62, pose, Color(1, 1, 1), 0))
-        {
-            spiritSheets[entry.species].Draw(
-                r, {box.x + 41, box.y + 81}, 62, pose, Color(1, 1, 1), width, height);
-        }
-        name = SpiritName(entry.species);
-        for (int star = 0; star < entry.rarity; ++star)
-        {
-            const float sx = box.x + 17 + star * 13;
-            r.Quad({sx, box.y + 82},
-                   {sx + 4, box.y + 87},
-                   {sx, box.y + 92},
-                   {sx - 4, box.y + 87},
-                   Color(.94f, .64f, .10f));
-        }
-        info =
-            "등급 " + std::to_string(entry.rarity) + " / 체력 " + std::to_string(int(entry.health));
-        if (levelOne.orderSeal.Blocks(index))
-        {
-            action =
-                "봉쇄 · " + std::to_string(int(std::ceil(levelOne.orderSeal.remaining))) + "초";
-        }
-        else
-        {
-            action = selected ? "동행 중" : "클릭하여 동행";
-            if (entry.memory)
-            {
-                action += " · 기억";
-            }
-        }
-    }
-    else
-    {
-        const char* names[] = {"회복물약",
-                               "강화석",
-                               "주령석",
-                               "전리품",
-                               "낡은 부적",
-                               "봉인 부적",
-                               "고급 부적",
-                               "인연 부적",
-                               "성자의 잔재",
-                               "검은 파편",
-                               "성유물"};
-        const int amounts[] = {
-            levelOne.potions,
-            levelOne.weaponStones,
-            levelOne.stones,
-            levelOne.spoils,
-            levelOne.tickets[0],
-            levelOne.tickets[1],
-            levelOne.tickets[2],
-            levelOne.tickets[3],
-            levelOne.saintRemains,
-            int(levelOne.resolvedBosses.count(1)),
-            int(levelOne.complete || chapter.step > chapter.Index("C109_RELIC"))};
-        const int icons[] = {2, 1, 3, 0, 4, 4, 4, 4, 3, 3, 3};
-        lootSheets[icons[index]].Draw(
-            r, {box.x + 41, box.y + 78}, 48, pose, Color(1, 1, 1), width, height);
-        name = names[index];
-        info = std::to_string(amounts[index]) + "개";
-        action = index == 0                 ? "클릭 사용 · H"
-                 : index >= 4 && index <= 6 ? (selected ? "선택한 부적" : "클릭 선택")
-                 : index == 7               ? "사용처 잠김"
-                 : index >= 8               ? "이야기 물품"
-                                            : "재료 · 상점 거래";
-    }
+    const char* names[] = {"회복물약",
+                           "강화석",
+                           "주령석",
+                           "전리품",
+                           "낡은 부적",
+                           "봉인 부적",
+                           "고급 부적",
+                           "인연 부적",
+                           "성자의 잔재",
+                           "검은 파편",
+                           "성유물"};
+    const int amounts[] = {levelOne.potions,
+                           levelOne.weaponStones,
+                           levelOne.stones,
+                           levelOne.spoils,
+                           levelOne.tickets[0],
+                           levelOne.tickets[1],
+                           levelOne.tickets[2],
+                           levelOne.tickets[3],
+                           levelOne.saintRemains,
+                           int(levelOne.resolvedBosses.count(1)),
+                           int(levelOne.complete || chapter.step > chapter.Index("C109_RELIC"))};
+    const int icons[] = {2, 1, 3, 0, 4, 4, 4, 4, 3, 3, 3};
+    lootSheets[icons[index]].Draw(
+        r, {box.x + 41, box.y + 78}, 48, pose, Color(1, 1, 1), width, height);
+    name = names[index];
+    info = std::to_string(amounts[index]) + "개";
+    action = index == 0                 ? "클릭 사용 · H"
+             : index >= 4 && index <= 6 ? (selected ? "선택한 부적" : "클릭 선택")
+             : index == 7               ? "사용처 잠김"
+             : index >= 8               ? "이야기 물품"
+                                        : "재료 · 상점 거래";
     const Color ink(.16f, .21f, .32f);
     WrappedText(box.x + 82, box.y + 32, box.w - 92, name, ink, 2);
     WrappedText(box.x + 82, box.y + 75, box.w - 92, info, ink, 1);
@@ -380,11 +323,20 @@ void DrawJournalSlot(int index, int local)
 
 int JournalCapacity() const
 {
+    if (menuTab == 2)
+    {
+        return Bestiary::Layout(JournalBounds()).capacity;
+    }
     return VisualJournal() ? VisualCapacity() : (std::max)(1, int((JournalBounds().h - 212) / 64));
 }
 
 void ChangeJournalPage(int delta)
 {
+    if (menuTab == 2 && Bestiary::Layout(JournalBounds()).compact && bestiaryDetailOpen)
+    {
+        ChangeBestiaryDetailPage(delta);
+        return;
+    }
     const int count =
         (std::max)(1, (JournalItemCount() + JournalCapacity() - 1) / JournalCapacity());
     journalPage = (std::max)(0, (std::min)(count - 1, journalPage + delta));
@@ -399,6 +351,11 @@ void JournalClick(int x, int y)
             journalPage = 0;
             return;
         }
+    if (menuTab == 2)
+    {
+        BestiaryClick(x, y);
+        return;
+    }
     if (VisualJournal())
     {
         for (int i = 0; i < JournalCapacity(); ++i)
@@ -410,10 +367,6 @@ void JournalClick(int x, int y)
                 levelOne.UsePotion();
             else if (menuTab == 1 && index >= 4 && index <= 6)
                 levelOne.selectedTicket = index - 4;
-            else if (menuTab == 2)
-            {
-                SelectCompanion(index);
-            }
             return;
         }
     }
@@ -424,6 +377,11 @@ void JournalClick(int x, int y)
 
 void DrawJournal()
 {
+    if (menuTab == 2)
+    {
+        DrawBestiary();
+        return;
+    }
     const auto b = JournalBounds();
     const Color ivory(.16f, .21f, .32f), gold(.23f, .34f, .58f), muted(.38f, .43f, .54f);
     r.Rect(0, 0, float(width), float(height), Color(0, 0, 0, .76f));
