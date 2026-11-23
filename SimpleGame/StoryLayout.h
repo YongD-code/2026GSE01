@@ -14,6 +14,14 @@ inline constexpr WorldPoint ShrineGuard = {1580, 235};
 inline constexpr WorldPoint ShrineFrameA = {1280, 235};
 inline constexpr WorldPoint ShrineFrameB = {1660, 330};
 inline constexpr WorldPoint ShrineLedger = {1450, 295};
+inline constexpr WorldPoint GarMeeting = {1800, 90};
+inline constexpr WorldPoint GarPost = {2080, 290};
+inline constexpr WorldPoint GarIndex = {2350, 180};
+inline constexpr WorldPoint GarExternal = {2350, 20};
+inline constexpr WorldPoint GarLedger = {2490, 230};
+inline constexpr WorldPoint GarCopy = {2620, 230};
+inline constexpr WorldPoint CityGate = {2350, -545};
+inline constexpr WorldPoint CitySquare = {2350, -680};
 constexpr double SaintSealInteractRange = 55;
 
 struct OrderGuard
@@ -131,7 +139,37 @@ inline const std::vector<Site>& Sites()
          "C203_RESULT",
          "",
          6,
-         {{{0, 6, 3, 6}}, 1.f}}};
+         {{{0, 6, 3, 6}}, 1.f}},
+        {"gar_meeting",
+         "성흔기사 가르",
+         Kind::Adult,
+         GarMeeting,
+         "C204",
+         "C205",
+         6,
+         {{{1, 5, 3, 6}}, 1.2f}},
+        {"gar_court", "성흔회 결투장", Kind::Evidence, {1850, 290}, "C204", ""},
+        {"gar_post",
+         "성흔기사 가르",
+         Kind::Adult,
+         GarPost,
+         "C206",
+         "C207",
+         6,
+         {{{1, 5, 3, 6}}, 1.2f}},
+        {"gar_index", "전초 기록소 · 인계 색인", Kind::Evidence, GarIndex, "C207", ""},
+        {"gar_external", "외부 인계실 · 사본", Kind::Evidence, GarExternal, "C207", ""},
+        {"gar_ledger", "수도원 운송 대조대", Kind::Evidence, GarLedger, "C207", ""},
+        {"gar_copy", "도시행 운송대장", Kind::Evidence, GarCopy, "C207", ""},
+        {"gar_after",
+         "성흔기사 가르",
+         Kind::Adult,
+         {2440, 60},
+         "C207",
+         "C208",
+         6,
+         {{{1, 5, 3, 6}}, 1.2f}},
+        {"city_gate", "죽은 자의 도시 성문", Kind::Evidence, CityGate, "C208", ""}};
     return sites;
 }
 
@@ -169,7 +207,10 @@ inline const std::vector<WorldObject>& Buildings()
                                                        {0, 3060, -300, 260, 150, 160},
                                                        {2, 3090, 95, 24, 24, 80},
                                                        {2, 3350, 95, 24, 24, 80},
-                                                       {0, 1380, 350, 140, 42, 115}};
+                                                       {0, 1380, 350, 140, 42, 115},
+                                                       {0, 2360, 300, 180, 110, 114},
+                                                       {0, 2110, -790, 155, 105, 136},
+                                                       {0, 2430, -790, 155, 105, 136}};
     return buildings;
 }
 } // namespace StoryLayout

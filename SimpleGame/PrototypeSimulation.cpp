@@ -272,6 +272,11 @@ void Prototype::UpdateSimulation(float dt, bool sprint)
             StartStoryScene(StoryScene::RoomVictory);
             return;
         }
+        if (garEngaged && levelOne.resolvedBosses.count(StoryEncounter::Gar))
+        {
+            FinishGarDuel();
+            return;
+        }
         if (!controlling && levelOne.companionCooldown > previousCompanionCooldown)
         {
             spiritCastPose = .55f;

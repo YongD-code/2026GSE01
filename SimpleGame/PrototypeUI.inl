@@ -40,6 +40,10 @@ const char* CompletedStoryTitle() const
     {
         return "퀘스트 데이터 없음";
     }
+    if (chapter.step > chapter.Index("C208"))
+    {
+        return "2장 완료 · 죽은 자의 도시";
+    }
     if (chapter.step > chapter.Index("C203_LEDGER"))
     {
         return "숲 사당 조사 완료";
@@ -158,6 +162,17 @@ std::vector<std::string> JournalEntries()
                 if (chapter.step > chapter.Index("C203_LEDGER"))
                     add("보관 중인 사건 물증 · 종 받침의 운송 인계표 / 성흔회 지휘관 추적");
             }
+        }
+        if (levelOne.garChoice)
+        {
+            const char* choices[] = {"", "신뢰의 출발점", "불신 · 외부 인계 기록", "조건부 협력"};
+            add(std::string("가르 · ") + choices[levelOne.garChoice]);
+            if (levelOne.garRecords & 1)
+                add("물증 · 사당 운송 번호 확인");
+            if (levelOne.garRecords & 2)
+                add("물증 · 수도원과 폐수문의 운송 기록 일치");
+            if (levelOne.garRecords & 4)
+                add("물증 · 도시행 운송대장 / 동생과 일치하는 특징 / 죽은 자의 도시 위치");
         }
         else if (chapter.step > chapter.Index("C202_MARK"))
         {
@@ -611,6 +626,26 @@ void DrawQuestTracker()
         progress = done / 4.f;
         counter = std::to_string(done) + " / 4";
     }
+    else if (quest->id == "C205")
+    {
+        for (const auto& enemy : levelOne.enemies)
+        {
+            if (enemy.boss == StoryEncounter::Gar && enemy.health > 0)
+            {
+                progress =
+                    (std::max)(0.f, (std::min)(1.f, (1.f - enemy.health / enemy.maximum) / .9f));
+                break;
+            }
+        }
+        counter = std::to_string(int(progress * 100)) + "%";
+    }
+    else if (quest->id == "C207")
+    {
+        const int done = (levelOne.garRecords & 1 ? 1 : 0) + (levelOne.garRecords & 2 ? 1 : 0) +
+                         (levelOne.garRecords & 4 ? 1 : 0);
+        progress = done / 3.f;
+        counter = std::to_string(done) + " / 3";
+    }
     else
     {
         const bool encounter = quest->trigger == "fight" || quest->trigger == "first_capture";
@@ -820,6 +855,24 @@ void HUD()
     if (chapter.choicePending || levelOne.Dead())
     {
         r.Rect(0, 0, sw, sh, Color(0, 0, 0, .76f));
+        if (GarChoiceOpen())
+        {
+            const float w = (std::min)(640.f, sw - 40), x = (sw - w) / 2;
+            const float y = (sh - 306.f) / 2;
+            Panel(x, y, w, 306);
+            r.Text(x + 24, y + 29, "성흔기사 가르 · 결투의 끝", gold, true);
+            WrappedText(x + 24,
+                        y + 57,
+                        w - 48,
+                        "가르는 검을 내려놓았다. 선택은 이후 관계와 지원에 반영된다.",
+                        ivory,
+                        2);
+            const char* labels[] = {
+                "1  살려둔다", "2  마지막 공격 시도", "3  성유물 정보를 요구한다", "4  돌아가기"};
+            for (int i = 0; i < 4; ++i)
+                UIButton(ShrineChoiceButton(i), labels[i]);
+            return;
+        }
         if (ShrineChoiceOpen())
         {
             const float w = (std::min)(640.f, sw - 40), x = (sw - w) / 2;
@@ -865,9 +918,12 @@ void HUD()
         else
         {
             UIButton({x + 24, y + 62, w - 48, 44},
-                     cemeteryEngaged ? "R  묘역 입구에서 재도전" : "F9  저장된 여정 불러오기");
+                     garEngaged        ? "R  가르 결투장에서 재도전"
+                     : cemeteryEngaged ? "R  묘역 입구에서 재도전"
+                                       : "F9  저장된 여정 불러오기");
             UIButton({x + 24, y + 120, w - 48, 44},
-                     cemeteryEngaged ? "F9  저장된 여정 불러오기" : "R  처음부터 시작");
+                     garEngaged || cemeteryEngaged ? "F9  저장된 여정 불러오기"
+                                                   : "R  처음부터 시작");
         }
         return;
     }

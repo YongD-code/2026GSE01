@@ -97,3 +97,23 @@ inline bool Blocked(WorldPoint p, bool gateClosed)
            p.y < gate.y + gate.d + 16;
 }
 } // namespace CemeteryRoom
+
+namespace GarCourt
+{
+inline constexpr WorldObject Bounds = {0, 1850, 150, 460, 280, 0};
+inline constexpr WorldPoint Gate = {1850, 290};
+inline constexpr WorldPoint Outside = {1770, 290};
+inline constexpr WorldPoint Entry = {1940, 290};
+inline constexpr WorldPoint Boss = {2190, 290};
+
+inline bool Contains(WorldPoint p, double margin = 0)
+{
+    return p.x >= Bounds.x - margin && p.x <= Bounds.x + Bounds.w + margin &&
+           p.y >= Bounds.y - margin && p.y <= Bounds.y + Bounds.d + margin;
+}
+
+inline bool Barrier(WorldPoint p)
+{
+    return Contains(p, 12) && !Contains(p, -12);
+}
+} // namespace GarCourt

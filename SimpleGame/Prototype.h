@@ -45,11 +45,15 @@ class Prototype
         None,
         RoomEntrance,
         RoomVictory,
-        SealDiscovery
+        SealDiscovery,
+        GarEntrance,
+        GarEscort,
+        CityArrival
     };
     StoryScene storyScene = StoryScene::None;
     float storySceneTime = 0;
     bool cemeteryEngaged = false;
+    bool garEngaged = false;
     WorldPoint cemeteryBossPosition = CemeteryRoom::Boss();
     int dialoguePage = 0;
     bool pauseMenu = false, exitConfirm = false, exitRequested = false, skipExitSave = false;
@@ -215,6 +219,10 @@ class Prototype
 
     bool Blocked(WorldPoint p)
     {
+        if (garEngaged && GarCourt::Barrier(p))
+        {
+            return true;
+        }
         if (CemeteryRoom::Contains(p, 30) && CemeteryRoom::Blocked(p, !CemeteryCleared()))
         {
             return true;
@@ -310,6 +318,10 @@ class Prototype
             return;
         }
         if (InteractShrine())
+        {
+            return;
+        }
+        if (InteractGar())
         {
             return;
         }
@@ -412,6 +424,13 @@ class Prototype
                        ? "맡겨 준 주령은 봉인해 기록소로 옮기겠다. 지휘관에게도 이 일을 전하겠다."
                        : "포획기사는 살아 있다. 종 받침의 운송 기록은 지휘관도 찾고 있는 물증이다.";
         }
+        if (site.id == "gar_after")
+        {
+            return levelOne.garChoice == 1
+                       ? "네가 실험의 편이 아니라는 걸 믿겠다. 기록소의 운송대장을 확인해."
+                       : "아직 모든 것을 믿을 수는 없다. 그래도 일곱 번째 종에 관한 정보는 "
+                         "공유하겠다.";
+        }
         const auto* quest = chapter.Current();
         for (int i = 0; i < chapter.step && i < int(chapter.quests.size()); ++i)
         {
@@ -472,6 +491,10 @@ class Prototype
             return;
         }
         if (UpdateShrine(*quest))
+        {
+            return;
+        }
+        if (UpdateGar(*quest))
         {
             return;
         }
@@ -1131,6 +1154,14 @@ class Prototype
         }
         if (chapter.choicePending && !journal)
         {
+            if (GarChoiceOpen())
+            {
+                if (key >= '1' && key <= '4')
+                {
+                    ChooseGar(key - '0');
+                }
+                return;
+            }
             if (ShrineChoiceOpen())
             {
                 if (key >= '1' && key <= '4')
@@ -1237,6 +1268,11 @@ class Prototype
 
         if (key == 'r' && levelOne.Dead())
         {
+            if (garEngaged)
+            {
+                RetryGar();
+                return;
+            }
             if (cemeteryEngaged)
             {
                 RetryCemetery();
@@ -1359,6 +1395,16 @@ class Prototype
     bool NearShrineSpirit() const;
     int ShrineProgress() const;
     void ChooseShrine(int disposition);
+    bool UpdateGar(const Chapter::Quest& quest);
+    bool InteractGar();
+    bool GarChoiceOpen() const;
+    WorldPoint GarRecordPosition() const;
+    void ChooseGar(int choice);
+    void EnterGar();
+    void FinishGarDuel();
+    void RetryGar();
+    void BindGarCourt();
+    void BindCityEntrance();
     int DefeatedOrderGuards() const;
     bool CanCompareSaintSeal() const;
     void CompareSaintSeal();

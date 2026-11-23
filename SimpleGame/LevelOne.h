@@ -23,6 +23,13 @@ class LevelOne
     static constexpr double OrderSealRadius = 64.;
     static constexpr float PlayerInterventionSeconds = 5.f;
     static constexpr float TargetSwitchNoticeSeconds = 1.6f;
+    static constexpr float GarSweepWindup = .58f;
+    static constexpr double GarSweepReach = 105.;
+    static constexpr double GarSweepDot = .25;
+    static constexpr float GarLungeWindup = .85f;
+    static constexpr float GarLungeTime = .42f;
+    static constexpr double GarLungeSpeed = 420.;
+    static constexpr double GarLungeRadius = 30.;
 
     struct OrderSeal
     {
@@ -72,6 +79,8 @@ class LevelOne
         int ritualCount = 0;
         int orderSealTarget = -1;
         float orderSealCooldown = 0;
+        int garPattern = 0, garPressure = 0, garSequence = 0, garTrackedCompanion = -1;
+        bool garHit = false;
         EaterBoss::State eater;
 
         bool SaintSealExposed() const
@@ -358,6 +367,8 @@ class LevelOne
     int shrineFrames = 0;
     int shrineDisposition = 0; // 0 pending, 1 captured, 2 purified, 3 handed over.
     int shrineCaptureAttempts = 0;
+    int garChoice = 0; // 1 spare, 2 finishing attack attempt, 3 ask for information.
+    int garRecords = 0;
     // Session-only arena ownership. Snapshots are taken outside active fights.
     int arenaBoss = 0;
 
@@ -396,7 +407,7 @@ class LevelOne
             camps[enemy.camp].defeated |= 1u << enemy.slot;
             camps[enemy.camp].health[enemy.slot] = 0;
         }
-        if (enemy.boss == StoryEncounter::OrderSealer)
+        if (enemy.boss == StoryEncounter::OrderSealer || enemy.boss == StoryEncounter::Gar)
         {
             orderSeal = {};
         }
@@ -508,7 +519,7 @@ class LevelOne
         LegacyRemnant
     };
 
-    Enemy* ShrineActor(int id)
+    Enemy* ActiveStoryEnemy(int id)
     {
         for (auto& enemy : enemies)
         {
@@ -522,7 +533,7 @@ class LevelOne
 
     void RefreshShrineWeakness()
     {
-        auto* bell = ShrineActor(StoryEncounter::BellWraith);
+        auto* bell = ActiveStoryEnemy(StoryEncounter::BellWraith);
         if (bell && !bell->weakened && shrineFrames == 3 && bell->health <= bell->maximum * .2f)
         {
             bell->health = bell->maximum * .2f;
@@ -537,7 +548,7 @@ class LevelOne
 
     bool DisposeShrineSpirit(int disposition)
     {
-        auto* bell = ShrineActor(StoryEncounter::BellWraith);
+        auto* bell = ActiveStoryEnemy(StoryEncounter::BellWraith);
         if (!bell || !bell->weakened || shrineDisposition != 0 ||
             resolvedBosses.count(StoryEncounter::ShrineGuard) == 0 || disposition < 1 ||
             disposition > 3)
@@ -610,6 +621,21 @@ class LevelOne
             RefreshShrineWeakness();
             return;
         }
+        if (enemy.boss == StoryEncounter::Gar)
+        {
+            if (damage > 0 && (owner == DamageSource::AutomaticCompanion || damageSpirit >= 0))
+            {
+                enemy.garPressure = (std::min)(3, enemy.garPressure + 1);
+            }
+            if (enemy.health - damage <= enemy.maximum * .1f)
+            {
+                // A duel surrender is terminal for combat, never a death or a remnant.
+                enemy.phase = 0;
+                enemy.alerted = false;
+                Resolve(enemy, false);
+                return;
+            }
+        }
         enemy.health -= enemy.boss == 12 ? .05f : damage;
         if (enemy.boss == 12)
         {
@@ -663,7 +689,8 @@ class LevelOne
 
     static bool IsCombatBoss(const Enemy& enemy)
     {
-        return (enemy.boss >= 1 && enemy.boss <= 4) || enemy.boss == 12;
+        return (enemy.boss >= 1 && enemy.boss <= 4) || enemy.boss == 12 ||
+               enemy.boss == StoryEncounter::Gar;
     }
 
     template <class Collision>
@@ -742,6 +769,10 @@ class LevelOne
         else if (id == StoryEncounter::BellWraith)
         {
             enemy.maximum = 280.f;
+        }
+        else if (id == StoryEncounter::Gar)
+        {
+            enemy.maximum = 620.f;
         }
         enemy.health = enemy.maximum;
         enemies.push_back(enemy);
@@ -982,7 +1013,8 @@ class LevelOne
                                if (enemy.boss != 0 ||
                                    (!SpiritCatalog::Get(enemy.type).bossOnly &&
                                     !World::CemeteryReserved(enemy.position) &&
-                                    (enemy.weakened || !World::ShrineReserved(enemy.home, 64))))
+                                    (enemy.weakened || (!World::ShrineReserved(enemy.home, 64) &&
+                                                        !World::GarReserved(enemy.home, 64)))))
                                {
                                    return false;
                                }
@@ -1081,7 +1113,7 @@ class LevelOne
                     home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
                             baseY + 60 + (quadrant / 2) * 256 + double((placement >> 16) % 120)};
                     if (World::Settlement(home.x, home.y) || World::CemeteryReserved(home, 64) ||
-                        World::ShrineReserved(home, 64))
+                        World::ShrineReserved(home, 64) || World::GarReserved(home, 64))
                     {
                         continue;
                     }
@@ -1212,7 +1244,7 @@ class LevelOne
                 Hurt(damage);
             }
             auto* rival =
-                ShrineActor(bell ? StoryEncounter::ShrineGuard : StoryEncounter::BellWraith);
+                ActiveStoryEnemy(bell ? StoryEncounter::ShrineGuard : StoryEncounter::BellWraith);
             if (rival && !rival->weakened && inHit(rival->position))
             {
                 // Rival attacks are real hits, but cannot finish the player's objective alone.
@@ -1256,6 +1288,137 @@ class LevelOne
     }
 
     template <class Collision>
+    void AttackGar(Enemy& enemy,
+                   WorldPoint target,
+                   float dt,
+                   Collision blocked,
+                   WorldPoint companion,
+                   int equipped)
+    {
+        if (enemy.garTrackedCompanion != equipped)
+        {
+            enemy.garTrackedCompanion = equipped;
+            enemy.garPressure = 0;
+        }
+        enemy.phaseTime -= dt;
+        enemy.orderSealCooldown = (std::max)(0.f, enemy.orderSealCooldown - dt);
+        const float recovery = enemy.health < enemy.maximum * .5f ? .72f : 1.1f;
+        if (enemy.phase == OrderSealWindupPhase)
+        {
+            UpdateOrderSeal(enemy, companion, equipped, blocked);
+            return;
+        }
+        if (enemy.phase == 3)
+        {
+            if (enemy.phaseTime <= 0)
+            {
+                enemy.phase = 0;
+            }
+            return;
+        }
+        if (enemy.phase == 2)
+        {
+            double step = GarLungeSpeed * (std::min)(dt, (std::max)(0.f, enemy.phaseTime + dt));
+            const WorldPoint before = enemy.position;
+            // Stop at the first barrier rather than sliding sideways outside the telegraph.
+            WorldPoint next = {before.x + enemy.aim.x * step, before.y + enemy.aim.y * step};
+            const bool reachedWall = !ClearLine(before, next, blocked);
+            if (reachedWall)
+            {
+                for (int i = 0; i < 5; ++i)
+                {
+                    step *= .5;
+                    next = {before.x + enemy.aim.x * step, before.y + enemy.aim.y * step};
+                    if (ClearLine(before, next, blocked))
+                        break;
+                }
+            }
+            if (ClearLine(before, next, blocked))
+            {
+                enemy.position = next;
+                RecordTrail(enemy.trail, enemy.position, blocked);
+                const double along =
+                    (std::max)(0.,
+                               (std::min)(step,
+                                          (target.x - before.x) * enemy.aim.x +
+                                              (target.y - before.y) * enemy.aim.y));
+                const WorldPoint contact = {before.x + enemy.aim.x * along,
+                                            before.y + enemy.aim.y * along};
+                if (!enemy.garHit && Distance(target, contact) < GarLungeRadius &&
+                    ClearLine(contact, target, blocked))
+                {
+                    enemy.garHit = true;
+                    Hurt(combat.chargeDamage * 1.45f);
+                }
+            }
+            if (reachedWall)
+            {
+                enemy.phaseTime = 0;
+            }
+            if (enemy.phaseTime <= 0)
+            {
+                enemy.phase = 3;
+                enemy.phaseTime = recovery + .25f;
+            }
+            return;
+        }
+        const double distance = Distance(enemy.position, target);
+        if (enemy.phase == 1)
+        {
+            if (enemy.phaseTime > 0)
+            {
+                return;
+            }
+            if (enemy.garPattern == 1)
+            {
+                enemy.garHit = false;
+                enemy.phase = 2;
+                enemy.phaseTime = GarLungeTime;
+                return;
+            }
+            const double dot = (target.x - enemy.position.x) * enemy.aim.x +
+                               (target.y - enemy.position.y) * enemy.aim.y;
+            if (distance < GarSweepReach && dot >= distance * GarSweepDot &&
+                ClearLine(enemy.position, target, blocked))
+            {
+                Hurt(combat.meleeDamage * 1.5f);
+            }
+            enemy.phase = 3;
+            enemy.phaseTime = recovery;
+            return;
+        }
+        if ((enemy.garSequence % 3 == 2 || enemy.garPressure >= 3) &&
+            UpdateOrderSeal(enemy, companion, equipped, blocked))
+        {
+            enemy.garPressure = 0;
+            ++enemy.garSequence;
+            return;
+        }
+        const bool lunge = enemy.garSequence % 3 == 1 || distance > 120;
+        const double range = lunge ? 185. : 97.;
+        if (distance <= range && ClearLine(enemy.position, target, blocked))
+        {
+            const double length = (std::max)(.001, distance);
+            enemy.aim = {(target.x - enemy.position.x) / length,
+                         (target.y - enemy.position.y) / length};
+            enemy.garPattern = lunge ? 1 : 0;
+            ++enemy.garSequence;
+            enemy.phase = 1;
+            enemy.phaseTime = lunge ? GarLungeWindup : GarSweepWindup;
+            return;
+        }
+        if (distance > 76)
+        {
+            const double step = (std::min)(distance - 76, 85. * dt * EnemyMovementFactor(enemy));
+            Move(enemy.position,
+                 {(target.x - enemy.position.x) / distance * step,
+                  (target.y - enemy.position.y) / distance * step},
+                 blocked,
+                 &enemy.trail);
+        }
+    }
+
+    template <class Collision>
     void AttackEnemy(Enemy& enemy,
                      WorldPoint player,
                      float dt,
@@ -1263,6 +1426,11 @@ class LevelOne
                      WorldPoint companion,
                      int equipped)
     {
+        if (enemy.boss == StoryEncounter::Gar)
+        {
+            AttackGar(enemy, player, dt, blocked, companion, equipped);
+            return;
+        }
         const int attackType = StoryEncounter::AttackType(enemy.boss, enemy.type);
         enemy.stagger = (std::max)(0.f, enemy.stagger - dt);
         enemy.staggerGuard = (std::max)(0.f, enemy.staggerGuard - dt);
@@ -1712,9 +1880,9 @@ class LevelOne
                     enemy.animation.moving = false;
                     continue;
                 }
-                auto* rival = ShrineActor(enemy.boss == StoryEncounter::BellWraith
-                                              ? StoryEncounter::ShrineGuard
-                                              : StoryEncounter::BellWraith);
+                auto* rival = ActiveStoryEnemy(enemy.boss == StoryEncounter::BellWraith
+                                                   ? StoryEncounter::ShrineGuard
+                                                   : StoryEncounter::BellWraith);
                 if (rival && !rival->weakened &&
                     Distance(enemy.position, rival->position) <
                         Distance(enemy.position, combatTarget) &&

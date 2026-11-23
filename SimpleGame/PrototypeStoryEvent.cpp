@@ -8,6 +8,12 @@ bool Prototype::CemeteryCleared() const
 
 bool Prototype::StoryVisible(const StoryLayout::Site& site) const
 {
+    if ((site.id == "gar_index" && levelOne.garChoice == 2) ||
+        (site.id == "gar_external" && levelOne.garChoice != 2) ||
+        (site.id == "gar_after" && levelOne.garChoice == 2))
+    {
+        return false;
+    }
     return StoryLayout::Visible(site, chapter) && (site.id != "seal" || CemeteryCleared());
 }
 
@@ -18,6 +24,21 @@ WorldPoint Prototype::StoryPosition(const StoryLayout::Site& site) const
 
 WorldPoint Prototype::StoryObjectivePosition(const Chapter::Quest& quest) const
 {
+    if (quest.id == "C205")
+    {
+        if (garEngaged)
+        {
+            for (const auto& enemy : levelOne.enemies)
+                if (enemy.boss == StoryEncounter::Gar && enemy.health > 0)
+                    return enemy.position;
+            return GarCourt::Boss;
+        }
+        return GarCourt::Gate;
+    }
+    if (quest.id == "C207")
+    {
+        return GarRecordPosition();
+    }
     if (quest.id == "C203")
     {
         if (!(levelOne.shrineFrames & 1))
@@ -73,6 +94,17 @@ WorldPoint Prototype::StoryObjectivePosition(const Chapter::Quest& quest) const
 
 std::string Prototype::StoryObjectiveText(const Chapter::Quest& quest) const
 {
+    if (quest.id == "C205")
+        return garEngaged ? "가르 체력을 10%까지 낮추기" : "결투장 입구에서 F로 진입하기";
+    if (quest.id == "C207")
+    {
+        if (!(levelOne.garRecords & 1))
+            return levelOne.garChoice == 2 ? "외부 인계실 사본에서 운송 번호 찾기"
+                                           : "전초 기록소 인계 색인에서 운송 번호 찾기";
+        if (!(levelOne.garRecords & 2))
+            return "수도원 장부의 운송 번호와 대조하기";
+        return "도시행 운송대장에서 이송자 특징 확인하기";
+    }
     if (quest.id == "C203")
     {
         if (!(levelOne.shrineFrames & 1))
@@ -314,6 +346,216 @@ void Prototype::ChooseShrine(int disposition)
     autoSaveTime = 30;
 }
 
+WorldPoint Prototype::GarRecordPosition() const
+{
+    if (!(levelOne.garRecords & 1))
+        return levelOne.garChoice == 2 ? StoryLayout::GarExternal : StoryLayout::GarIndex;
+    if (!(levelOne.garRecords & 2))
+        return StoryLayout::GarLedger;
+    return StoryLayout::GarCopy;
+}
+
+bool Prototype::GarChoiceOpen() const
+{
+    const auto* quest = chapter.Current();
+    return chapter.choicePending && quest && quest->id == "C206";
+}
+
+bool Prototype::UpdateGar(const Chapter::Quest& quest)
+{
+    if (quest.id == "C205")
+    {
+        chapter.rewardPending = false;
+        if (levelOne.resolvedBosses.count(StoryEncounter::Gar))
+            FinishGarDuel();
+        return true;
+    }
+    if (quest.id == "C206" || quest.id == "C207" || quest.id == "C208")
+    {
+        chapter.rewardPending = false;
+        return true;
+    }
+    return false;
+}
+
+bool Prototype::InteractGar()
+{
+    const auto* quest = chapter.Current();
+    if (!quest || controlling)
+        return false;
+    if (quest->id == "C205" && !garEngaged && Distance(player, GarCourt::Gate) < 85)
+    {
+        EnterGar();
+        return true;
+    }
+    if (quest->id == "C206" && Distance(player, StoryLayout::GarPost) < 90)
+    {
+        ClearInput();
+        chapter.choicePending = true;
+        return true;
+    }
+    if (quest->id == "C207" && Distance(player, GarRecordPosition()) < 62)
+    {
+        const int before = levelOne.garRecords;
+        levelOne.garRecords = before == 0 ? 1 : before == 1 ? 3 : 7;
+        ClearInput();
+        if (before == 0)
+            Say("운송 번호",
+                levelOne.garChoice == 2
+                    ? "후송 인력이 남긴 외부 인계실의 사본에서 사당의 번호와 같은 항목을 찾았다."
+                    : "가르가 알려 준 색인에서 사당의 운송 번호를 찾았다.");
+        else if (before == 1)
+            Say("수도원 장부",
+                "번호는 폐수문 중계 창고의 장부와 일치한다. 이어지는 목적지를 확인하자.");
+        else
+        {
+            Say("도시행 운송대장",
+                "최근 이송자 기록에 동생의 신체 특징과 일치하는 항목이 있다. 목적지는 죽은 자의 "
+                "도시다. 아직 이름은 확인할 수 없다.");
+            AdvanceChapter();
+        }
+        dialoguePending = true;
+        autoSaveTime = 30;
+        return true;
+    }
+    if (quest->id == "C208" && Distance(player, StoryLayout::CityGate) < 75)
+    {
+        StartStoryScene(StoryScene::CityArrival);
+        return true;
+    }
+    return false;
+}
+
+void Prototype::ChooseGar(int choice)
+{
+    if (!GarChoiceOpen() || choice < 1 || choice > 4)
+        return;
+    chapter.choicePending = false;
+    ClearInput();
+    if (choice == 4)
+        return;
+    levelOne.garChoice = choice;
+    if (choice == 2)
+    {
+        AdvanceChapter();
+        StartStoryScene(StoryScene::GarEscort);
+        return;
+    }
+    const char* lines[] = {"",
+                           "가르: 네가 살려둘 줄은 몰랐다. 일곱 번째 종이 울리면 죽은 자와 산 자의 "
+                           "경계가 무너진다. 전초 기록소를 열어 주겠다.",
+                           "",
+                           "가르: 일곱 번째 종이 울리면 경계가 무너진다. 네 말을 전부 믿지는 "
+                           "않겠지만 기록소에서 증거를 확인해라."};
+    Say("결투의 결과", lines[choice]);
+    dialoguePending = true;
+    AdvanceChapter();
+    autoSaveTime = 30;
+}
+
+void Prototype::EnterGar()
+{
+    SaveProgress(false);
+    ClearInput();
+    controlling = false;
+    levelOne.damageSpirit = -1;
+    player = GarCourt::Entry;
+    spirit = {player.x + 30, player.y - 20};
+    // Ordinary roaming combatants are not part of the duel. Return them to their homes.
+    for (auto& enemy : levelOne.enemies)
+    {
+        if (enemy.boss == 0 && !enemy.weakened && GarCourt::Contains(enemy.position, 20))
+        {
+            enemy.position = enemy.home;
+            enemy.alerted = enemy.returning = false;
+            enemy.phase = 0;
+            enemy.trail.assign(1, enemy.home);
+        }
+    }
+    garEngaged = true;
+    levelOne.arenaBoss = StoryEncounter::Gar;
+    levelOne.EnsureBoss(StoryEncounter::Gar,
+                        GarCourt::Boss,
+                        player,
+                        [this](WorldPoint p)
+                        {
+                            return Blocked(p);
+                        });
+    auto* gar = levelOne.ActiveStoryEnemy(StoryEncounter::Gar);
+    if (!gar)
+    {
+        garEngaged = false;
+        levelOne.arenaBoss = 0;
+        player = spirit = GarCourt::Outside;
+        Say("결투장", "전투 장소를 준비하지 못했습니다. 입구에서 다시 시도하세요.");
+        return;
+    }
+    gar->alerted = true;
+    StartStoryScene(StoryScene::GarEntrance);
+}
+
+void Prototype::FinishGarDuel()
+{
+    const auto* quest = chapter.Current();
+    if (!quest || quest->id != "C205" || !levelOne.resolvedBosses.count(StoryEncounter::Gar))
+        return;
+    garEngaged = false;
+    levelOne.arenaBoss = 0;
+    levelOne.orderSeal = {};
+    levelOne.health = (std::max)(1.f, levelOne.health);
+    controlling = false;
+    levelOne.damageSpirit = -1;
+    spirit = player;
+    skillEffects.clear();
+    levelOne.projectiles.erase(std::remove_if(levelOne.projectiles.begin(),
+                                              levelOne.projectiles.end(),
+                                              [](const LevelOne::Projectile& shot)
+                                              {
+                                                  return GarCourt::Contains(shot.position, 120);
+                                              }),
+                               levelOne.projectiles.end());
+    ClearInput();
+    AdvanceChapter();
+    Say("가르", "됐다. 널 실험자의 편이라고 단정할 수는 없겠군. 검을 내려놓겠다.");
+    dialoguePending = true;
+    autoSaveTime = 30;
+}
+
+void Prototype::RetryGar()
+{
+    if (!garEngaged || levelOne.resolvedBosses.count(StoryEncounter::Gar))
+        return;
+    garEngaged = false;
+    levelOne.arenaBoss = 0;
+    levelOne.orderSeal = {};
+    levelOne.enemies.erase(std::remove_if(levelOne.enemies.begin(),
+                                          levelOne.enemies.end(),
+                                          [](const LevelOne::Enemy& enemy)
+                                          {
+                                              return enemy.boss == StoryEncounter::Gar;
+                                          }),
+                           levelOne.enemies.end());
+    levelOne.projectiles.erase(std::remove_if(levelOne.projectiles.begin(),
+                                              levelOne.projectiles.end(),
+                                              [](const LevelOne::Projectile& shot)
+                                              {
+                                                  return GarCourt::Contains(shot.position, 120);
+                                              }),
+                               levelOne.projectiles.end());
+    ResetControls();
+    levelOne.health = levelOne.MaximumHealth();
+    levelOne.hurtTime = levelOne.invulnerability = levelOne.dodgeTime = levelOne.dodgeCooldown = 0;
+    levelOne.cooldown = levelOne.companionCooldown = 0;
+    levelOne.damageSpirit = -1;
+    for (auto& member : levelOne.collection)
+        member.health = 100;
+    controlling = false;
+    player = spirit = camera = GarCourt::Outside;
+    dialoguePending = false;
+    ClearInput();
+    Say("결투장 입구", "F로 다시 도전하세요. 사용한 물약은 돌아오지 않습니다.");
+}
+
 bool Prototype::CanCompareSaintSeal() const
 {
     return !chapter.saintSealUnderstood && chapter.step > chapter.Index("C106_RECORD") &&
@@ -506,6 +748,7 @@ void Prototype::ResetStoryEvent()
     storySceneTime = 0;
     cemeteryBossPosition = CemeteryRoom::Boss();
     cemeteryEngaged = false;
+    garEngaged = false;
     levelOne.arenaBoss = 0;
     levelOne.projectiles.erase(std::remove_if(levelOne.projectiles.begin(),
                                               levelOne.projectiles.end(),
@@ -577,6 +820,20 @@ void Prototype::StartStoryScene(StoryScene kind)
                                               }),
                                levelOne.projectiles.end());
     levelOne.hitFeedback.clear();
+    if (kind == StoryScene::GarEntrance || kind == StoryScene::GarEscort ||
+        kind == StoryScene::CityArrival)
+    {
+        levelOne.projectiles.erase(
+            std::remove_if(levelOne.projectiles.begin(),
+                           levelOne.projectiles.end(),
+                           [kind](const LevelOne::Projectile& shot)
+                           {
+                               return kind == StoryScene::CityArrival
+                                          ? Distance(shot.position, StoryLayout::CityGate) < 420
+                                          : GarCourt::Contains(shot.position, 120);
+                           }),
+            levelOne.projectiles.end());
+    }
     levelOne.hitStop = levelOne.hurtTime = purpleShake = domainShake = 0;
     levelOne.castTime = spiritCastPose = 0;
     protagonistStopTime = .08f;
@@ -591,6 +848,9 @@ void Prototype::UpdateStoryScene(float dt)
     UpdateCharacterPresentation(elapsed, 0, 0, 0);
     const float duration = storyScene == StoryScene::RoomEntrance  ? 3.5f
                            : storyScene == StoryScene::RoomVictory ? 8.f
+                           : storyScene == StoryScene::GarEntrance ? 5.f
+                           : storyScene == StoryScene::GarEscort   ? 4.5f
+                           : storyScene == StoryScene::CityArrival ? 9.f
                                                                    : 6.f;
     WorldPoint focus = cemeteryBossPosition;
     if (storyScene == StoryScene::RoomVictory && storySceneTime >= 2.8f)
@@ -600,6 +860,19 @@ void Prototype::UpdateStoryScene(float dt)
     else if (storyScene == StoryScene::SealDiscovery)
     {
         focus = CemeteryRoom::Seal();
+    }
+    else if (storyScene == StoryScene::GarEntrance)
+    {
+        focus = GarCourt::Boss;
+    }
+    else if (storyScene == StoryScene::GarEscort)
+    {
+        focus = {StoryLayout::GarPost.x + (std::min)(1.f, storySceneTime / 4.5f) * 210,
+                 StoryLayout::GarPost.y};
+    }
+    else if (storyScene == StoryScene::CityArrival)
+    {
+        focus = storySceneTime < 3.f ? StoryLayout::CityGate : StoryLayout::CitySquare;
     }
     const float t = 1 - std::exp(-elapsed * 2.2f);
     camera.x += (focus.x - camera.x) * t;
@@ -650,6 +923,28 @@ void Prototype::FinishStoryScene()
         // completion step; they cannot be sold, consumed or granted a second time.
         autoSaveTime = 30;
     }
+    else if (finished == StoryScene::GarEntrance)
+    {
+        levelOne.invulnerability = .5f;
+    }
+    else if (finished == StoryScene::GarEscort)
+    {
+        Say("결투의 결과",
+            "라엔: 성흔회가 가르를 후송했어. 떨어진 조사 문서에 일곱 번째 종의 경고와 외부 인계실 "
+            "위치가 적혀 있다.");
+        dialoguePending = true;
+        autoSaveTime = 30;
+    }
+    else if (finished == StoryScene::CityArrival && quest && quest->id == "C208")
+    {
+        player = StoryLayout::CitySquare;
+        spirit = {player.x + 32, player.y + 20};
+        levelOne.tickets[1] += 2;
+        ++levelOne.stones;
+        levelOne.gold += 35;
+        AdvanceChapter();
+        autoSaveTime = 30;
+    }
     camera = controlling ? spirit : player;
 }
 
@@ -679,6 +974,29 @@ void Prototype::DrawStorySceneOverlay()
                       ? "울음이 사라진 자리. 석벽에 검은 봉인 자국이 드러났다."
                       : "누군가 주령을 이곳에 묶어 두었다. 남은 흔적을 조사하자.";
     }
+    else if (storyScene == StoryScene::GarEntrance)
+    {
+        title = "성흔기사 가르";
+        caption =
+            storySceneTime < 2.f
+                ? "가르: 주령을 부리는 힘에 휘둘리는 자인지, 네 검으로 증명해 보아라."
+                : "넓은 검술과 직선 돌진을 피하자. 금빛 봉인 표식에서는 동행 주령을 이동시키자.";
+    }
+    else if (storyScene == StoryScene::GarEscort)
+    {
+        title = "성흔회의 개입";
+        caption = storySceneTime < 2.f
+                      ? "마지막 일격을 가하려는 순간, 성흔회 지원병이 앞을 막아선다."
+                      : "지원병은 부상당한 가르를 데리고 기록소 쪽으로 물러난다.";
+    }
+    else if (storyScene == StoryScene::CityArrival)
+    {
+        title = "2장 완료 · 사냥당하는 주술사";
+        caption = storySceneTime < 3.f ? "운송대장의 번호가 마침내 이 성문을 가리킨다."
+                  : storySceneTime < 6.f
+                      ? "종이 울리고, 성문 너머의 주령들은 싸울 기색 없이 서 있다."
+                      : "라엔: 여기, 백 년 전에 끝났어야 할 도시야.";
+    }
     else
     {
         title = "자연적으로 생긴 흔적이 아니다";
@@ -689,6 +1007,192 @@ void Prototype::DrawStorySceneOverlay()
     WrappedText(24, bar + 30, float(width) - 48, title, Color(.95f, .81f, .53f), 2);
     WrappedText(28, height - bottom + 28, float(width) - 56, caption, Color(.94f, .94f, .9f), 3);
     UIButton(StorySkipBounds(), "Space / ESC · 건너뛰기");
+}
+
+void Prototype::BindGarCourt()
+{
+    const auto b = GarCourt::Bounds;
+    const auto center = Screen(b.x + b.w / 2, b.y + b.d / 2);
+    if (center.x < -400 || center.x > width + 400 || center.y < -300 || center.y > height + 300)
+        return;
+    scene.Ensure("gar-court", "world");
+    auto& floor = scene.Ensure("gar-court/floor", "gar-court");
+    floor.layer = ActorLayer::Terrain;
+    floor.depthOffset = 1.e13;
+    floor.draw = [this, b](const Actor&)
+    {
+        const Point origin = Screen(b.x, b.y);
+        const std::string key = "gar-court-floor-v1";
+        if (r.BeginCachedMesh(key, origin))
+        {
+            Ground(b.x, b.y, b.w, b.d, Color(.21f, .19f, .15f));
+            for (int row = 0; row < 7; ++row)
+                for (int col = 0; col < 11; ++col)
+                    Ground(b.x + 10 + col * 40,
+                           b.y + 3 + row * 39,
+                           38,
+                           37,
+                           Color(.36f + (col % 3) * .025f, .32f, .24f));
+            const WorldPoint corners[] = {
+                {b.x, b.y}, {b.x + b.w, b.y}, {b.x + b.w, b.y + b.d}, {b.x, b.y + b.d}};
+            for (int i = 0; i < 4; ++i)
+                r.Line(Screen(corners[i].x, corners[i].y, 1),
+                       Screen(corners[(i + 1) % 4].x, corners[(i + 1) % 4].y, 1),
+                       4,
+                       Color(.64f, .53f, .32f));
+            r.EndCachedMesh();
+        }
+        r.DrawCachedMesh(key, origin);
+    };
+    if (garEngaged)
+    {
+        auto& barrier = scene.Ensure("gar-court/barrier", "gar-court");
+        barrier.layer = ActorLayer::Atmosphere;
+        barrier.draw = [this, b](const Actor&)
+        {
+            const WorldPoint corners[] = {
+                {b.x, b.y}, {b.x + b.w, b.y}, {b.x + b.w, b.y + b.d}, {b.x, b.y + b.d}};
+            for (int i = 0; i < 4; ++i)
+            {
+                const auto a = corners[i], c = corners[(i + 1) % 4];
+                r.Quad(Screen(a.x, a.y),
+                       Screen(c.x, c.y),
+                       Screen(c.x, c.y, 45),
+                       Screen(a.x, a.y, 45),
+                       Color(.78f, .51f, .16f, .12f));
+                r.Line(Screen(a.x, a.y, 3), Screen(c.x, c.y, 3), 3, Color(.94f, .74f, .35f, .8f));
+            }
+        };
+    }
+    if (storyScene == StoryScene::GarEscort)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            const float t = (std::max)(0.f, (std::min)(1.f, (storySceneTime - .8f) / 3.7f));
+            const WorldPoint at = {StoryLayout::GarPost.x + 210 * t + (i == 0 ? 0 : 18),
+                                   StoryLayout::GarPost.y + (i == 1   ? -26
+                                                             : i == 2 ? 26
+                                                                      : 0)};
+            auto& actor =
+                scene.Ensure<ModelActor>("gar-court/escort/" + std::to_string(i), "gar-court");
+            actor.SetWorldPosition({at.x, at.y, 0});
+            actor.layer = ActorLayer::Character;
+            actor.footprint = {0, 0, 0, 0, true};
+            actor.draw = [this, i](const Actor& node)
+            {
+                const auto at = node.WorldPosition();
+                const auto feet = Screen(at.x, at.y);
+                SpriteAnimation walk;
+                walk.UpdateWorld(1, 0, 0, true, 1);
+                walk.moving = storySceneTime > .8f;
+                walk.phase = std::fmod(storySceneTime * 9.f, 8.f);
+                const CharacterModel::Parts parts = i == 0   ? CharacterModel::Parts{1, 5, 3, 6}
+                                                    : i == 1 ? CharacterModel::Parts{0, 0, 3, 6}
+                                                             : CharacterModel::Parts{1, 6, 4, 1};
+                r.Ellipse(feet.x, feet.y, 18, 6, Color(0, 0, 0, .3f));
+                if (!DrawKeyedModel(npcModel,
+                                    feet,
+                                    i == 0 ? 94.f : 78.f,
+                                    walk,
+                                    Color(1, 1, 1),
+                                    walk.moving ? CharacterModel::Motion::Walk
+                                                : CharacterModel::Motion::Idle,
+                                    walk.phase / 8.f,
+                                    &static_cast<const ModelActor&>(node).modelState,
+                                    &parts))
+                    populationWalkSheets[Population::Hunter].Draw(
+                        r, feet, i == 0 ? 94.f : 78.f, walk, Color(1, 1, 1), width, height);
+            };
+        }
+    }
+}
+
+void Prototype::BindCityEntrance()
+{
+    if (chapter.step < chapter.Index("C208"))
+        return;
+    const auto plaza = Screen(StoryLayout::CitySquare.x, StoryLayout::CitySquare.y);
+    if (plaza.x < -350 || plaza.x > width + 350 || plaza.y < -300 || plaza.y > height + 300)
+        return;
+    scene.Ensure("city-preview", "world");
+    auto& floor = scene.Ensure("city-preview/floor", "city-preview");
+    floor.layer = ActorLayer::Terrain;
+    floor.depthOffset = 1.e13;
+    floor.draw = [this](const Actor&)
+    {
+        const double x = StoryLayout::CitySquare.x - 170, y = StoryLayout::CitySquare.y - 70;
+        const Point origin = Screen(x, y);
+        const std::string key = "city-gateway-floor-v1";
+        if (r.BeginCachedMesh(key, origin))
+        {
+            Ground(x, y, 340, 250, Color(.13f, .17f, .18f));
+            for (int row = 0; row < 6; ++row)
+                for (int col = 0; col < 8; ++col)
+                {
+                    const float tone = float((col * 7 + row * 3) % 5) * .012f;
+                    Ground(x + 10 + col * 40,
+                           y + 5 + row * 40,
+                           38,
+                           38,
+                           Color(.25f + tone, .30f + tone, .31f + tone));
+                }
+            r.EndCachedMesh();
+        }
+        r.DrawCachedMesh(key, origin);
+    };
+    if (storyScene == StoryScene::CityArrival && storySceneTime > 1.5f && storySceneTime < 6.f)
+    {
+        auto& sound = scene.Ensure("city-preview/bell-echo", "city-preview");
+        sound.layer = ActorLayer::Atmosphere;
+        sound.draw = [this](const Actor&)
+        {
+            const auto at = StoryLayout::CityGate;
+            const float phase = std::fmod((storySceneTime - 1.5f) * .7f, 1.f);
+            for (int ring = 0; ring < 2; ++ring)
+            {
+                const float t = std::fmod(phase + ring * .5f, 1.f);
+                const double radius = 28 + 125 * t;
+                for (int i = 0; i < 24; ++i)
+                {
+                    const double a = i * 6.2831853 / 24, b = (i + 1) * 6.2831853 / 24;
+                    r.Line(Screen(at.x + std::cos(a) * radius, at.y + std::sin(a) * radius, 8),
+                           Screen(at.x + std::cos(b) * radius, at.y + std::sin(b) * radius, 8),
+                           2,
+                           Color(.66f, .85f, .93f, (1 - t) * .38f));
+                }
+            }
+        };
+    }
+    const WorldPoint sites[] = {{2270, -640}, {2430, -645}};
+    const int species[] = {SpiritCatalog::Forgotten, SpiritCatalog::Pilgrim};
+    for (int i = 0; i < 2; ++i)
+    {
+        const auto at = sites[i];
+        if (!CharacterInView(at, 96))
+            continue;
+        scene.Ensure("city-preview", "world");
+        auto& actor = scene.Ensure<ModelActor>("city-preview/" + std::to_string(i), "city-preview");
+        actor.SetWorldPosition({at.x, at.y, 0});
+        actor.layer = ActorLayer::Character;
+        actor.footprint = {0, 0, 0, 0, true};
+        const int kind = species[i];
+        actor.draw = [this, kind](const Actor& node)
+        {
+            const auto pos = node.WorldPosition();
+            const auto feet = Screen(pos.x, pos.y);
+            SpriteAnimation idle;
+            idle.facing = Facing::SouthWest;
+            if (!DrawSpiritModel(kind,
+                                 feet,
+                                 76,
+                                 idle,
+                                 Color(.85f, 1.f, .95f),
+                                 time,
+                                 -1,
+                                 &static_cast<const ModelActor&>(node).modelState))
+                spiritSheets[kind].Draw(r, feet, 76, idle, Color(.85f, 1.f, .95f), width, height);
+        };
+    }
 }
 
 void Prototype::BindCemeteryRoom()

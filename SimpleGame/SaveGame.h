@@ -15,7 +15,7 @@
 class SaveGame
 {
   public:
-    static constexpr int CurrentVersion = 12;
+    static constexpr int CurrentVersion = 13;
 
     struct State
     {
@@ -233,6 +233,10 @@ class SaveGame
         if (version >= 12)
         {
             a.Fields(l.shrineFrames, l.shrineDisposition, l.shrineCaptureAttempts);
+        }
+        if (version >= 13)
+        {
+            a.Fields(l.garChoice, l.garRecords);
         }
         std::string rng;
         if (!a.reading)
@@ -679,6 +683,10 @@ class SaveGame
         const int shrineChoice = authored.Index("C203_RESULT");
         const bool shrineGuardDown = l.resolvedBosses.count(StoryEncounter::ShrineGuard) != 0;
         const bool shrineBellDown = l.resolvedBosses.count(StoryEncounter::BellWraith) != 0;
+        const int garFight = authored.Index("C205");
+        const int garChoice = authored.Index("C206");
+        const int garRecords = authored.Index("C207");
+        const bool garDown = l.resolvedBosses.count(StoryEncounter::Gar) != 0;
         if (authored.quests.empty() || s.story != StoryHash(authored) || !s.tutorials.Valid() ||
             (l.discoveredSpecies & ~Bestiary::KnownSpecies) != 0 || !Point(s.player) ||
             !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
@@ -707,7 +715,14 @@ class SaveGame
             (c.step < shrineChoice && l.shrineCaptureAttempts) ||
             (c.step > shrineChoice && (!l.shrineDisposition || !shrineBellDown)) ||
             (l.shrineDisposition == 1 && l.shrineCaptureAttempts == 0) ||
-            (c.choicePending && c.step != authored.Index("P001_WITNESS") && c.step != shrineChoice))
+            (c.step <= garFight && garDown) || (c.step > garFight && !garDown) ||
+            !Number(l.garChoice, 0, 3) || (c.step <= garChoice && l.garChoice != 0) ||
+            (c.step > garChoice && l.garChoice == 0) ||
+            (c.step < garRecords && l.garRecords != 0) ||
+            (c.step == garRecords && l.garRecords != 0 && l.garRecords != 1 && l.garRecords != 3) ||
+            (c.step > garRecords && l.garRecords != 7) ||
+            (c.choicePending && c.step != authored.Index("P001_WITNESS") &&
+             c.step != shrineChoice && c.step != garChoice))
         {
             return false;
         }
@@ -773,6 +788,7 @@ class SaveGame
             {
                 if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
                     (e.boss == StoryEncounter::OrderSealer && c.step < sealerFight) ||
+                    e.boss == StoryEncounter::Gar ||
                     (StoryEncounter::ShrineEncounter(e.boss) && c.step < shrineFight) ||
                     (e.boss == StoryEncounter::ShrineGuard && c.step > shrineFight) ||
                     (e.boss == StoryEncounter::BellWraith &&
@@ -830,6 +846,16 @@ class SaveGame
         }
 
         const int shrineStart = chapter.Index("C203_APPROACH");
+        const int garStart = chapter.Index("C204");
+        if (garStart == 47 && candidate.story == StoryHash(chapter, garStart))
+        {
+            if (candidate.chapter.step > garStart)
+                return false;
+            candidate.story = currentStory;
+            if (candidate.chapter.step == garStart)
+                candidate.chapter.rewardPending = true;
+            return true;
+        }
         if (shrineStart == 43 && candidate.story == StoryHash(chapter, shrineStart))
         {
             if (candidate.chapter.step > shrineStart)

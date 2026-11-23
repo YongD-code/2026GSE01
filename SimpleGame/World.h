@@ -53,6 +53,14 @@ class World
         return p.x >= 1240 - margin && p.x <= 1720 + margin && p.y >= 100 - margin &&
                p.y <= 400 + margin;
     }
+
+    static bool GarReserved(WorldPoint p, double margin = 0)
+    {
+        return (p.x >= 1740 - margin && p.x <= 2680 + margin && p.y >= 100 - margin &&
+                p.y <= 480 + margin) ||
+               (p.x >= 2000 - margin && p.x <= 2600 + margin && p.y >= -810 - margin &&
+                p.y <= -450 + margin);
+    }
     using Coordinate = std::int64_t;
     using Key = std::pair<Coordinate, Coordinate>;
 
@@ -217,6 +225,7 @@ class World
                 double px = double(x) * ChunkSize + 85 + col * 112 + double((h >> 8) % 12);
                 double py = double(y) * ChunkSize + 85 + row * 112 + double((h >> 16) % 12);
                 if (Settlement(px, py) || RoadPoint({px, py}, 100) || CemeteryReserved({px, py}) ||
+                    GarReserved({px, py}, 32) ||
                     (px >= 500 && px <= 3500 && py >= -450 && py <= 400))
                     continue;
                 int kind = c.biome == 2 ? 2 : 1;
@@ -305,6 +314,10 @@ class World
 
     const char* Region(WorldPoint p)
     {
+        if (p.x >= 2000 && p.x <= 2600 && p.y >= -810 && p.y <= -450)
+        {
+            return "죽은 자의 도시";
+        }
         const int village = VillageAt(p);
         if (village >= 0)
             return VillageName(village);

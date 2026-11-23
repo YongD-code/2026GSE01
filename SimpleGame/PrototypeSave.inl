@@ -2,7 +2,7 @@
 bool CanSaveProgress() const
 {
     if (titleScreen || openingPlaying || storyScene != StoryScene::None || cemeteryEngaged ||
-        levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
+        garEngaged || levelOne.Dead() || chapter.quests.empty() || levelOne.dodgeTime > 0 ||
         levelOne.invulnerability > 0 || levelOne.orderSeal.remaining > 0 || !skillEffects.empty())
     {
         return false;
@@ -120,7 +120,7 @@ void RefreshSavedStoryDialogue()
 {
     if (chapter.choicePending)
     {
-        if (!ShrineChoiceOpen())
+        if (!ShrineChoiceOpen() && !GarChoiceOpen())
         {
             Say("마을 아이", "아이에게 동생의 행방을 물어볼까요?");
         }
@@ -236,6 +236,29 @@ bool LoadProgress(bool startup = false, int slot = 0)
         for (auto& enemy : state.level.enemies)
         {
             if (inNewHall(enemy.position) || inNewHall(enemy.home))
+            {
+                enemy.position = Population::OpenPoint(enemy.position, blocked);
+                enemy.home = enemy.position;
+                enemy.trail.assign(1, enemy.home);
+            }
+        }
+    }
+    if (state.formatVersion < 13)
+    {
+        // Three new solid footprints: the record post and the two city gate halls.
+        const auto inNewStoryBuilding = [](WorldPoint p)
+        {
+            return (p.x > 2348 && p.x < 2552 && p.y > 288 && p.y < 422) ||
+                   (p.x > 2098 && p.x < 2277 && p.y > -802 && p.y < -673) ||
+                   (p.x > 2418 && p.x < 2597 && p.y > -802 && p.y < -673);
+        };
+        if (inNewStoryBuilding(state.player))
+            state.player = Population::OpenPoint(state.player, blocked);
+        if (inNewStoryBuilding(state.spirit))
+            state.spirit = Population::OpenPoint(state.spirit, blocked);
+        for (auto& enemy : state.level.enemies)
+        {
+            if (inNewStoryBuilding(enemy.position) || inNewStoryBuilding(enemy.home))
             {
                 enemy.position = Population::OpenPoint(enemy.position, blocked);
                 enemy.home = enemy.position;

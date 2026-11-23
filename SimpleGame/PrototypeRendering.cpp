@@ -545,8 +545,9 @@ void Prototype::StoryPerson(const StoryLayout::Site& site,
     }
 
     const bool childPortrait = site.kind == StoryLayout::Kind::Child;
-    const auto appearance =
-        models.npcDirect ? models.catalog.Story(index, site.appearance) : site.appearance;
+    const auto appearance = models.npcDirect && site.id.compare(0, 4, "gar_") != 0
+                                ? models.catalog.Story(index, site.appearance)
+                                : site.appearance;
     r.Ellipse(p.x, p.y + 1, childPortrait ? 10.f : 14.f, 5, Color(0, 0, 0, .35f));
     if (DrawKeyedModel(npcModel,
                        p,
@@ -969,7 +970,9 @@ void Prototype::DrawEnemy(const EnemyVisual& enemy, CharacterModel::State* state
     {
         const bool archer = enemy.boss == StoryEncounter::OrderArcher;
         const bool sealer = enemy.boss == StoryEncounter::OrderSealer;
-        const CharacterModel::Parts parts = sealer   ? CharacterModel::Parts{0, 4, 5, 3}
+        const bool gar = enemy.boss == StoryEncounter::Gar;
+        const CharacterModel::Parts parts = gar      ? CharacterModel::Parts{1, 5, 3, 6}
+                                            : sealer ? CharacterModel::Parts{0, 4, 5, 3}
                                             : archer ? CharacterModel::Parts{1, 6, 4, 1}
                                                      : CharacterModel::Parts{0, 0, 3, 6};
         const Color tint = sealer ? Color(.95f, .83f, 1.f) : Color(.95f, .86f, .81f);
@@ -1088,6 +1091,71 @@ void Prototype::DrawCombatWarnings()
                    {center.x + size, center.y},
                    {center.x, center.y + size * .5f},
                    Color(.9f, .55f, .18f, .24f + .42f * progress));
+            continue;
+        }
+        if (enemy.boss == StoryEncounter::Gar)
+        {
+            if (!enemy.alerted || enemy.health <= 0 || (enemy.phase != 1 && enemy.phase != 2))
+                continue;
+            const auto origin = enemy.position;
+            const float windup =
+                enemy.garPattern == 1 ? LevelOne::GarLungeWindup : LevelOne::GarSweepWindup;
+            const float progress = 1.f - (std::max)(0.f, (std::min)(1.f, enemy.phaseTime / windup));
+            const Color color(1.f, .38f, .08f, enemy.phase == 2 ? .55f : .18f + .45f * progress);
+            if (enemy.garPattern == 0)
+            {
+                const double angle = std::atan2(enemy.aim.y, enemy.aim.x);
+                const double arc = std::acos(LevelOne::GarSweepDot);
+                for (int i = 0; i < 16; ++i)
+                {
+                    const double a = angle - arc + 2 * arc * i / 16;
+                    const double b = angle - arc + 2 * arc * (i + 1) / 16;
+                    r.Triangle(Screen(origin.x, origin.y),
+                               Screen(origin.x + std::cos(a) * LevelOne::GarSweepReach,
+                                      origin.y + std::sin(a) * LevelOne::GarSweepReach),
+                               Screen(origin.x + std::cos(b) * LevelOne::GarSweepReach,
+                                      origin.y + std::sin(b) * LevelOne::GarSweepReach),
+                               color);
+                }
+            }
+            else
+            {
+                double reach =
+                    LevelOne::GarLungeSpeed *
+                    (enemy.phase == 2 ? (std::max)(0.f, enemy.phaseTime) : LevelOne::GarLungeTime);
+                const auto b = GarCourt::Bounds;
+                if (enemy.aim.x > .001)
+                    reach = (std::min)(reach, (b.x + b.w - 12 - origin.x) / enemy.aim.x);
+                if (enemy.aim.x < -.001)
+                    reach = (std::min)(reach, (b.x + 12 - origin.x) / enemy.aim.x);
+                if (enemy.aim.y > .001)
+                    reach = (std::min)(reach, (b.y + b.d - 12 - origin.y) / enemy.aim.y);
+                if (enemy.aim.y < -.001)
+                    reach = (std::min)(reach, (b.y + 12 - origin.y) / enemy.aim.y);
+                reach = (std::max)(0., reach);
+                const WorldPoint end = {origin.x + enemy.aim.x * reach,
+                                        origin.y + enemy.aim.y * reach};
+                const double nx = -enemy.aim.y * LevelOne::GarLungeRadius;
+                const double ny = enemy.aim.x * LevelOne::GarLungeRadius;
+                r.Quad(Screen(origin.x + nx, origin.y + ny),
+                       Screen(origin.x - nx, origin.y - ny),
+                       Screen(end.x - nx, end.y - ny),
+                       Screen(end.x + nx, end.y + ny),
+                       color);
+                for (const auto& at : {origin, end})
+                {
+                    for (int i = 0; i < 12; ++i)
+                    {
+                        const double a = i * 6.2831853 / 12, b = (i + 1) * 6.2831853 / 12;
+                        r.Triangle(Screen(at.x, at.y),
+                                   Screen(at.x + std::cos(a) * LevelOne::GarLungeRadius,
+                                          at.y + std::sin(a) * LevelOne::GarLungeRadius),
+                                   Screen(at.x + std::cos(b) * LevelOne::GarLungeRadius,
+                                          at.y + std::sin(b) * LevelOne::GarLungeRadius),
+                                   color);
+                    }
+                }
+            }
             continue;
         }
         if (attackType == 3 && enemy.alerted && !enemy.weakened && enemy.health > 0)

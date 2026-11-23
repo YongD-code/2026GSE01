@@ -12,7 +12,8 @@ constexpr int OrderArcher = 14;
 constexpr int OrderSealer = 15;
 constexpr int ShrineGuard = 16;
 constexpr int BellWraith = 17;
-constexpr int MaxId = BellWraith;
+constexpr int Gar = 18;
+constexpr int MaxId = Gar;
 
 inline bool ShrineEncounter(int id)
 {
@@ -49,7 +50,8 @@ inline const Definition& Get(int id)
          {"성흔회 궁수", SpiritCatalog::Forgotten, -1, 74, false, 10, 2},
          {"성흔회 봉인사", SpiritCatalog::Forgotten, -1, 78, false, 10, 2},
          {"성흔회 포획기사", SpiritCatalog::Forgotten, -1, 80, false, 10, 0},
-         {"종을 듣는 자", SpiritCatalog::Pilgrim, -1, 104, true, 12}}};
+         {"종을 듣는 자", SpiritCatalog::Pilgrim, -1, 104, true, 12},
+         {"성흔기사 가르", SpiritCatalog::Forgotten, -1, 94, false, 12, 0}}};
     return definitions[id >= 0 && id < int(definitions.size()) ? id : 0];
 }
 

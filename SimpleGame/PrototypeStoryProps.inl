@@ -86,7 +86,7 @@ void Prototype::StoryFacade(const Object& building)
                 r.Line(p(o.w * .38, z), p(o.w * .62, z), 4, wood);
             }
         }
-        else if (o.x == 2440 || o.x == 2740 || o.x == 2200)
+        else if (o.x == 2440 || o.x == 2740 || o.x == 2200 || o.x == 2360)
         {
             // Shipping depots: crossed braces, loading doors and cargo seals.
             r.Line(p(o.w * .36, 12), p(o.w * .64, o.h * .53), 5, wood);
@@ -150,7 +150,10 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
         (site.id == "shrine_gate" && chapter.step > chapter.Index("C203_APPROACH")) ||
         (site.id == "shrine_frame_a" && (levelOne.shrineFrames & 1)) ||
         (site.id == "shrine_frame_b" && (levelOne.shrineFrames & 2)) ||
-        (site.id == "shrine_ledger" && chapter.step > chapter.Index("C203_LEDGER"));
+        (site.id == "shrine_ledger" && chapter.step > chapter.Index("C203_LEDGER")) ||
+        ((site.id == "gar_index" || site.id == "gar_external") && (levelOne.garRecords & 1)) ||
+        (site.id == "gar_ledger" && (levelOne.garRecords & 2)) ||
+        (site.id == "gar_copy" && (levelOne.garRecords & 4));
     const std::string key = cachePrefix + site.id +
                             (StoryCharacterModel(site.id) ? ":workstation" : "") +
                             (collected ? ":collected" : ":present");
@@ -264,6 +267,49 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             }
             const Point bowl = p(10, 17, 4);
             r.Ellipse(bowl.x, bowl.y, 6, 3, metal);
+        }
+        else if (site.id == "gar_court")
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                box(-5, side * 48 - 9, 10, 18, 8, stone);
+                box(-3, side * 48 - 4, 6, 8, 70, timber);
+                r.Quad(p(0, side * 48, 65),
+                       p(0, side * 18, 62),
+                       p(0, side * 18, 35),
+                       p(0, side * 48, 34),
+                       red);
+                line(0, side * 36, 57, 0, side * 26, 42, 2, paper);
+            }
+            line(0, -52, 73, 0, 52, 73, 6, edge);
+        }
+        else if (site.id == "gar_index" || site.id == "gar_external" || site.id == "gar_ledger" ||
+                 site.id == "gar_copy")
+        {
+            desk();
+            box(-22, -36, 14, 14, 32, metal);
+            sheet(-4, -32, 27, 22, 15);
+            sheet(1, -17, 27, 17, 9);
+            line(2, -28, 28, 15, -22, 28, 2, collected ? metal : red);
+            lantern(29, -25);
+            if (site.id == "gar_copy")
+                box(-27, -8, 20, 16, 8, timber);
+        }
+        else if (site.id == "city_gate")
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                box(side * 76 - 19, -18, 38, 36, 12, stone);
+                box(side * 76 - 12, -12, 24, 24, 103, stone);
+                box(side * 76 - 16, -16, 32, 32, 8, edge);
+                lantern(side * 112, 15);
+            }
+            r.Quad(p(-102, -18, 104), p(102, -18, 104), p(112, 18, 104), p(-112, 18, 104), ink);
+            r.Triangle(p(-112, 18, 104), p(0, 18, 135), p(112, 18, 104), metal);
+            line(-88, 0, 88, 88, 0, 88, 7, timber);
+            r.Quad(p(-24, 0, 85), p(24, 0, 85), p(24, 0, 62), p(-24, 0, 62), edge);
+            for (int i = -1; i <= 1; ++i)
+                line(i * 13, 0, 80, i * 13, 0, 69, 2, paper);
         }
         else if (site.id == "shrine_gate")
         {

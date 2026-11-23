@@ -218,6 +218,8 @@ void Prototype::SynchronizeScene()
     scene.Ensure("effects", "world");
     scene.Ensure("interface");
     BindCemeteryRoom();
+    BindGarCourt();
+    BindCityEntrance();
 
     auto bind = [this](const std::string& id,
                        const std::string& parent,
@@ -567,7 +569,9 @@ void Prototype::SynchronizeScene()
                      (evidence && StoryVisible(site) && Distance(player, at) < 130))
                  {
                      const float elevation =
-                         site.id == "shrine_gate" || site.id == "shrine_ledger"       ? 96.f
+                         site.id == "city_gate"                                       ? 148.f
+                         : site.id == "gar_court"                                     ? 87.f
+                         : site.id == "shrine_gate" || site.id == "shrine_ledger"     ? 96.f
                          : site.id == "shrine_frame_a" || site.id == "shrine_frame_b" ? 63.f
                          : evidence                                                   ? 40.f
                                     : StoryLayout::PersonHeight(site) + 12.f;
@@ -759,6 +763,15 @@ void Prototype::SynchronizeScene()
                 {
                     name += " · 봉인틀 연결";
                 }
+            }
+            else if (enemy.boss == StoryEncounter::Gar)
+            {
+                if (enemy.phase == LevelOne::OrderSealWindupPhase)
+                    name += " · 주령 봉쇄";
+                else if (enemy.phase == 1 || enemy.phase == 2)
+                    name += enemy.garPattern == 1 ? " · 돌진" : " · 횡베기";
+                else if (enemy.phase == 3)
+                    name += " · 반격 기회";
             }
             else if (enemy.phase == LevelOne::OrderSealWindupPhase)
             {

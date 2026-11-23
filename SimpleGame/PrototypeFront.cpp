@@ -476,6 +476,18 @@ bool Prototype::GameUIClick(int x, int y)
     }
     if ((!chapter.choicePending && !levelOne.Dead()) || width < 480 || height < 360)
         return false;
+    if (GarChoiceOpen())
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            if (ShrineChoiceButton(i).Contains(x, y))
+            {
+                ChooseGar(i + 1);
+                break;
+            }
+        }
+        return true;
+    }
     if (ShrineChoiceOpen())
     {
         for (int i = 0; i < 4; ++i)
@@ -500,9 +512,11 @@ bool Prototype::GameUIClick(int x, int y)
         ClearInput();
         if (choice)
             ChooseChildDialogue(i == 0);
+        else if (garEngaged && i == 0)
+            RetryGar();
         else if (cemeteryEngaged && i == 0)
             RetryCemetery();
-        else if (i == 0 || cemeteryEngaged)
+        else if (i == 0 || cemeteryEngaged || garEngaged)
             ProgressKey(true);
         else
             Key('r', true);
