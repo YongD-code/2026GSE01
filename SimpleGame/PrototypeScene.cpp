@@ -909,6 +909,34 @@ void Prototype::SynchronizeScene()
          });
     for (const auto& effect : skillEffects)
     {
+        if (IsSkeletonQ(effect))
+        {
+            const auto aim = SkeletonQAim(effect);
+            for (int shard = 0; shard < 3; ++shard)
+            {
+                const float progress =
+                    (std::min)(effect.branchEnds[shard], SkeletonSkill::Progress(effect.age));
+                const auto at = SkeletonSkill::Point(effect.origin, aim, shard, progress);
+                if (!CharacterInView(at, 110))
+                {
+                    continue;
+                }
+                bind("effects/skeleton-shard/" + std::to_string(effect.id) + "/" +
+                         std::to_string(shard),
+                     "effects",
+                     at,
+                     ActorLayer::World,
+                     [this,
+                      origin = effect.origin,
+                      aim,
+                      shard,
+                      age = effect.age,
+                      end = effect.branchEnds[shard]](const Actor&)
+                     {
+                         DrawSkeletonQShard(origin, aim, shard, age, end);
+                     });
+            }
+        }
         if (IsStagR(effect) && effect.age >= StagSkill::SanctuaryOpening)
         {
             if (CharacterInView(effect.origin, 360))

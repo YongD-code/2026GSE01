@@ -1,0 +1,125 @@
+"""Author three curved bone splinters and export the same geometry for game drawing."""
+import json
+import math
+from pathlib import Path
+
+import bpy
+from mathutils import Vector
+
+HERE = Path(__file__).resolve().parent
+DEST = HERE / 'q_shards'
+ROOT = HERE.parents[3]
+PALETTE = {'Ivory': (.74, .66, .49), 'Enamel': (.87, .79, .62),
+           'Marrow': (.37, .28, .18), 'Fissure': (.15, .46, .48)}
+
+
+def make_shard(index):
+    vertices, faces, colors = [], [], []
+    length = (1.0, 1.13, .88)[index]
+    bend = (1.0, -.7, 1.3)[index]
+    radii = (2.5, 3.4, 2.2, 1.8, 2.0, 1.35, .20)
+    rings = []
+    for ring, x in enumerate((-15, -12, -7, 0, 7, 13, 18)):
+        center = Vector((x * length, bend * (3.8 * math.sin((x + 15) / 33 * math.pi) - 1),
+                         .55 * math.sin(ring * .9 + index)))
+        ring_points = []
+        for side in range(7):
+            angle = side * math.tau / 7 + .08 * math.sin(ring + index)
+            radius = radii[ring] * (1 + .12 * math.sin(side * 2.7 + ring * 1.1 + index))
+            chipped = (1.35 * math.sin(side * 2.2 + index)) if ring in (0, 6) else 0
+            point = center + Vector((chipped, math.cos(angle) * radius,
+                                      math.sin(angle) * radius * .79))
+            ring_points.append(len(vertices))
+            vertices.append(tuple(point))
+        rings.append(ring_points)
+    for ring in range(6):
+        for side in range(7):
+            a, b = rings[ring][side], rings[ring][(side + 1) % 7]
+            c, d = rings[ring+1][(side + 1) % 7], rings[ring+1][side]
+            faces.extend(((a, b, c), (a, c, d)))
+            name = 'Enamel' if side in (0, 1, 2) else 'Ivory'
+            colors.extend((name, name))
+    for ring, reverse in ((0, True), (6, False)):
+        center = sum((Vector(vertices[i]) for i in rings[ring]), Vector()) / 7
+        center.x += .5 if reverse else -.2
+        center_index = len(vertices)
+        vertices.append(tuple(center))
+        for side in range(7):
+            a, b = rings[ring][side], rings[ring][(side+1) % 7]
+            faces.append((center_index, b, a) if reverse else (center_index, a, b))
+            colors.append('Marrow' if reverse else 'Enamel')
+    # Thin, irregular fissures sit on the bone surface; they do not make extra objects.
+    for side in (1, 4):
+        for ring in range(1, 5):
+            a = Vector(vertices[rings[ring][side]])
+            b = Vector(vertices[rings[ring+1][side]])
+            a.z += .025 if side == 1 else -.025
+            b.z += .025 if side == 1 else -.025
+            shift = Vector((0, .08 * (-1 if side == 4 else 1), 0))
+            start = len(vertices)
+            vertices.extend((tuple(a-shift), tuple(a+shift), tuple(b)))
+            faces.append((start, start+1, start+2))
+            colors.append('Fissure' if ring in (2, 3) else 'Marrow')
+    mesh = bpy.data.meshes.new(f'MOB_SKELETON_Q_SHARD_{index:02d}')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(mesh.name, mesh)
+    bpy.context.collection.objects.link(obj)
+    for material in MATERIALS.values():
+        mesh.materials.append(material)
+    names = list(MATERIALS)
+    for polygon, name in zip(mesh.polygons, colors):
+        polygon.material_index = names.index(name)
+    obj['partIndex'] = index
+    obj['purpose'] = '골편 사출 투사체'
+    return obj
+
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete(use_global=False)
+MATERIALS = {}
+for name, rgb in PALETTE.items():
+    material = bpy.data.materials.new('SkeletonQ_' + name)
+    material.diffuse_color = (*rgb, 1)
+    material.use_nodes = True
+    shader = material.node_tree.nodes.get('Principled BSDF')
+    shader.inputs['Base Color'].default_value = (*rgb, 1)
+    shader.inputs['Roughness'].default_value = .84
+    if name == 'Fissure':
+        shader.inputs['Emission Color'].default_value = (*rgb, 1)
+        shader.inputs['Emission Strength'].default_value = .7
+    MATERIALS[name] = material
+objects = [make_shard(index) for index in range(3)]
+DEST.mkdir(parents=True, exist_ok=True)
+bpy.context.preferences.filepaths.save_version = 0
+bpy.ops.wm.save_as_mainfile(filepath=str(DEST / 'model.blend'))
+pending = DEST / 'model.pending.glb'
+bpy.ops.export_scene.gltf(filepath=str(pending), export_format='GLB', export_animations=False,
+                          export_extras=True)
+pending.replace(DEST / 'model.glb')
+rows, ranges, parts = [], [], []
+for index, obj in enumerate(objects):
+    start = len(rows)
+    obj.data.calc_loop_triangles()
+    for triangle in obj.data.loop_triangles:
+        rgb = obj.data.materials[triangle.material_index].diffuse_color[:3]
+        for vertex in triangle.vertices:
+            rows.append((*obj.data.vertices[vertex].co, *rgb))
+    ranges.append((start, len(rows) - start))
+    parts.append({'index': index, 'name': obj.name, 'triangles': (len(rows)-start)//3})
+lines = ['#pragma once', '#include <array>', '// Generated by skeleton/create_q_shards.py.',
+         'namespace SkeletonShardMesh', '{',
+         'struct Vertex { float x, y, z, r, g, b; };',
+         'struct Range { int first, count; };',
+         f'constexpr size_t MaxFaces = {max(count//3 for _, count in ranges)};',
+         f'constexpr std::array<Vertex, {len(rows)}> Vertices = {{{{']
+for row in rows:
+    lines.append('    {' + ', '.join(f'{value:.6f}f' for value in row) + '},')
+lines.extend(['}};', 'constexpr std::array<Range, 3> Ranges = {{'])
+lines.extend('    {' + f'{start}, {count}' + '},' for start, count in ranges)
+lines.extend(['}};', '} // namespace SkeletonShardMesh', ''])
+(ROOT/'SimpleGame/SkeletonShardMesh.h').write_text('\n'.join(lines), encoding='utf-8')
+(DEST/'model.json').write_text(json.dumps({'skill': '골편 사출', 'axis': '+X',
+    'units': 'world', 'parts': parts, 'triangles': len(rows)//3}, ensure_ascii=False, indent=2)+'\n',
+    encoding='utf-8')
+print('SKELETON_Q_SHARDS_READY', len(rows)//3, 'triangles', flush=True)

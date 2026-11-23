@@ -15,6 +15,8 @@
 #include "StoryEvent.h"
 #include "StagSkill.h"
 #include "StagMeadowMesh.h"
+#include "SkeletonSkill.h"
+#include "SkeletonShardMesh.h"
 #include "ClickNavigation.h"
 #include "Monitoring.h"
 #include "Population.h"

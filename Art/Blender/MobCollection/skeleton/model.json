@@ -99,6 +99,14 @@
       "seconds": 1.25,
       "loop": false,
       "rootMotion": false
+    },
+    "q_shards": {
+      "action": "MOB_SKELETON_Q_SHARDS",
+      "firstFrame": 1,
+      "lastFrame": 25,
+      "seconds": 1.0,
+      "loop": false,
+      "rootMotion": false
     }
   },
   "triangles": 8090,

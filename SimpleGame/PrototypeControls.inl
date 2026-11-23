@@ -22,6 +22,11 @@ bool IsStagQ(const SkillEffect& effect) const
     return effect.species == SpiritCatalog::Stag && effect.slot == 0;
 }
 
+bool IsSkeletonQ(const SkillEffect& effect) const
+{
+    return effect.species == SpiritCatalog::Skeleton && effect.slot == 0;
+}
+
 bool IsStagW(const SkillEffect& effect) const
 {
     return effect.species == SpiritCatalog::Stag && effect.slot == 1;
@@ -238,12 +243,15 @@ bool PreparingSkill() const
                                                   (e.slot == 1 && e.age < RedCharge) ||
                                                   (e.slot == 2 && e.age < BlueCharge))) ||
                                   (e.set > 0 && e.slot == 3 && e.age < RealmOpening(e)) ||
-                                  (e.species == SpiritCatalog::Stag && e.slot == 1 && e.age < .6f) ||
+                                  (e.species == SpiritCatalog::Stag && e.slot == 1 &&
+                                   e.age < .6f) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 2 &&
                                    e.age < StagSkill::LeapAnimation) ||
                                   (e.species == SpiritCatalog::Stag && e.slot == 0 &&
                                    e.age < StagSkill::Charge) ||
-                                  (e.species != SpiritCatalog::Stag && e.set > 0 && e.slot == 0 &&
+                                  (IsSkeletonQ(e) && e.age < SkeletonSkill::Charge) ||
+                                  (e.species != SpiritCatalog::Stag && !IsSkeletonQ(e) &&
+                                   e.set > 0 && e.slot == 0 &&
                                    e.age < (e.set == 2   ? .18f
                                             : e.set == 4 ? .55f
                                                          : .45f));
@@ -517,8 +525,16 @@ int SkillSet() const
     return captured && controlling ? 1 + SpiritCatalog::Get(capturedSpirit).skillSpecies : 0;
 }
 
-const char* SkillName(int set, int slot) const
+const char* SkillName(int set, int slot, int species = -1) const
 {
+    if (species < 0 && captured && controlling)
+    {
+        species = capturedSpirit;
+    }
+    if (set == 3 && slot == 0 && species == SpiritCatalog::Skeleton)
+    {
+        return "골편 사출";
+    }
     if (set == SpiritCatalog::StagSkills)
     {
         if (slot == 0)
@@ -559,8 +575,16 @@ WorldPoint CursorWorld() const
     return {camera.x + (x + y) * .5, camera.y + (y - x) * .5};
 }
 
-const char* SkillDescription(int set, int slot) const
+const char* SkillDescription(int set, int slot, int species = -1) const
 {
+    if (species < 0 && captured && controlling)
+    {
+        species = capturedSpirit;
+    }
+    if (set == 3 && slot == 0 && species == SpiritCatalog::Skeleton)
+    {
+        return "골편 3개를 전방 280 범위로 사출 · 피해 1.8배 · 일반 적 짧은 경직 / 재사용 5초";
+    }
     if (set == SpiritCatalog::StagSkills)
     {
         if (slot == 0)
@@ -707,6 +731,7 @@ void CastSkill(int slot)
     const int cooldownSet = SkillSet();
     const int set = cooldownSet == SpiritCatalog::StagSkills ? 3 : cooldownSet;
     const bool stagQ = cooldownSet == SpiritCatalog::StagSkills && slot == 0;
+    const bool skeletonQ = controlling && capturedSpirit == SpiritCatalog::Skeleton && slot == 0;
     // Do not reserve unavailable skills for an entire cooldown, even during another cast.
     if (skillTimers[cooldownSet][slot] > .3f)
     {
@@ -739,7 +764,8 @@ void CastSkill(int slot)
         target.x += 1;
         distance = 1;
     }
-    const double reach = stagQ       ? StagSkill::Reach
+    const double reach = skeletonQ   ? SkeletonSkill::Reach
+                         : stagQ     ? StagSkill::Reach
                          : slot == 0 ? (set == 3   ? 175
                                         : set == 2 ? 320
                                                    : 420)
@@ -833,6 +859,12 @@ void CastSkill(int slot)
         effect.nextPulse = set == 3 ? .45f : .55f;
         skillTimers[cooldownSet][slot] = set == 1 ? 5.f : set == 2 ? 7.f : set == 3 ? 8.f : 9.f;
         spiritCastPose = set == 3 ? .8f : .55f;
+        if (skeletonQ)
+        {
+            StartSkeletonQ(effect);
+            skillTimers[cooldownSet][slot] = SkeletonSkill::Cooldown;
+            spiritCastPose = SkeletonSkill::Animation;
+        }
         if (stagQ)
         {
             effect.duration = StagSkill::Duration;
@@ -917,6 +949,7 @@ void CastSkill(int slot)
 #include "PrototypeStagW.inl"
 #include "PrototypeStagE.inl"
 #include "PrototypeStagR.inl"
+#include "PrototypeSkeletonQ.inl"
 #include "PrototypeSpiritSkills.inl"
 #include "PrototypeSpiritEffects.inl"
 

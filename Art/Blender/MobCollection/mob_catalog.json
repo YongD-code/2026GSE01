@@ -479,7 +479,8 @@
         "jump": "MOB_SKELETON_JUMP",
         "turn_left": "MOB_SKELETON_TURN_LEFT",
         "turn_right": "MOB_SKELETON_TURN_RIGHT",
-        "attack": "MOB_SKELETON_ATTACK"
+        "attack": "MOB_SKELETON_ATTACK",
+        "q_shards": "MOB_SKELETON_Q_SHARDS"
       },
       "locomotion": {
         "walkStrideRatio": 0.3625,

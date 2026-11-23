@@ -113,6 +113,9 @@ def export(key):
     prefix = 'NPC_' if npc else 'MOB_'+key.upper()+'_'
 
     def action_for(name):
+        if key == 'skeleton' and name == 'cast':
+            # The fixed eight-slot fallback uses Q's authored pose in the cast slot.
+            return bpy.data.actions['MOB_SKELETON_Q_SHARDS']
         action = bpy.data.actions.get(prefix+name.upper())
         if action:
             return action

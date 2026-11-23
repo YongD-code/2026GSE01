@@ -183,6 +183,9 @@
     <ClInclude Include="LevelOne.h" />
     <ClInclude Include="EaterBoss.h" />
     <ClInclude Include="StagSkill.h" />
+    <ClInclude Include="SkeletonSkill.h" />
+    <ClInclude Include="SkeletonShardMesh.h" />
+    <ClInclude Include="PrototypeSkeletonQ.inl" />
     <ClInclude Include="PrototypeStagQ.inl" />
     <ClInclude Include="PrototypeStagW.inl" />
     <ClInclude Include="PrototypeStagE.inl" />

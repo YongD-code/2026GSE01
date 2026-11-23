@@ -791,6 +791,31 @@ void Prototype::Wisp(int type, WorldPoint position, CharacterModel::State* state
             controlling && PreparingSkill() ? .45f : 1.f - (std::min)(1.f, spiritCastPose / .55f);
     }
     const SkillEffect* stagCast = type == SpiritCatalog::Stag ? StagQCast() : nullptr;
+    const auto* skeletonCast = type == SpiritCatalog::Skeleton ? SkeletonQCast() : nullptr;
+    if (skeletonCast && (skeletonCast->age < SkeletonSkill::Charge || !companionAnimation.moving))
+    {
+        const auto aim = SkeletonQAim(*skeletonCast);
+        castProgress = skeletonCast->age / SkeletonSkill::Animation;
+        if (UsingSpiritModel(type) && DrawKeyedModel(spiritMeshes[type],
+                                                     p,
+                                                     SpiritCatalog::Get(type).size,
+                                                     animation,
+                                                     Color(1, 1, 1),
+                                                     CharacterModel::Motion::Cast,
+                                                     castProgress,
+                                                     state,
+                                                     nullptr,
+                                                     "MOB_SKELETON_Q_SHARDS",
+                                                     &aim))
+        {
+            return;
+        }
+    }
+    else if (skeletonCast)
+    {
+        animation = companionAnimation;
+        castProgress = -1;
+    }
     if (type == SpiritCatalog::Stag)
     {
         for (auto it = skillEffects.rbegin(); it != skillEffects.rend(); ++it)

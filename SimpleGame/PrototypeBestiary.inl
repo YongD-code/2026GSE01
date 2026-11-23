@@ -130,16 +130,21 @@ std::string BestiaryEntryText() const
         const int set =
             species == SpiritCatalog::Stag ? SpiritCatalog::StagSkills : 1 + entry.skillSpecies;
         const char key = "QWER"[bestiarySkill];
-        std::string text = std::string(1, key) + " · " + SkillName(set, bestiarySkill) + "\n\n" +
-                           SkillDescription(set, bestiarySkill);
+        std::string text = std::string(1, key) + " · " + SkillName(set, bestiarySkill, species) +
+                           "\n\n" + SkillDescription(set, bestiarySkill, species);
         if (species == SpiritCatalog::Hound || species == SpiritCatalog::Eater ||
-            species == SpiritCatalog::Skeleton)
+            (species == SpiritCatalog::Skeleton && bestiarySkill != 0))
         {
             text += "\n\n현재 조종 술식은 " +
                     std::string(entry.skillSpecies == SpiritCatalog::Pilgrim ? "목 없는 순례자"
                                 : entry.skillSpecies == SpiritCatalog::Hands ? "기도하는 손"
                                                                              : "남겨진 자") +
                     " 계열을 공유합니다.";
+        }
+        if (species == SpiritCatalog::Skeleton && bestiarySkill == 0)
+        {
+            text += "\n\n각 골편은 처음 닿은 적이나 벽에서 부서집니다. "
+                    "같은 적에게는 한 번만 피해를 줍니다. 보스는 경직되지 않습니다.";
         }
         return text;
     }

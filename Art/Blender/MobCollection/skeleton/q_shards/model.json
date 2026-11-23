@@ -1,0 +1,23 @@
+{
+  "skill": "골편 사출",
+  "axis": "+X",
+  "units": "world",
+  "parts": [
+    {
+      "index": 0,
+      "name": "MOB_SKELETON_Q_SHARD_00",
+      "triangles": 106
+    },
+    {
+      "index": 1,
+      "name": "MOB_SKELETON_Q_SHARD_01",
+      "triangles": 106
+    },
+    {
+      "index": 2,
+      "name": "MOB_SKELETON_Q_SHARD_02",
+      "triangles": 106
+    }
+  ],
+  "triangles": 318
+}

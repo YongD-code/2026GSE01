@@ -16,6 +16,7 @@ CLIPS = {
     'turn_left': (14, False),
     'turn_right': (14, False),
     'attack': (30, False),
+    'q_shards': (24, False),
 }
 STRIDE = {'walk': 1.20, 'run': 1.92}
 
@@ -81,6 +82,51 @@ def stride(phase, distance, duty, lift):
     return distance * (.5 - smooth(step)), lift * math.sin(math.pi * step)**2
 
 
+def shard_arm(rig, t):
+    """Bake a chest gather and palm-first release, with the elbow outside the rib cage."""
+    upper = rig.pose.bones['upper_arm.L']
+    forearm = rig.pose.bones['forearm.L']
+    hand = rig.pose.bones['hand.L']
+    rest = hand.bone.head_local.copy()
+    gather = Vector((.08, -.39, 2.15))
+    release = Vector((.19, -1.02, 2.20))
+    if t <= .30:
+        target = rest.lerp(gather, smooth(t / .30))
+    elif t <= .40:
+        target = gather.lerp(release, smooth((t - .30) / .10))
+    else:
+        target = release.lerp(rest, smooth((t - .49) / .51))
+    hip = upper.head.copy()
+    delta = target - hip
+    axis = delta.normalized()
+    a, b = upper.bone.length, forearm.bone.length
+    reach = max(abs(a - b) + .001, min(a + b - .002, delta.length))
+    along = (a*a - b*b + reach*reach) / (2*reach)
+    pole = Vector((1, -.25, -.35))
+    pole = (pole - axis * pole.dot(axis)).normalized()
+    elbow = hip + axis * along + pole * math.sqrt(max(0., a*a - along*along))
+    end = hip + axis * reach
+    desired = []
+    for bone, start, stop in ((upper, hip, elbow), (forearm, elbow, end)):
+        source = bone.bone
+        rotation = (source.tail_local - source.head_local).rotation_difference(stop - start)
+        desired.append(Matrix.Translation(start) @ rotation.to_matrix().to_4x4() @
+                       source.matrix_local.to_quaternion().to_matrix().to_4x4())
+    amount = curve(t, (0, 0), (.30, .65), (.40, 1), (.54, 1), (1, 0))
+    rotation = Quaternion((1, 0, 0), math.radians(-85 * amount))
+    desired.append(Matrix.Translation(end) @ rotation.to_matrix().to_4x4() @
+                   hand.bone.matrix_local.to_quaternion().to_matrix().to_4x4())
+    parent = upper.parent.matrix.copy()
+    for bone, matrix in zip((upper, forearm, hand), desired):
+        rest_local = bone.parent.bone.matrix_local.inverted() @ bone.bone.matrix_local
+        bone.matrix_basis = rest_local.inverted() @ parent.inverted() @ matrix
+        parent = matrix
+    blend = curve(t, (0,0), (.18,1), (.75,1), (1,0))
+    for bone in (upper, forearm, hand):
+        bone.rotation_quaternion = Quaternion((1, 0, 0, 0)).slerp(bone.rotation_quaternion, blend)
+        bone.location *= blend
+
+
 def pose(rig, clip, t, foot_correction):
     set_pose(rig, 'rest')
     angle = math.tau * t
@@ -134,6 +180,15 @@ def pose(rig, clip, t, foot_correction):
                      0., 0., curve(t, (0,0), (.45,-19), (1,0)))
         clothes = -chest * .7
         charm = curve(t, (0,0), (.36,6), (.54,-20), (.72,8), (1,0))
+    elif clip == 'q_shards':
+        gather = curve(t, (0,0), (.28,1), (.40,.15), (.55,.35), (1,0))
+        hip_z = -.04 - .10 * gather
+        spine = 11 * gather
+        chest = 7 * gather
+        twist = curve(t, (0,0), (.30,12), (.40,-8), (.57,-5), (1,0))
+        neck, jaw = -spine * .5, 3 + 18 * gather
+        arms['R'] = (-14 * gather, 8 * gather, -8 * gather, -22 * gather)
+        clothes, charm = -10 * gather, 12 * gather
     elif clip == 'cast':
         strength = curve(t, (0,0), (.33,1), (.55,.82), (.69,1), (.82,.55), (1,0))
         hip_z = -.04 - .09 * strength
@@ -183,6 +238,9 @@ def pose(rig, clip, t, foot_correction):
         bend(rig, 'upper_arm.' + side, raise_arm, spread, sweep)
         bend(rig, 'forearm.' + side, elbow)
     bpy.context.view_layer.update()
+    if clip == 'q_shards':
+        shard_arm(rig, t)
+        bpy.context.view_layer.update()
     errors = []
     for side, _ in SIDES:
         x, y, z = feet[side]

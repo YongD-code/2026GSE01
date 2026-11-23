@@ -13,6 +13,11 @@ WorldPoint SpiritQPosition(const SkillEffect& effect) const
 
 void UpdateSpiritQ(SkillEffect& effect, float dt)
 {
+    if (IsSkeletonQ(effect))
+    {
+        UpdateSkeletonQ(effect, dt);
+        return;
+    }
     if (IsStagQ(effect))
     {
         UpdateStagQ(effect, dt);

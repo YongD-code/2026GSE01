@@ -8,7 +8,8 @@ FRAMES = HERE.parents[3] / 'tmp' / 'skeleton_motion_review'
 META = json.loads((HERE/'model.json').read_text(encoding='utf-8'))
 CLIPS = META['clips']
 LABELS = {'idle':'대기', 'walk':'걷기', 'run':'달리기', 'cast':'시전',
-          'jump':'점프', 'turn_left':'좌회전', 'turn_right':'우회전', 'attack':'팔 휘두르기'}
+          'jump':'점프', 'turn_left':'좌회전', 'turn_right':'우회전', 'attack':'팔 휘두르기',
+          'q_shards':'골편 사출'}
 
 
 def render():
@@ -58,11 +59,11 @@ def compose():
     background = '#151d23'
     card = '#253239'
     ivory = '#ece0ca'
-    board = Image.new('RGB', (1520, 935), background)
+    board = Image.new('RGB', (1520, 75 + 430 * ((len(CLIPS) + 3) // 4)), background)
     draw = ImageDraw.Draw(board)
     draw.text((23, 18), '해골형 주령 · 게임용 동작', font=title, fill=ivory)
     fractions = {'idle':.27, 'walk':.36, 'run':.40, 'cast':.35,
-                 'jump':.50, 'turn_left':.28, 'turn_right':.66, 'attack':.51}
+                 'jump':.50, 'turn_left':.28, 'turn_right':.66, 'attack':.51, 'q_shards':.40}
     frames = {}
     for index, (key, clip) in enumerate(CLIPS.items()):
         paths = sorted((FRAMES/key).glob('*.png'))
