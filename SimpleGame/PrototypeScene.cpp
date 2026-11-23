@@ -566,10 +566,12 @@ void Prototype::SynchronizeScene()
                  if ((!evidence && StoryPersonVisible(site, at)) ||
                      (evidence && StoryVisible(site) && Distance(player, at) < 130))
                  {
-                     DrawWorldLabel(at,
-                                    evidence ? 40.f : StoryLayout::PersonHeight(site) + 12.f,
-                                    site.name,
-                                    Color(.95f, .9f, .72f));
+                     const float elevation =
+                         site.id == "shrine_gate" || site.id == "shrine_ledger"       ? 96.f
+                         : site.id == "shrine_frame_a" || site.id == "shrine_frame_b" ? 63.f
+                         : evidence                                                   ? 40.f
+                                    : StoryLayout::PersonHeight(site) + 12.f;
+                     DrawWorldLabel(at, elevation, site.name, Color(.95f, .9f, .72f));
                  }
              });
     }
@@ -746,6 +748,17 @@ void Prototype::SynchronizeScene()
                      enemy.phase == LevelOne::SaintSealRecoveryPhase)
             {
                 name += " · 반격 기회";
+            }
+            else if (enemy.boss == StoryEncounter::BellWraith)
+            {
+                if (enemy.weakened)
+                {
+                    name += " · 처분 대기";
+                }
+                else if (levelOne.shrineFrames != 3)
+                {
+                    name += " · 봉인틀 연결";
+                }
             }
             else if (enemy.phase == LevelOne::OrderSealWindupPhase)
             {

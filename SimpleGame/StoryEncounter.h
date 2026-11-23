@@ -10,7 +10,14 @@ constexpr int SaintBoss = 4;
 constexpr int OrderSwordsman = 13;
 constexpr int OrderArcher = 14;
 constexpr int OrderSealer = 15;
-constexpr int MaxId = OrderSealer;
+constexpr int ShrineGuard = 16;
+constexpr int BellWraith = 17;
+constexpr int MaxId = BellWraith;
+
+inline bool ShrineEncounter(int id)
+{
+    return id == ShrineGuard || id == BellWraith;
+}
 
 struct Definition
 {
@@ -40,12 +47,18 @@ inline const Definition& Get(int id)
          {"돌아가지 못한 사람", SpiritCatalog::Forgotten, -1, 88, false},
          {"성흔회 검병", SpiritCatalog::Forgotten, -1, 78, false, 10, 0},
          {"성흔회 궁수", SpiritCatalog::Forgotten, -1, 74, false, 10, 2},
-         {"성흔회 봉인사", SpiritCatalog::Forgotten, -1, 78, false, 10, 2}}};
+         {"성흔회 봉인사", SpiritCatalog::Forgotten, -1, 78, false, 10, 2},
+         {"성흔회 포획기사", SpiritCatalog::Forgotten, -1, 80, false, 10, 0},
+         {"종을 듣는 자", SpiritCatalog::Pilgrim, -1, 104, true, 12}}};
     return definitions[id >= 0 && id < int(definitions.size()) ? id : 0];
 }
 
 inline int AttackType(int id, int species)
 {
+    if (id == BellWraith)
+    {
+        return 3;
+    }
     const int humanAttack = Get(id).humanAttack;
     return humanAttack >= 0 ? humanAttack : SpiritCatalog::Get(species).combatType;
 }

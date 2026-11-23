@@ -476,6 +476,18 @@ bool Prototype::GameUIClick(int x, int y)
     }
     if ((!chapter.choicePending && !levelOne.Dead()) || width < 480 || height < 360)
         return false;
+    if (ShrineChoiceOpen())
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            if (ShrineChoiceButton(i).Contains(x, y))
+            {
+                ChooseShrine(i + 1);
+                break;
+            }
+        }
+        return true;
+    }
     const bool choice = chapter.choicePending;
     const float w = (std::min)(640.f, float(width) - 40), h = 190.f;
     const float left = (width - w) / 2, top = (height - h) / 2;

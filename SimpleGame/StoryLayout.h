@@ -8,6 +8,12 @@ namespace StoryLayout
 {
 constexpr int NpcCount = 8;
 inline constexpr WorldPoint SaintSeal = {3095, 30};
+inline constexpr WorldPoint ShrineGate = {1540, 145};
+inline constexpr WorldPoint ShrineBell = {1450, 225};
+inline constexpr WorldPoint ShrineGuard = {1580, 235};
+inline constexpr WorldPoint ShrineFrameA = {1280, 235};
+inline constexpr WorldPoint ShrineFrameB = {1660, 330};
+inline constexpr WorldPoint ShrineLedger = {1450, 295};
 constexpr double SaintSealInteractRange = 55;
 
 struct OrderGuard
@@ -108,7 +114,24 @@ inline const std::vector<Site>& Sites()
          {2250, -82},
          "C202_MARK",
          ""},
-        {"order_seal_fragment", "부서진 성흔 봉인", Kind::Evidence, {2060, 100}, "C202_SEAL", ""}};
+        {"order_seal_fragment", "부서진 성흔 봉인", Kind::Evidence, {2060, 100}, "C202_SEAL", ""},
+        {"shrine_gate", "숲 사당의 종 문양", Kind::Evidence, ShrineGate, "C203_APPROACH", ""},
+        {"shrine_frame_a", "서쪽 포획 봉인틀", Kind::Evidence, ShrineFrameA, "C203", ""},
+        {"shrine_frame_b", "동쪽 포획 봉인틀", Kind::Evidence, ShrineFrameB, "C203", ""},
+        {"shrine_ledger",
+         "종 받침의 운송 인계표",
+         Kind::Evidence,
+         ShrineLedger,
+         "C203_APPROACH",
+         ""},
+        {"shrine_order",
+         "성흔회 연락병",
+         Kind::Adult,
+         {1680, 210},
+         "C203_RESULT",
+         "",
+         6,
+         {{{0, 6, 3, 6}}, 1.f}}};
     return sites;
 }
 
@@ -145,7 +168,8 @@ inline const std::vector<WorldObject>& Buildings()
                                                        {0, 2740, -260, 185, 125, 125},
                                                        {0, 3060, -300, 260, 150, 160},
                                                        {2, 3090, 95, 24, 24, 80},
-                                                       {2, 3350, 95, 24, 24, 80}};
+                                                       {2, 3350, 95, 24, 24, 80},
+                                                       {0, 1380, 350, 140, 42, 115}};
     return buildings;
 }
 } // namespace StoryLayout

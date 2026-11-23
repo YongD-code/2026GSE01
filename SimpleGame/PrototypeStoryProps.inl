@@ -98,7 +98,7 @@ void Prototype::StoryFacade(const Object& building)
                 r.Line(p(x + 2, 53), p(x + 5, 63), 1, dark);
             }
         }
-        else if (o.x == 3060 || o.x == 1570 || o.x == 940)
+        else if (o.x == 3060 || o.x == 1570 || o.x == 940 || o.x == 1380)
         {
             // Sacred hall: braided entrance rope and folded paper wards.
             for (int i = 0; i < 12; ++i)
@@ -146,7 +146,11 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
     const bool fragmentCollected =
         site.id == "order_seal_fragment" && chapter.step > chapter.Index("C202_SEAL");
     const bool collected =
-        fragmentCollected || (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL"));
+        fragmentCollected || (site.id == "seal" && chapter.step > chapter.Index("P007_SEAL")) ||
+        (site.id == "shrine_gate" && chapter.step > chapter.Index("C203_APPROACH")) ||
+        (site.id == "shrine_frame_a" && (levelOne.shrineFrames & 1)) ||
+        (site.id == "shrine_frame_b" && (levelOne.shrineFrames & 2)) ||
+        (site.id == "shrine_ledger" && chapter.step > chapter.Index("C203_LEDGER"));
     const std::string key = cachePrefix + site.id +
                             (StoryCharacterModel(site.id) ? ":workstation" : "") +
                             (collected ? ":collected" : ":present");
@@ -260,6 +264,60 @@ void Prototype::StoryProp(const StoryLayout::Site& site, WorldPoint at)
             }
             const Point bowl = p(10, 17, 4);
             r.Ellipse(bowl.x, bowl.y, 6, 3, metal);
+        }
+        else if (site.id == "shrine_gate")
+        {
+            for (int i = -1; i <= 1; i += 2)
+            {
+                box(i * 34 - 8, -8, 16, 16, 10, stone);
+                box(i * 34 - 4, -4, 8, 8, 60, red);
+            }
+            line(-48, 0, 68, 48, 0, 68, 7, edge);
+            line(-42, 0, 59, 42, 0, 59, 5, red);
+            line(0, 0, 59, 0, 0, 52, 3, timber);
+            const Point bell = p(0, 0, 43);
+            r.Ellipse(bell.x, bell.y, 9, 11, metal);
+            r.Ellipse(bell.x, bell.y + 8, 12, 3, collected ? stone : Color(.94f, .68f, .28f));
+            lantern(-48, 10);
+            lantern(48, 10);
+        }
+        else if (site.id == "shrine_frame_a" || site.id == "shrine_frame_b")
+        {
+            box(-22, -18, 44, 36, 5, stone);
+            for (int i = -1; i <= 1; i += 2)
+            {
+                line(i * 18, -12, 5, i * 18, -12, collected ? 15 : 48, 5, wood);
+                line(i * 18, 12, 5, i * 18, -12, collected ? 15 : 48, 3, timber);
+            }
+            line(-19, -12, collected ? 15 : 48, 19, -12, collected ? 15 : 48, 4, timber);
+            if (!collected)
+            {
+                for (int i = -1; i <= 1; ++i)
+                {
+                    line(i * 11, -12, 45, i * 11, -12, 24, 5, Color(1.f, .72f, .27f));
+                }
+                line(-18, -12, 32, 18, -12, 32, 2, paper);
+            }
+        }
+        else if (site.id == "shrine_ledger")
+        {
+            box(-24, -18, 48, 36, 8, stone);
+            box(-19, -13, 38, 26, 15, timber);
+            for (int i = -1; i <= 1; i += 2)
+            {
+                box(i * 23 - 3, -13, 6, 6, 66, wood);
+            }
+            line(-27, -10, 66, 27, -10, 66, 6, edge);
+            r.Quad(p(-31, -23, 67), p(0, -14, 81), p(31, -23, 67), p(0, 7, 77), ink);
+            line(0, -10, 66, 0, -10, 55, 3, metal);
+            const Point bronze = p(0, -10, 41);
+            r.Ellipse(bronze.x, bronze.y, 13, 15, Color(.34f, .39f, .29f));
+            r.Ellipse(bronze.x, bronze.y + 11, 18, 5, Color(.54f, .53f, .33f));
+            if (!collected)
+            {
+                sheet(-14, -8, 16, 28, 16);
+                line(-6, -5, 17, 6, 5, 17, 2, red);
+            }
         }
         else if (site.id == "order_barricade")
         {

@@ -15,7 +15,7 @@
 class SaveGame
 {
   public:
-    static constexpr int CurrentVersion = 11;
+    static constexpr int CurrentVersion = 12;
 
     struct State
     {
@@ -229,6 +229,10 @@ class SaveGame
         if (version >= 9)
         {
             a.Field(c.saintSealUnderstood);
+        }
+        if (version >= 12)
+        {
+            a.Fields(l.shrineFrames, l.shrineDisposition, l.shrineCaptureAttempts);
         }
         std::string rng;
         if (!a.reading)
@@ -671,6 +675,10 @@ class SaveGame
                                     l.resolvedBosses.count(StoryEncounter::OrderArcher);
         const int sealerFight = authored.Index("C202");
         const bool defeatedSealer = l.resolvedBosses.count(StoryEncounter::OrderSealer) != 0;
+        const int shrineFight = authored.Index("C203");
+        const int shrineChoice = authored.Index("C203_RESULT");
+        const bool shrineGuardDown = l.resolvedBosses.count(StoryEncounter::ShrineGuard) != 0;
+        const bool shrineBellDown = l.resolvedBosses.count(StoryEncounter::BellWraith) != 0;
         if (authored.quests.empty() || s.story != StoryHash(authored) || !s.tutorials.Valid() ||
             (l.discoveredSpecies & ~Bestiary::KnownSpecies) != 0 || !Point(s.player) ||
             !Point(s.spirit) || !Point(s.keeper) || !Number(s.messageTime, 0, 60) ||
@@ -691,7 +699,15 @@ class SaveGame
             (beforeOrderFight && defeatedGuards != 0) ||
             (c.step > orderFight && defeatedGuards != 2) ||
             (c.step < sealerFight && defeatedSealer) || (c.step > sealerFight && !defeatedSealer) ||
-            (c.choicePending && c.step != authored.Index("P001_WITNESS")))
+            !Number(l.shrineFrames, 0, 3) || !Number(l.shrineDisposition, 0, 3) ||
+            !Number(l.shrineCaptureAttempts, 0, 1000000000) ||
+            (c.step < shrineFight && (l.shrineFrames || shrineGuardDown || shrineBellDown)) ||
+            (c.step > shrineFight && (l.shrineFrames != 3 || !shrineGuardDown)) ||
+            (c.step <= shrineChoice && (l.shrineDisposition || shrineBellDown)) ||
+            (c.step < shrineChoice && l.shrineCaptureAttempts) ||
+            (c.step > shrineChoice && (!l.shrineDisposition || !shrineBellDown)) ||
+            (l.shrineDisposition == 1 && l.shrineCaptureAttempts == 0) ||
+            (c.choicePending && c.step != authored.Index("P001_WITNESS") && c.step != shrineChoice))
         {
             return false;
         }
@@ -757,6 +773,12 @@ class SaveGame
             {
                 if ((!e.weakened && l.resolvedBosses.count(e.boss)) ||
                     (e.boss == StoryEncounter::OrderSealer && c.step < sealerFight) ||
+                    (StoryEncounter::ShrineEncounter(e.boss) && c.step < shrineFight) ||
+                    (e.boss == StoryEncounter::ShrineGuard && c.step > shrineFight) ||
+                    (e.boss == StoryEncounter::BellWraith &&
+                     (c.step > shrineChoice ||
+                      (e.weakened && (l.shrineFrames != 3 || e.remnantTime != -1.f ||
+                                      e.health > e.maximum * .2f + .001f)))) ||
                     (StoryEncounter::Get(e.boss).humanAttack >= 0 &&
                      (beforeOrderFight || e.weakened)) ||
                     (e.saintSealBroken && !c.saintSealUnderstood) || !bosses.insert(e.boss).second)
@@ -775,6 +797,20 @@ class SaveGame
                 }
             }
         }
+        if (c.step == shrineChoice)
+        {
+            const auto bell = std::find_if(l.enemies.begin(),
+                                           l.enemies.end(),
+                                           [](const LevelOne::Enemy& e)
+                                           {
+                                               return e.boss == StoryEncounter::BellWraith &&
+                                                      e.weakened && e.health > 0;
+                                           });
+            if (bell == l.enemies.end())
+            {
+                return false;
+            }
+        }
         for (const auto& item : l.loot)
         {
             if (!Point(item.position) || !Number(item.age, 0, 90))
@@ -790,6 +826,21 @@ class SaveGame
         const auto currentStory = StoryHash(chapter);
         if (candidate.story == currentStory)
         {
+            return true;
+        }
+
+        const int shrineStart = chapter.Index("C203_APPROACH");
+        if (shrineStart == 43 && candidate.story == StoryHash(chapter, shrineStart))
+        {
+            if (candidate.chapter.step > shrineStart)
+            {
+                return false;
+            }
+            candidate.story = currentStory;
+            if (candidate.chapter.step == shrineStart)
+            {
+                candidate.chapter.rewardPending = true;
+            }
             return true;
         }
 

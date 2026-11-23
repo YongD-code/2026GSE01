@@ -309,6 +309,10 @@ class Prototype
         {
             return;
         }
+        if (InteractShrine())
+        {
+            return;
+        }
         const auto* quest = chapter.Current();
         const auto* site = NearbyStory();
         const bool storyObjective = IsStoryObjective(site);
@@ -402,6 +406,12 @@ class Prototype
             return "집에 가야 하는데…. 돌아가는 길이 기억나지 않아….";
         if (site.id == "order_barricade")
             return "성흔회의 깃발 너머로 서쪽 길이 이어진다. 검병과 궁수가 길을 지키고 있다.";
+        if (site.id == "shrine_order")
+        {
+            return levelOne.shrineDisposition == 3
+                       ? "맡겨 준 주령은 봉인해 기록소로 옮기겠다. 지휘관에게도 이 일을 전하겠다."
+                       : "포획기사는 살아 있다. 종 받침의 운송 기록은 지휘관도 찾고 있는 물증이다.";
+        }
         const auto* quest = chapter.Current();
         for (int i = 0; i < chapter.step && i < int(chapter.quests.size()); ++i)
         {
@@ -458,6 +468,10 @@ class Prototype
             return;
         }
         if (UpdateMonasteryEscape(*quest))
+        {
+            return;
+        }
+        if (UpdateShrine(*quest))
         {
             return;
         }
@@ -1117,6 +1131,18 @@ class Prototype
         }
         if (chapter.choicePending && !journal)
         {
+            if (ShrineChoiceOpen())
+            {
+                if (key >= '1' && key <= '4')
+                {
+                    ChooseShrine(key - '0');
+                }
+                else if (key == 't')
+                {
+                    levelOne.selectedTicket = (levelOne.selectedTicket + 1) % 3;
+                }
+                return;
+            }
             if (key == '1' || key == '2')
             {
                 ChooseChildDialogue(key == '1');
@@ -1327,6 +1353,12 @@ class Prototype
     WorldPoint StoryObjectivePosition(const Chapter::Quest& quest) const;
     std::string StoryObjectiveText(const Chapter::Quest& quest) const;
     bool UpdateMonasteryEscape(const Chapter::Quest& quest);
+    bool UpdateShrine(const Chapter::Quest& quest);
+    bool InteractShrine();
+    bool ShrineChoiceOpen() const;
+    bool NearShrineSpirit() const;
+    int ShrineProgress() const;
+    void ChooseShrine(int disposition);
     int DefeatedOrderGuards() const;
     bool CanCompareSaintSeal() const;
     void CompareSaintSeal();

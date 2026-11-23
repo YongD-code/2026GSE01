@@ -40,6 +40,10 @@ const char* CompletedStoryTitle() const
     {
         return "퀘스트 데이터 없음";
     }
+    if (chapter.step > chapter.Index("C203_LEDGER"))
+    {
+        return "숲 사당 조사 완료";
+    }
     if (chapter.step > chapter.Index("C202_SEAL"))
     {
         return "성흔회 봉인사 제압 완료";
@@ -145,7 +149,15 @@ std::vector<std::string> JournalEntries()
         if (chapter.step > chapter.Index("C202_SEAL"))
         {
             add("보관 중인 사건 물증 · 부서진 성흔 봉인");
-            add("다음 목적지 · 숲 사당 / 종을 듣는 자");
+            if (chapter.step <= chapter.Index("C203_RESULT"))
+                add("다음 목적지 · 숲 사당 / 종을 듣는 자");
+            else
+            {
+                const char* results[] = {"미결", "목 없는 순례자 계열 봉인", "정화", "성흔회 인계"};
+                add(std::string("사당 처분 · ") + results[levelOne.shrineDisposition]);
+                if (chapter.step > chapter.Index("C203_LEDGER"))
+                    add("보관 중인 사건 물증 · 종 받침의 운송 인계표 / 성흔회 지휘관 추적");
+            }
         }
         else if (chapter.step > chapter.Index("C202_MARK"))
         {
@@ -593,6 +605,12 @@ void DrawQuestTracker()
         progress = float(defeated) / total;
         counter = std::to_string(defeated) + " / " + std::to_string(total);
     }
+    else if (quest->id == "C203")
+    {
+        const int done = ShrineProgress();
+        progress = done / 4.f;
+        counter = std::to_string(done) + " / 4";
+    }
     else
     {
         const bool encounter = quest->trigger == "fight" || quest->trigger == "first_capture";
@@ -629,6 +647,12 @@ UIRect ChildDialogueButton(int index) const
 {
     const float w = (std::min)(640.f, float(width) - 40);
     return {(width - w) / 2 + 24, (height - 190.f) / 2 + 64 + index * 56, w - 48, 44};
+}
+
+UIRect ShrineChoiceButton(int index) const
+{
+    const float w = (std::min)(640.f, float(width) - 40);
+    return {(width - w) / 2 + 24, (height - 306.f) / 2 + 112 + index * 44, w - 48, 38};
 }
 
 UIRect MessageBounds() const
@@ -796,6 +820,34 @@ void HUD()
     if (chapter.choicePending || levelOne.Dead())
     {
         r.Rect(0, 0, sw, sh, Color(0, 0, 0, .76f));
+        if (ShrineChoiceOpen())
+        {
+            const float w = (std::min)(640.f, sw - 40), x = (sw - w) / 2;
+            const float y = (sh - 306.f) / 2;
+            Panel(x, y, w, 306);
+            r.Text(x + 24, y + 28, "종을 듣는 자 · 잔향의 선택", gold, true);
+            const char* tickets[] = {"낡은 봉인권", "봉인권", "고급 봉인권"};
+            r.Text(x + 24,
+                   y + 53,
+                   std::string("T · ") + tickets[levelOne.selectedTicket] + " " +
+                       std::to_string(levelOne.tickets[levelOne.selectedTicket]) + "장 · 성공 " +
+                       std::to_string(int(levelOne.captureRules.normalChance * 100)) + "%",
+                   ivory);
+            WrappedText(x + 24,
+                        y + 77,
+                        w - 48,
+                        levelOne.notice.empty() ? "모든 선택에서 인계표를 얻을 수 있습니다."
+                                                : levelOne.notice,
+                        ivory,
+                        2);
+            const char* labels[] = {
+                "1  봉인권으로 포획", "2  원념 정화", "3  성흔회에 인계", "4  돌아가기"};
+            for (int i = 0; i < 4; ++i)
+            {
+                UIButton(ShrineChoiceButton(i), labels[i]);
+            }
+            return;
+        }
         const float w = (std::min)(640.f, sw - 40), h = 190.f;
         const float x = (sw - w) / 2, y = (sh - h) / 2;
         Panel(x, y, w, h);
@@ -894,6 +946,11 @@ void HUD()
     {
         heading = nearbyStory->name;
         body = "F · 감금실의 결박 문양과 대조";
+    }
+    else if (!dialoguePending && NearShrineSpirit())
+    {
+        heading = "종을 듣는 자";
+        body = "F · 포획 / 정화 / 성흔회 인계";
     }
     else if (weak >= 0)
     {

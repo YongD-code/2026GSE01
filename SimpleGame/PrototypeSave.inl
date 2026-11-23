@@ -10,8 +10,14 @@ bool CanSaveProgress() const
     for (const auto& shot : levelOne.projectiles)
         if (!shot.residentBattle || Distance(player, shot.position) < 700)
             return false;
+    const auto* quest = chapter.Current();
+    const bool shrineFight = quest && quest->id == "C203";
     for (const auto& enemy : levelOne.enemies)
     {
+        if (shrineFight && StoryEncounter::ShrineEncounter(enemy.boss) && enemy.health > 0)
+        {
+            return false;
+        }
         if (enemy.health > 0 && (enemy.alerted || enemy.returning || enemy.phase != 0) &&
             !enemy.weakened && (enemy.boss != 0 || Distance(player, enemy.position) < 700))
         {
@@ -114,7 +120,10 @@ void RefreshSavedStoryDialogue()
 {
     if (chapter.choicePending)
     {
-        Say("마을 아이", "아이에게 동생의 행방을 물어볼까요?");
+        if (!ShrineChoiceOpen())
+        {
+            Say("마을 아이", "아이에게 동생의 행방을 물어볼까요?");
+        }
         return;
     }
     if (!dialoguePending)
@@ -207,6 +216,32 @@ bool LoadProgress(bool startup = false, int slot = 0)
                                                                               enemy.position.y);
                                                  }),
                                   state.level.enemies.end());
+    }
+    if (state.formatVersion < 12)
+    {
+        // The only added solid footprint is the shrine hall. Preserve old slots
+        // whose player or dormant actor happened to stand where it was built.
+        const auto inNewHall = [](WorldPoint p)
+        {
+            return p.x > 1368 && p.x < 1532 && p.y > 338 && p.y < 404;
+        };
+        if (inNewHall(state.player))
+        {
+            state.player = Population::OpenPoint(state.player, blocked);
+        }
+        if (inNewHall(state.spirit))
+        {
+            state.spirit = Population::OpenPoint(state.spirit, blocked);
+        }
+        for (auto& enemy : state.level.enemies)
+        {
+            if (inNewHall(enemy.position) || inNewHall(enemy.home))
+            {
+                enemy.position = Population::OpenPoint(enemy.position, blocked);
+                enemy.home = enemy.position;
+                enemy.trail.assign(1, enemy.home);
+            }
+        }
     }
     const bool recallSavedCompanion =
         !state.controlling && !state.level.collection.empty() &&

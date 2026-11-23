@@ -354,6 +354,10 @@ class LevelOne
     float skillCooldown = 0;
     int skillsUsed = 0;
     std::set<int> resolvedBosses;
+    // Story encounter state: two dismantled frames and a single final disposition.
+    int shrineFrames = 0;
+    int shrineDisposition = 0; // 0 pending, 1 captured, 2 purified, 3 handed over.
+    int shrineCaptureAttempts = 0;
     // Session-only arena ownership. Snapshots are taken outside active fights.
     int arenaBoss = 0;
 
@@ -364,7 +368,8 @@ class LevelOne
         for (size_t i = 0; i < enemies.size(); ++i)
         {
             const double distance = Distance(player, enemies[i].position);
-            if (enemies[i].health > 0 && enemies[i].weakened && distance < best)
+            if (enemies[i].health > 0 && enemies[i].weakened &&
+                enemies[i].boss != StoryEncounter::BellWraith && distance < best)
             {
                 best = distance;
                 index = static_cast<int>(i);
@@ -503,6 +508,63 @@ class LevelOne
         LegacyRemnant
     };
 
+    Enemy* ShrineActor(int id)
+    {
+        for (auto& enemy : enemies)
+        {
+            if (enemy.boss == id && enemy.health > 0)
+            {
+                return &enemy;
+            }
+        }
+        return nullptr;
+    }
+
+    void RefreshShrineWeakness()
+    {
+        auto* bell = ShrineActor(StoryEncounter::BellWraith);
+        if (bell && !bell->weakened && shrineFrames == 3 && bell->health <= bell->maximum * .2f)
+        {
+            bell->health = bell->maximum * .2f;
+            bell->weakened = true;
+            bell->remnantTime = -1.f;
+            bell->remnantRarity = 3;
+            bell->alerted = bell->returning = false;
+            bell->phase = 0;
+            bell->animation.moving = false;
+        }
+    }
+
+    bool DisposeShrineSpirit(int disposition)
+    {
+        auto* bell = ShrineActor(StoryEncounter::BellWraith);
+        if (!bell || !bell->weakened || shrineDisposition != 0 ||
+            resolvedBosses.count(StoryEncounter::ShrineGuard) == 0 || disposition < 1 ||
+            disposition > 3)
+        {
+            return false;
+        }
+        if (disposition == 1)
+        {
+            if (tickets[selectedTicket] <= 0)
+            {
+                notice = "선택한 봉인권이 없습니다. 다른 봉인권을 선택하세요.";
+                return false;
+            }
+            --tickets[selectedTicket];
+            ++shrineCaptureAttempts;
+            if (Roll() > captureRules.normalChance)
+            {
+                notice = "봉인 실패. 봉인권 1장을 소모했습니다. 다시 선택하세요.";
+                return false;
+            }
+            collection.push_back({SpiritCatalog::Pilgrim, 3, Roll() < .15f});
+        }
+        shrineDisposition = disposition;
+        Resolve(*bell, false);
+        return true;
+    }
+
     void DamageEnemy(Enemy& enemy,
                      float damage,
                      WorldPoint source = {0, 0},
@@ -536,6 +598,17 @@ class LevelOne
         if (enemy.boss == StoryEncounter::SaintBoss && enemy.phase == SaintSealRecoveryPhase)
         {
             damage *= 1.35f;
+        }
+        if (enemy.boss == StoryEncounter::BellWraith)
+        {
+            enemy.health = (std::max)(enemy.maximum * .2f, enemy.health - damage);
+            enemy.alerted = true;
+            if (feedback)
+            {
+                enemy.flash = .15f;
+            }
+            RefreshShrineWeakness();
+            return;
         }
         enemy.health -= enemy.boss == 12 ? .05f : damage;
         if (enemy.boss == 12)
@@ -661,6 +734,14 @@ class LevelOne
         else if (id == StoryEncounter::OrderSealer)
         {
             enemy.maximum = 155.f;
+        }
+        else if (id == StoryEncounter::ShrineGuard)
+        {
+            enemy.maximum = 165.f;
+        }
+        else if (id == StoryEncounter::BellWraith)
+        {
+            enemy.maximum = 280.f;
         }
         enemy.health = enemy.maximum;
         enemies.push_back(enemy);
@@ -893,24 +974,26 @@ class LevelOne
     void SanitizeFieldEncounters()
     {
         bool removed = false;
-        enemies.erase(std::remove_if(enemies.begin(),
-                                     enemies.end(),
-                                     [&](const Enemy& enemy)
-                                     {
-                                         if (enemy.boss != 0 ||
-                                             (!SpiritCatalog::Get(enemy.type).bossOnly &&
-                                              !World::CemeteryReserved(enemy.position)))
-                                         {
-                                             return false;
-                                         }
-                                         if (enemy.slot >= 0 && enemy.slot < 4 && !enemy.weakened)
-                                         {
-                                             camps[enemy.camp].health[enemy.slot] = -1;
-                                         }
-                                         removed = true;
-                                         return true;
-                                     }),
-                      enemies.end());
+        enemies.erase(
+            std::remove_if(enemies.begin(),
+                           enemies.end(),
+                           [&](const Enemy& enemy)
+                           {
+                               if (enemy.boss != 0 ||
+                                   (!SpiritCatalog::Get(enemy.type).bossOnly &&
+                                    !World::CemeteryReserved(enemy.position) &&
+                                    (enemy.weakened || !World::ShrineReserved(enemy.home, 64))))
+                               {
+                                   return false;
+                               }
+                               if (enemy.slot >= 0 && enemy.slot < 4 && !enemy.weakened)
+                               {
+                                   camps[enemy.camp].health[enemy.slot] = -1;
+                               }
+                               removed = true;
+                               return true;
+                           }),
+            enemies.end());
         if (removed)
         {
             regionLoaded = false;
@@ -997,7 +1080,8 @@ class LevelOne
                     const int quadrant = (slot + int((hash >> 8) % 4)) % 4;
                     home = {baseX + 60 + (quadrant % 2) * 256 + double(placement % 120),
                             baseY + 60 + (quadrant / 2) * 256 + double((placement >> 16) % 120)};
-                    if (World::Settlement(home.x, home.y) || World::CemeteryReserved(home, 64))
+                    if (World::Settlement(home.x, home.y) || World::CemeteryReserved(home, 64) ||
+                        World::ShrineReserved(home, 64))
                     {
                         continue;
                     }
@@ -1079,6 +1163,96 @@ class LevelOne
         enemy.phaseTime = OrderSealWindup;
         enemy.orderSealCooldown = 8.f;
         return true;
+    }
+
+    template <class Collision>
+    void AttackShrine(
+        Enemy& enemy, WorldPoint target, WorldPoint player, float dt, Collision blocked)
+    {
+        const bool bell = enemy.boss == StoryEncounter::BellWraith;
+        const auto melee = MeleeFor(enemy.type);
+        enemy.stagger = (std::max)(0.f, enemy.stagger - dt);
+        if (enemy.stagger > 0)
+        {
+            return;
+        }
+        enemy.phaseTime -= dt;
+        if (enemy.phase == 3)
+        {
+            if (enemy.phaseTime <= 0)
+            {
+                enemy.phase = 0;
+            }
+            return;
+        }
+        const auto inHit = [&](WorldPoint at)
+        {
+            if (!ClearLine(enemy.position, at, blocked))
+            {
+                return false;
+            }
+            if (bell)
+            {
+                return Distance(at, enemy.ritualTarget) < combat.saintRadius;
+            }
+            const double distance = Distance(enemy.position, at);
+            return distance < melee.reach &&
+                   ((at.x - enemy.position.x) * enemy.aim.x +
+                    (at.y - enemy.position.y) * enemy.aim.y) >= distance * melee.facingDot;
+        };
+        if (enemy.phase == 1)
+        {
+            if (enemy.phaseTime > 0)
+            {
+                return;
+            }
+            const float damage = bell ? combat.rangedDamage * 1.35f : combat.meleeDamage;
+            if (inHit(player))
+            {
+                Hurt(damage);
+            }
+            auto* rival =
+                ShrineActor(bell ? StoryEncounter::ShrineGuard : StoryEncounter::BellWraith);
+            if (rival && !rival->weakened && inHit(rival->position))
+            {
+                // Rival attacks are real hits, but cannot finish the player's objective alone.
+                const float allowed = (std::max)(0.f, rival->health - rival->maximum * .25f);
+                if (allowed > 0)
+                {
+                    DamageEnemy(*rival,
+                                (std::min)(allowed, damage),
+                                enemy.position,
+                                false,
+                                false,
+                                DamageSource::Resident);
+                    rival->flash = .15f;
+                }
+            }
+            enemy.phase = 3;
+            enemy.phaseTime = bell ? combat.saintRecovery : melee.recovery;
+            return;
+        }
+        const double distance = Distance(enemy.position, target);
+        const double range = bell ? 240. : melee.triggerDistance;
+        if (distance < range && ClearLine(enemy.position, target, blocked))
+        {
+            const double length = (std::max)(.001, distance);
+            enemy.aim = {(target.x - enemy.position.x) / length,
+                         (target.y - enemy.position.y) / length};
+            enemy.ritualTarget = target;
+            enemy.phase = 1;
+            enemy.phaseTime = bell ? combat.saintWindup : melee.windup;
+        }
+        else if (distance > (bell ? 180. : melee.approachStop))
+        {
+            const double step = (std::min)(distance - (bell ? 180. : melee.approachStop),
+                                           double(55.f * dt * EnemyMovementFactor(enemy)));
+            Move(enemy.position,
+                 {(target.x - enemy.position.x) / distance * step,
+                  (target.y - enemy.position.y) / distance * step},
+                 blocked,
+                 &enemy.trail);
+        }
     }
 
     template <class Collision>
@@ -1528,11 +1702,34 @@ class LevelOne
             {
                 enemyTarget = residentCombatants[damageResident].position;
             }
+            const bool shrine = StoryEncounter::ShrineEncounter(enemy.boss);
+            if (shrine)
+            {
+                if (!World::ShrineReserved(combatTarget, 120))
+                {
+                    enemy.alerted = false;
+                    enemy.phase = 0;
+                    enemy.animation.moving = false;
+                    continue;
+                }
+                auto* rival = ShrineActor(enemy.boss == StoryEncounter::BellWraith
+                                              ? StoryEncounter::ShrineGuard
+                                              : StoryEncounter::BellWraith);
+                if (rival && !rival->weakened &&
+                    Distance(enemy.position, rival->position) <
+                        Distance(enemy.position, combatTarget) &&
+                    ClearLine(enemy.position, rival->position, blocked))
+                {
+                    enemyTarget = rival->position;
+                }
+                enemy.alerted = true;
+                enemy.returning = false;
+            }
             const double distance = Distance(enemyTarget, enemy.position);
             if (!enemy.returning && !enemy.alerted && distance < combat.aggro &&
                 ClearLine(enemy.position, enemyTarget, blocked))
                 enemy.alerted = true;
-            if (enemy.alerted && (arenaBoss == 0 || enemy.boss != arenaBoss) &&
+            if (!shrine && enemy.alerted && (arenaBoss == 0 || enemy.boss != arenaBoss) &&
                 OutsidePursuit(enemy, enemyTarget))
             {
                 enemy.alerted = false;
@@ -1576,7 +1773,16 @@ class LevelOne
 
             const size_t previousProjectiles = projectiles.size();
             if (enemy.alerted)
-                AttackEnemy(enemy, enemyTarget, enemyDt, blocked, companion, equipped);
+            {
+                if (shrine)
+                {
+                    AttackShrine(enemy, enemyTarget, combatTarget, enemyDt, blocked);
+                }
+                else
+                {
+                    AttackEnemy(enemy, enemyTarget, enemyDt, blocked, companion, equipped);
+                }
+            }
             if (damageResident >= 0)
                 for (size_t i = previousProjectiles; i < projectiles.size(); ++i)
                     projectiles[i].residentBattle = true;
@@ -1595,7 +1801,7 @@ class LevelOne
             {
                 const WorldPoint direction =
                     (enemy.phase == OrderSealWindupPhase ||
-                     SpiritCatalog::Get(enemy.type).combatType == 3)
+                     StoryEncounter::AttackType(enemy.boss, enemy.type) == 3)
                         ? WorldPoint{enemy.ritualTarget.x - enemy.position.x,
                                      enemy.ritualTarget.y - enemy.position.y}
                         : enemy.aim;

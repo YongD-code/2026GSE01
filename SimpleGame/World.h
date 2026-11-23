@@ -47,6 +47,12 @@ class World
         return p.x >= b.x - margin && p.x <= b.x + b.w + margin && p.y >= b.y - margin &&
                p.y <= b.y + b.d + margin;
     }
+
+    static bool ShrineReserved(WorldPoint p, double margin = 0)
+    {
+        return p.x >= 1240 - margin && p.x <= 1720 + margin && p.y >= 100 - margin &&
+               p.y <= 400 + margin;
+    }
     using Coordinate = std::int64_t;
     using Key = std::pair<Coordinate, Coordinate>;
 

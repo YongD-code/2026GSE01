@@ -18,6 +18,34 @@ WorldPoint Prototype::StoryPosition(const StoryLayout::Site& site) const
 
 WorldPoint Prototype::StoryObjectivePosition(const Chapter::Quest& quest) const
 {
+    if (quest.id == "C203")
+    {
+        if (!(levelOne.shrineFrames & 1))
+        {
+            return StoryLayout::ShrineFrameA;
+        }
+        if (!(levelOne.shrineFrames & 2))
+        {
+            return StoryLayout::ShrineFrameB;
+        }
+        for (const auto& enemy : levelOne.enemies)
+        {
+            if (enemy.boss == StoryEncounter::ShrineGuard && enemy.health > 0)
+            {
+                return enemy.position;
+            }
+        }
+    }
+    if (quest.id == "C203" || quest.id == "C203_RESULT")
+    {
+        for (const auto& enemy : levelOne.enemies)
+        {
+            if (enemy.boss == StoryEncounter::BellWraith && enemy.health > 0)
+            {
+                return enemy.position;
+            }
+        }
+    }
     if (quest.id == "P007")
     {
         return cemeteryEngaged ? CemeteryRoom::Boss() : CemeteryRoom::Gate();
@@ -45,6 +73,26 @@ WorldPoint Prototype::StoryObjectivePosition(const Chapter::Quest& quest) const
 
 std::string Prototype::StoryObjectiveText(const Chapter::Quest& quest) const
 {
+    if (quest.id == "C203")
+    {
+        if (!(levelOne.shrineFrames & 1))
+        {
+            return "서쪽 금빛 봉인틀에서 F로 연결 끊기";
+        }
+        if (!(levelOne.shrineFrames & 2))
+        {
+            return "동쪽 금빛 봉인틀에서 F로 연결 끊기";
+        }
+        if (!levelOne.resolvedBosses.count(StoryEncounter::ShrineGuard))
+        {
+            return "성흔회 포획기사 제압하기";
+        }
+        return "종을 듣는 자의 체력을 20% 이하로 낮추기";
+    }
+    if (quest.id == "C203_RESULT" && controlling)
+    {
+        return "B로 본체에 돌아와 종 주령 가까이에서 F";
+    }
     if (quest.id == "P007")
     {
         return cemeteryEngaged ? "묘역 안의 울음 먹는 자를 격파하기"
@@ -120,6 +168,150 @@ bool Prototype::UpdateMonasteryEscape(const Chapter::Quest& quest)
         }
     }
     return true;
+}
+
+int Prototype::ShrineProgress() const
+{
+    int progress = (levelOne.shrineFrames & 1 ? 1 : 0) + (levelOne.shrineFrames & 2 ? 1 : 0);
+    progress += levelOne.resolvedBosses.count(StoryEncounter::ShrineGuard) != 0;
+    for (const auto& enemy : levelOne.enemies)
+    {
+        if (enemy.boss == StoryEncounter::BellWraith && enemy.weakened && enemy.health > 0)
+        {
+            ++progress;
+        }
+    }
+    return progress;
+}
+
+bool Prototype::UpdateShrine(const Chapter::Quest& quest)
+{
+    if (quest.id == "C203_RESULT" || quest.id == "C203_LEDGER")
+    {
+        chapter.rewardPending = false;
+        return true;
+    }
+    if (quest.id != "C203")
+    {
+        return false;
+    }
+    if (chapter.rewardPending)
+    {
+        chapter.rewardPending = false;
+        // A safe snapshot immediately before the authored actors enter combat.
+        // If disk saving fails, the existing slot is preserved.
+        SaveProgress(false);
+    }
+    if (Distance(player, StoryLayout::ShrineBell) < 300)
+    {
+        // Reuse the authored encounter actors. No periodic wave spawning.
+        auto blocked = [this](WorldPoint p)
+        {
+            return Blocked(p);
+        };
+        levelOne.EnsureBoss(
+            StoryEncounter::BellWraith, StoryLayout::ShrineBell, StoryLayout::ShrineGate, blocked);
+        levelOne.EnsureBoss(StoryEncounter::ShrineGuard,
+                            StoryLayout::ShrineGuard,
+                            StoryLayout::ShrineGate,
+                            blocked);
+    }
+    levelOne.RefreshShrineWeakness();
+    if (ShrineProgress() == 4)
+    {
+        AdvanceChapter();
+        Say("잔향의 선택",
+            "포획기사가 쓰러지고 종소리가 멎었다. 주령 가까이에서 F로 처분을 정하자.");
+        autoSaveTime = 30;
+    }
+    return true;
+}
+
+bool Prototype::ShrineChoiceOpen() const
+{
+    const auto* quest = chapter.Current();
+    return chapter.choicePending && quest && quest->id == "C203_RESULT";
+}
+
+bool Prototype::NearShrineSpirit() const
+{
+    const auto* quest = chapter.Current();
+    if (controlling || !quest || quest->id != "C203_RESULT")
+    {
+        return false;
+    }
+    for (const auto& enemy : levelOne.enemies)
+    {
+        if (enemy.boss == StoryEncounter::BellWraith && enemy.weakened && enemy.health > 0 &&
+            Distance(player, enemy.position) < 110)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Prototype::InteractShrine()
+{
+    const auto* quest = chapter.Current();
+    if (!quest || controlling)
+    {
+        return false;
+    }
+    if (quest->id == "C203")
+    {
+        const WorldPoint frames[] = {StoryLayout::ShrineFrameA, StoryLayout::ShrineFrameB};
+        for (int i = 0; i < 2; ++i)
+        {
+            if (Distance(player, frames[i]) < 62 && !(levelOne.shrineFrames & (1 << i)))
+            {
+                levelOne.shrineFrames |= 1 << i;
+                levelOne.RefreshShrineWeakness();
+                Say("포획 봉인틀",
+                    levelOne.shrineFrames == 3 ? "두 연결이 끊겼다. 종 주령을 약화할 수 있다."
+                                               : "연결 하나가 끊겼다. 다른 봉인틀도 해체하자.");
+                return true;
+            }
+        }
+    }
+    if (NearShrineSpirit())
+    {
+        ClearInput();
+        levelOne.notice.clear();
+        chapter.choicePending = true;
+        return true;
+    }
+    return false;
+}
+
+void Prototype::ChooseShrine(int disposition)
+{
+    if (!ShrineChoiceOpen())
+    {
+        return;
+    }
+    if (disposition == 4)
+    {
+        chapter.choicePending = false;
+        levelOne.notice.clear();
+        ClearInput();
+        return;
+    }
+    if (!NearShrineSpirit() || !levelOne.DisposeShrineSpirit(disposition))
+    {
+        return;
+    }
+    chapter.choicePending = false;
+    ClearInput();
+    levelOne.notice.clear();
+    const char* results[] = {"",
+                             "종 주령을 봉인했다. 도감의 목 없는 순례자 개체 기록에서 확인하자.",
+                             "종에 묶인 원념을 풀어 주령을 정화했다.",
+                             "성흔회 연락병에게 주령의 봉인을 인계했다."};
+    Say("잔향의 결말", std::string(results[disposition]) + " 종 받침에 남은 인계표를 조사하자.");
+    dialoguePending = true;
+    AdvanceChapter();
+    autoSaveTime = 30;
 }
 
 bool Prototype::CanCompareSaintSeal() const
